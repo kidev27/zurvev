@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 
 import { ZombieWaveIntermissionTime } from "../../server/src/game/specOpsManager.ts";
 import { WeaponManager } from "../../server/src/game/weaponManager.ts";
@@ -758,7 +759,7 @@ test("Mystery Box charges once, synchronizes its roll, and replaces the held gun
     let preview = game.lootBarn.loots.find((loot) => loot.mysteryBoxId === box.__id)!;
     expect(preview.mysteryBoxLocked).toBe(true);
     // The cycling preview is any box gun, or the Ray Gun flashing by as a tease.
-    expect([...ZombieMysteryBoxWeapons, ZombieRayGun.type]).toContain(preview.type);
+    expect([...ZombieMysteryBoxWeapons, ...ZombieWonderWeapons.map((weapon) => weapon.type)]).toContain(preview.type);
 
     const teammateCash = teammate.specOpsCash;
     box.interact(teammate);
@@ -917,8 +918,9 @@ test("Ray Gun: box odds follow ZombieRayGun.boxChance, other 22 guns share the r
     expect(ZombieMysteryBoxWeapons).toHaveLength(22);
     expect(ops.rollMysteryBoxResult(a, 0)).toBe(ZombieRayGun.type);
     expect(ops.rollMysteryBoxResult(a, chance * 0.99)).toBe(ZombieRayGun.type);
+    const allWonderChance = ZombieWonderWeapons.reduce((sum, weapon) => sum + weapon.chance, 0);
     for (let i = 0; i < 50; i++) {
-        const result = ops.rollMysteryBoxResult(a, chance + (i / 50) * (1 - chance));
+        const result = ops.rollMysteryBoxResult(a, allWonderChance + (i / 50) * (1 - allWonderChance));
         expect(ZombieMysteryBoxWeapons).toContain(result);
     }
     let hits = 0;
@@ -1214,7 +1216,8 @@ test("Ray Gun: legendary ring on the floor and it flashes by in the box cycle", 
     }
     expect(seen.has(ZombieRayGun.type)).toBe(true);
     for (const gun of ZombieMysteryBoxWeapons) expect(seen.has(gun), gun).toBe(true);
-    expect(seen.size).toBe(ZombieMysteryBoxWeapons.length + 1);
+    for (const weapon of ZombieWonderWeapons) expect(seen.has(weapon.type), weapon.type).toBe(true);
+    expect(seen.size).toBe(ZombieMysteryBoxWeapons.length + ZombieWonderWeapons.length);
 });
 
 test("Ray Gun: the box reveal plays the legendary burst", () => {
@@ -1303,7 +1306,7 @@ test("Pack-a-Punch: Mark II tracers are visual only (same damage, speed, range)"
         const pellets = gun.bulletCount > 1;
         expect(!!bullet.sparkTrail, base).toBe(!pellets);
         expect(!!bullet.tracerCore, base).toBe(!pellets);
-        expect(bullet.glowColor, base).toBeUndefined();
+        expect(bullet.glowColor, base).toBe(orig.glowColor);
     }
     expect(GameConfig.tracerColors.pap).toBeDefined();
 });
@@ -1378,13 +1381,17 @@ test("Pack-a-Punch specials: table is valid and only listed guns change behaviou
                 expect(mk2.fireDelay, base).toBe(gun.fireDelay);
                 expect(mk2.variableFireRate, base).toBeUndefined();
         }
-        if (special?.kind !== "pierce") expect(bullet.pierce, base).toBeUndefined();
-        if (special?.kind !== "chain") expect(bullet.chain, base).toBeUndefined();
+        if (special?.kind !== "pierce") {
+            expect(bullet.pierce, base).toEqual(GameObjectDefs.typeToDef(gun.bulletType, "bullet").pierce);
+        }
+        if (special?.kind !== "chain") {
+            expect(bullet.chain, base).toEqual(GameObjectDefs.typeToDef(gun.bulletType, "bullet").chain);
+        }
         // The shared Mark II bullet never carries a gun's special.
         const shared = GameObjectDefs.typeToDefSafe(packAPunchBulletType(gun.bulletType));
         if (shared?.type === "bullet") {
-            expect(shared.pierce, base).toBeUndefined();
-            expect(shared.chain, base).toBeUndefined();
+            expect(shared.pierce, base).toEqual(GameObjectDefs.typeToDef(gun.bulletType, "bullet").pierce);
+            expect(shared.chain, base).toEqual(GameObjectDefs.typeToDef(gun.bulletType, "bullet").chain);
         }
     }
     const arc = GameObjectDefs.typeToDef(ZombiePackAPunchArcBullet, "bullet");

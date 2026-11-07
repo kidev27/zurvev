@@ -380,6 +380,8 @@ export const GameConfig = {
             chambered: 0xb48cff,
             apSaturated: 0x7a4bdf,
         },
+        pressure: { regular: 0xe8e1c8, saturated: 0xe8e1c8, chambered: 0xe8e1c8, apSaturated: 0xe8e1c8 },
+        tesla: { regular: 0x75e4ff, saturated: 0x75e4ff, chambered: 0xc6f7ff, apSaturated: 0x75e4ff },
         raygun: {
             regular: 0x7dff6b,
             saturated: 0x4fe63a,

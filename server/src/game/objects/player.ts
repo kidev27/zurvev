@@ -27,6 +27,7 @@ import {
     SpecOpsReviveHealth,
     SpecOpsReviveImmunity,
 } from "../../../../shared/defs/maps/specOpsShop.ts";
+import { packAPunchBaseType } from "../../../../shared/defs/maps/zombiePackAPunch.ts";
 import { isZombiePowerUpType, type ZombiePowerUpTimers } from "../../../../shared/defs/maps/zombiePowerUps.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../../shared/defs/register.ts";
 import {
@@ -56,12 +57,12 @@ import { InventoryManager } from "../inventoryManager.ts";
 import { QuestManager } from "../questManager.ts";
 import { NoOpSocket } from "../socket.ts";
 import { WeaponManager } from "../weaponManager.ts";
+import { ZombieEconomy } from "../zombieMode.ts";
 import type { Building } from "./building.ts";
 import { BaseGameObject, type DamageParams, type GameObject } from "./gameObject.ts";
 import type { Loot } from "./loot.ts";
 import type { MapIndicator } from "./mapIndicator.ts";
 import type { Obstacle } from "./obstacle.ts";
-import { ZombieEconomy } from "../zombieMode.ts";
 
 type MoveObjsMode = {
     enabled: boolean;
@@ -4226,8 +4227,9 @@ export class Player extends BaseGameObject {
 
     /** True if either gun slot holds this wonder weapon. */
     hasWonderWeapon(type: string): boolean {
-        return this.weapons[GameConfig.WeaponSlot.Primary].type === type
-            || this.weapons[GameConfig.WeaponSlot.Secondary].type === type;
+        const base = packAPunchBaseType(type);
+        return packAPunchBaseType(this.weapons[GameConfig.WeaponSlot.Primary].type) === base
+            || packAPunchBaseType(this.weapons[GameConfig.WeaponSlot.Secondary].type) === base;
     }
 
     pickupTicker = 0;

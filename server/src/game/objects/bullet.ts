@@ -649,7 +649,7 @@ export class Bullet {
             } else if (col.type == "player") {
                 // Remembered so on-hit splash (Ray Gun) doesn't hit the same target twice.
                 this.damagedObjIds.add(col.player!.__id);
-                if (!shooterDead) {
+                if (!shooterDead && this.damage > 0) {
                     const isHighValueTarget = this.player?.hasPerk("targeting") && col.player!.perks.length;
 
                     let multiplier = 1;

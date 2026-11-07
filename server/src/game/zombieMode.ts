@@ -1,5 +1,6 @@
 import { type SpecOpsDifficulty, specOpsDifficultyMods } from "../../../shared/defs/maps/specOpsShop.ts";
 import { ZombiePackAPunchStats } from "../../../shared/defs/maps/zombiePackAPunch.ts";
+import { ZombieWonderWeapons } from "../../../shared/defs/maps/zombieWonderWeapons.ts";
 
 /**
  * Zombie Survival content lives separately from the legacy Spec Ops roster.
@@ -128,7 +129,7 @@ export const ZombieMaxAmmoThrowables: readonly string[] = ["frag", "mirv"];
  */
 export const ZombieRayGun = {
     type: "raygun",
-    boxChance: 0.04,
+    boxChance: ZombieWonderWeapons[0].chance,
     /** Splash (explosion_raygun) falls from damage at rad.min to this fraction at rad.max. */
     splashEdgeMult: 0.5,
     /** Flat damage to the shooter when caught in their own splash. */

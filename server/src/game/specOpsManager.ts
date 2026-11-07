@@ -1,11 +1,6 @@
-import { survivalLayout } from "../../../shared/defs/maps/survival/index.ts";
-import { toLocal as survivalToLocal } from "../../../shared/defs/maps/survival/layout.ts";
 import { type BulletDef, BulletDefs } from "../../../shared/defs/gameObjects/bulletDefs.ts";
 import { type GunDef, GunDefs } from "../../../shared/defs/gameObjects/gunDefs.ts";
-import {
-    LastCallPlayerSpawns,
-    lastCallToLocal,
-} from "../../../shared/defs/maps/lastCallLayout.ts";
+import { LastCallPlayerSpawns, lastCallToLocal } from "../../../shared/defs/maps/lastCallLayout.ts";
 import { SpecOpsEnemyClasses } from "../../../shared/defs/maps/specOpsNpcDebug.ts";
 import {
     isSpecOpsArmorSatchel,
@@ -73,6 +68,9 @@ import {
     specOpsUnequipPerk,
     specOpsWaveBonus,
 } from "../../../shared/defs/maps/specOpsShop.ts";
+import { survivalLayout } from "../../../shared/defs/maps/survival/index.ts";
+import { toLocal as survivalToLocal } from "../../../shared/defs/maps/survival/layout.ts";
+import { packAPunchBaseType } from "../../../shared/defs/maps/zombiePackAPunch.ts";
 import {
     packAPunchArtOffset,
     packAPunchUpgradeFor,
@@ -88,11 +86,12 @@ import {
     ZombieNukeCash,
     ZombieNukeHealthFraction,
     ZombiePowerUpDrops,
-    ZombiePowerUpTypes,
     type ZombiePowerUpTimers,
     type ZombiePowerUpType,
+    ZombiePowerUpTypes,
     ZombieTimedPowerUpDuration,
 } from "../../../shared/defs/maps/zombiePowerUps.ts";
+import { ZombiePressureBlast, ZombieWonderWeapons } from "../../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
 import type { ObstacleDef } from "../../../shared/defs/types/obstacle.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../../shared/gameConfig.ts";
@@ -138,17 +137,17 @@ import {
     isZombieClass,
     zombieBuyGateCost,
     type ZombieClass,
-    zombieEnemyHealth,
     ZombieEconomy,
+    zombieEnemyHealth,
     ZombieKillBounty,
     ZombieLoadouts,
+    ZombieMaxAmmoThrowables,
     ZombieMysteryBoxClaimDuration,
     ZombieMysteryBoxCooldown,
     ZombieMysteryBoxCost,
     ZombieMysteryBoxCycleInterval,
     ZombieMysteryBoxRelocateUses,
     ZombieMysteryBoxRollDuration,
-    ZombieMaxAmmoThrowables,
     ZombieMysteryBoxWeapons,
     ZombieRayGun,
     ZombieUpgradeCost,
@@ -4836,7 +4835,13 @@ class AiBrain {
                     // at the target rather than treating that farther wall as a detour.
                     const authoredZombieCharge = zombieMelee && directClear && sameFloor
                         && !!survivalLayout(player.game.config.mapName)
-                        && lastCallWalkable(player.game, player.pos, target.pos, player.rad, navGroundLayer(player.layer));
+                        && lastCallWalkable(
+                            player.game,
+                            player.pos,
+                            target.pos,
+                            player.rad,
+                            navGroundLayer(player.layer),
+                        );
                     player.touchMoveDir = assaultDirect || zombieGraphRoute || authoredZombieCharge
                         ? v2.normalizeSafe(move)
                         : steerAroundWalls(
@@ -6036,10 +6041,9 @@ export class SpecOpsManager implements PracticeHost {
      * earns a drop) and roll the per-kill chance. Drops land on this zombie.
      */
     onZombieKilledForDrops(victim: Player, cash: number, rand = Math.random()): void {
-        
-        //Check if it is zombie mode, if it is specops type, stop and return here
+        // Check if it is zombie mode, if it is specops type, stop and return here
         if (!this.zombieMode || victim.specOpsKind !== "enemy") return;
-        
+
         const scale = this.zombieRoundDropScale;
         let earned = 0;
 
@@ -6052,13 +6056,13 @@ export class SpecOpsManager implements PracticeHost {
                 earned++;
             }
         }
-        
+
         if (rand < ZombiePowerUpDrops.killChance / scale) earned++;
-        
-        //todo: add wave balancing for later rounds 
+
+        // todo: add wave balancing for later rounds
         // -> round 35: 0.02 -> 0.015
         // -> round 50+: -> 0.015 -> 0.01
-        
+
         const owed = earned + this.zombiePendingDrops;
         if (!owed) return;
 
@@ -6114,22 +6118,29 @@ export class SpecOpsManager implements PracticeHost {
 
     /**
      * Gun shown while the box cycles. Cosmetic only (the result is picked at roll
-     * start), so the Ray Gun can flash by as a tease, like BO2.
+     * start), so every wonder weapon can flash by as a tease.
      */
     private pickMysteryBoxWeapon(previous = ""): string {
-        const pool = ZombieMysteryBoxWeapons;
+        const pool: readonly string[] = [
+            ...ZombieMysteryBoxWeapons,
+            ...ZombieWonderWeapons.map((weapon) => weapon.type),
+        ];
         let weapon = previous;
         while (weapon === previous) {
-            const idx = Math.floor(util.random(0, pool.length + 1));
-            weapon = idx >= pool.length ? ZombieRayGun.type : pool[idx];
+            weapon = pool[Math.floor(util.random(0, pool.length))];
         }
         return weapon;
     }
 
-    /** The roll's real result: Ray Gun at boxChance if eligible, else an even pick of the rest. */
+    /** Each wonder weapon has its own fixed interval; the remaining rolls use ordinary guns. */
     rollMysteryBoxResult(player: Player, rand = Math.random()): string {
-        if (rand < ZombieRayGun.boxChance && this.canGetWonderWeapon(player, ZombieRayGun.type)) {
-            return ZombieRayGun.type;
+        let threshold = 0;
+        for (const weapon of ZombieWonderWeapons) {
+            threshold += weapon.chance;
+            if (rand < threshold) {
+                if (this.canGetWonderWeapon(player, weapon.type)) return weapon.type;
+                break;
+            }
         }
         const pool = ZombieMysteryBoxWeapons;
         return pool[Math.floor(util.random(0, pool.length))];
@@ -6137,11 +6148,15 @@ export class SpecOpsManager implements PracticeHost {
 
     /** Not holding one, and no copy they dropped is still on the floor. */
     canGetWonderWeapon(player: Player, type: string): boolean {
+        type = packAPunchBaseType(type);
         if (player.hasWonderWeapon(type)) return false;
+        if (this.packAPunchState?.ownerId === player.__id && packAPunchBaseType(this.packAPunchState.result) === type) {
+            return false;
+        }
         const loots = this.game.lootBarn.loots;
         for (let i = 0; i < loots.length; i++) {
             const loot = loots[i];
-            if (!loot.destroyed && loot.type === type && loot.droppedById === player.__id) {
+            if (!loot.destroyed && packAPunchBaseType(loot.type) === type && loot.droppedById === player.__id) {
                 return false;
             }
         }
@@ -6332,6 +6347,60 @@ export class SpecOpsManager implements PracticeHost {
         brain.stunTimer = Math.max(brain.stunTimer, seconds);
     }
 
+    /** One damage pass per trigger pull; the gun's fan bullets are visual only. */
+    pressureBlast(shooter: Player, direction: Vec2, damageMult: number, sourceType: string): void {
+        if (!this.zombieMode || shooter.dead || shooter.downed || shooter.specOpsAi) return;
+        const blast = ZombiePressureBlast;
+        const layer = util.toGroundLayer(shooter.layer);
+        const targets = this.game.grid.intersectCollider(collider.createCircle(shooter.pos, blast.range))
+            .filter((obj): obj is Player =>
+                obj.__type === ObjectType.Player
+                && !(obj as Player).dead && this.isOrdinaryZombie(obj as Player)
+                && util.toGroundLayer(obj.layer) === layer
+            )
+            .sort((a, b) => v2.distance(a.pos, shooter.pos) - v2.distance(b.pos, shooter.pos));
+        let hits = 0;
+        for (const target of targets) {
+            const offset = v2.sub(target.pos, shooter.pos);
+            const distance = v2.length(offset);
+            if (distance > blast.range || distance <= 0.001) continue;
+            const dir = v2.div(offset, distance);
+            if (v2.dot(dir, direction) < Math.cos(blast.halfAngle)) continue;
+            if (!this.rayGunSplashClear(shooter.pos, target.pos, layer)) continue;
+            const falloff = math.clamp((distance - blast.nearRange) / (blast.range - blast.nearRange), 0, 1);
+            this.game.bulletBarn.damages.push({
+                obj: target,
+                amount: (blast.nearDamage + (blast.farDamage - blast.nearDamage) * falloff) * damageMult,
+                damageType: GameConfig.DamageType.Player,
+                source: shooter,
+                gameSourceType: sourceType,
+                weaponSourceType: sourceType,
+                dir,
+            });
+            this.stunEnemy(target, blast.stun);
+            // Sweep the body in small steps, stopping before stairs or solid cover.
+            if (target.layer < 2) {
+                for (let moved = 0; moved < blast.push; moved += 0.5) {
+                    const next = v2.add(target.pos, v2.mul(dir, 0.5));
+                    if (!lastCallWalkable(this.game, target.pos, next, target.rad, layer)) break;
+                    const near = this.game.grid.intersectCollider(collider.createCircle(next, target.rad));
+                    if (
+                        near.some((obj) =>
+                            obj.__type === ObjectType.Obstacle && (obj as Obstacle).isDoor
+                            && (obj as Obstacle).collidable && util.sameLayer(obj.layer, layer)
+                            && coldet.test(collider.createCircle(next, target.rad), (obj as Obstacle).collider)
+                        )
+                    ) break;
+                    if (stairAtPos(this.game, target.pos, target.rad) || stairAtPos(this.game, next, target.rad)) break;
+                    v2.set(target.pos, next);
+                }
+                this.game.grid.updateObject(target);
+                target.setPartDirty();
+            }
+            if (++hits >= blast.maxTargets) break;
+        }
+    }
+
     /** Test helper: seconds of stun left on an AI player (0 if none). */
     stunTimerPublic(player: Player): number {
         return this.brains.get(player)?.stunTimer ?? 0;
@@ -6460,8 +6529,8 @@ export class SpecOpsManager implements PracticeHost {
     }
 
     /**
-     * Final gun at reveal. If the owner picked up a Ray Gun mid-roll (or left),
-     * a Ray Gun result falls back to a normal box gun so nobody gets two.
+     * Final gun at reveal. Recheck wonder-weapon ownership, including upgrades,
+     * in case it changed during the roll.
      */
     private resolveMysteryBoxResult(state: ZombieMysteryBoxState): string {
         const def = GameObjectDefs.typeToDefSafe(state.result) as GunDef | undefined;
@@ -8258,7 +8327,8 @@ export class SpecOpsManager implements PracticeHost {
             // Zombies climb in through the windows (and manholes) of opened rooms only.
             const open = lastCallOpenZones(this.game);
             const entries = this.game.map.obstacles.filter((obstacle) =>
-                obstacle.type === "zombie_spawn_point" && obstacle.layer === 0 && lastCallPosReachable(this.game, obstacle.pos, open)
+                obstacle.type === "zombie_spawn_point" && obstacle.layer === 0
+                && lastCallPosReachable(this.game, obstacle.pos, open)
             );
             const start = entries.length
                 ? (indexInSquad + this.waveSpawnPulseIndex * 3) % entries.length

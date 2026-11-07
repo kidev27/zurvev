@@ -100,6 +100,8 @@ export interface GunDef {
     noDrop?: boolean;
     /** Zombies wonder weapon: one per player, mystery-box only, never sold. */
     wonderWeapon?: boolean;
+    /** Server applies a wall-blocked cone; bullets only draw its pressure trails. */
+    pressureBlast?: boolean;
     /** Skip ejected shell casings (energy weapons). */
     noCasing?: boolean;
     /** Zombies Pack-a-Punch upgraded gun (generated `<gun>_pap` type). */
@@ -3756,6 +3758,67 @@ const SkinDefs: Record<string, GunDef> = {
         },
     }),
 };
+
+for (
+    const [type, gun] of Object.entries({
+        pressure_cannon: {
+            name: "Pressure Cannon",
+            maxClip: 2,
+            ammoSpawnCount: 8,
+            reloadTime: 3.5,
+            fireDelay: 1.1,
+            barrelLength: 3.8,
+            bulletCount: 13,
+            shotSpread: 0,
+            bulletType: "bullet_pressure",
+            sound: { shoot: "pressure_cannon_01" },
+        },
+        tesla_rifle: {
+            name: "Tesla Rifle",
+            maxClip: 3,
+            ammoSpawnCount: 12,
+            reloadTime: 3.8,
+            fireDelay: 0.9,
+            barrelLength: 4.1,
+            bulletCount: 1,
+            shotSpread: 0,
+            bulletType: "bullet_tesla",
+            sound: { shoot: "tesla_rifle_01" },
+        },
+        gravegun: {
+            name: "Gravegun",
+            maxClip: 1,
+            ammoSpawnCount: 24,
+            reloadTime: 2.8,
+            fireDelay: 0.8,
+            barrelLength: 3.4,
+            bulletCount: 16,
+            shotSpread: 13,
+            bulletType: "bullet_gravegun",
+            sound: { shoot: "gravegun_01" },
+        },
+    })
+) {
+    BaseDefs[type] = util.mergeDeep({}, BaseDefs.raygun, {
+        ...gun,
+        pistol: false,
+        pressureBlast: type === "pressure_cannon",
+        ammo: type === "gravegun" ? "12gauge" : "50AE",
+        maxReload: gun.maxClip,
+        extendedClip: gun.maxClip,
+        extendedReload: gun.maxClip,
+        switchDelay: 0.8,
+        recoilTime: 1e10,
+        moveSpread: 0,
+        jitter: type === "gravegun" ? 0.3 : 0,
+        noSplinter: true,
+        ignoreEndlessAmmo: true,
+        speed: { equip: -1, attack: -2 },
+        lootImg: { sprite: `loot-weapon-${type}.img`, uiSprite: `loot-weapon-${type}-icon.img` },
+        worldImg: { sprite: `gun-${type}-top.img`, scale: { x: 0.5, y: 0.5 } },
+        sound: { ...gun.sound, reload: type === "gravegun" ? "usas_reload_01" : "ray_gun_reload_01" },
+    });
+}
 
 export const GunDefs: Record<string, GunDef> = { ...BaseDefs, ...SkinDefs };
 
