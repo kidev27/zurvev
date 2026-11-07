@@ -41,7 +41,7 @@ export const ZombieLoadouts: Record<ZombieClass, ZombieLoadout> = {
         melee: "fists",
         range: 3,
         holdRange: 2.2,
-        speedMult: 0.62,
+        speedMult: 0.50,
         turnRate: 150,
         aimError: 0,
         reaction: 0.18,
@@ -62,7 +62,7 @@ export const ZombieEconomy = {
     hitCash: 10,
     maxHitCashPerZombie: 100,
     killCash: 60,
-    meleeKillBonus: 50,
+    meleeKillBonus: 100,
 };
 
 export const ZombieKillBounty = ZombieEconomy.killCash;
