@@ -41,7 +41,7 @@ export const ZombieLoadouts: Record<ZombieClass, ZombieLoadout> = {
         melee: "fists",
         range: 3,
         holdRange: 2.2,
-        speedMult: 0.45,
+        speedMult: 0.50,
         turnRate: 150,
         aimError: 0,
         reaction: 0.18,
