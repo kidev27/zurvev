@@ -19,6 +19,7 @@ game: {
   apiUrl: "https://fireteam.bbyte.app"  // master — heartbeats + leaderboard push
   id: "ft1"
   name: "Fireteam 1"
+  l10n: "index-europe"                // set this node's actual geographic region
   url: "https://fireteam1.bbyte.app"    // players (nginx on this box)
   address: "10.0.0.11:8001"             // master → this game for find_game only (not 127.0.0.1)
 

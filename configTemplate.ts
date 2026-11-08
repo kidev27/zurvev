@@ -64,6 +64,7 @@ type TemplateValues = PartialConfig & {
         id?: string;
         thisRegion?: string;
         name?: string;
+        l10n?: string;
         url?: string;
         address?: string;
         apiUrl?: string;
@@ -138,6 +139,7 @@ function resolveGameIdentity(values: TemplateValues, live: boolean) {
     return {
         id,
         name: values.game?.name || entry?.name || (live ? "Main" : "Local"),
+        l10n: values.game?.l10n ?? entry?.l10n ?? "",
         url: values.game?.url
             || entry?.url
             || (entry?.publicAddress
@@ -249,7 +251,8 @@ game: {
   firstMatch: ${firstGamePort}
   maxGames: ${maxGames}
 ${apiUrlLine}  id: ${q(identity.id)}                         // unique on this host
-  name: ${q(identity.name)}                   // Server dropdown label
+  name: ${q(identity.name)}                   // fallback server name
+  l10n: ${q(identity.l10n)}                   // geographic key, e.g. index-north-america
 ${urlLine}  address: ${q(identity.address)}           // master → this game (:8001)
 
   mapName: ${q(mapName)}

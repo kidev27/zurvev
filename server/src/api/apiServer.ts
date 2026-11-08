@@ -117,6 +117,7 @@ export class ApiServer {
         opts: {
             address: string;
             name?: string;
+            l10n?: string;
             url?: string;
         },
     ): RegionEndpoint {
@@ -150,7 +151,7 @@ export class ApiServer {
             https,
             name,
             url,
-            l10n: `index-${regionId}`,
+            l10n: opts.l10n?.trim() || this.regions[regionId]?.data.l10n || `index-${regionId}`,
         };
 
         const existing = this.regions[regionId];

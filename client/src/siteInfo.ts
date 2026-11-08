@@ -2,6 +2,7 @@ import $ from "jquery";
 import { type MapDefKey, MapDefs } from "../../shared/defs/mapDefs.ts";
 import { GameConfig } from "../../shared/gameConfig.ts";
 import type { SiteInfoRes } from "../../shared/types/api.ts";
+import { serverDisplayName } from "../../shared/utils/serverLabels.ts";
 import { api } from "./api.ts";
 import type { ConfigManager } from "./config.ts";
 import { device } from "./device.ts";
@@ -32,9 +33,7 @@ export class SiteInfo {
 
         for (const region in serverRegistry) {
             const data = serverRegistry[region]!;
-            const name = (data.name && String(data.name).trim())
-                || (data.l10n ? this.localization.translate(data.l10n) : "")
-                || region;
+            const name = serverDisplayName(region, data, key => this.localization.translate(key));
             const elm = `<option value='${region}' data-l10n='${
                 data.l10n || ""
             }' data-label='${name}'>${name}</option>`;
@@ -122,9 +121,7 @@ export class SiteInfo {
 
         for (const region of Object.keys(pops)) {
             const data = pops[region]!;
-            const label = data.name
-                || (data.l10n ? this.localization.translate(data.l10n) : "")
-                || region;
+            const label = serverDisplayName(region, data, key => this.localization.translate(key));
 
             if (data.address) {
                 serverRegistry[region] = {
@@ -159,6 +156,7 @@ export class SiteInfo {
                 }
                 sel.data("label", label);
                 sel.attr("data-label", label);
+                sel.attr("data-l10n", data.l10n || "");
                 sel.text(`${label} [${data.playerCount} ${players}]`);
             }
         }
