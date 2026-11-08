@@ -78,6 +78,8 @@ export interface GunDef {
     sound: {
         shoot: string;
         reload: string;
+        /** Authored reload sound length; optional so playback can follow reload-speed perks. */
+        reloadDuration?: number;
         pickup: string;
         empty: string;
         deploy: string;
@@ -3771,7 +3773,7 @@ for (
             bulletCount: 13,
             shotSpread: 0,
             bulletType: "bullet_pressure",
-            sound: { shoot: "pressure_cannon_01" },
+            sound: { shoot: "pressure_cannon_01", reload: "pressure_cannon_reload_01", reloadDuration: 3.5 },
         },
         tesla_rifle: {
             name: "Tesla Rifle",
@@ -3783,7 +3785,7 @@ for (
             bulletCount: 1,
             shotSpread: 0,
             bulletType: "bullet_tesla",
-            sound: { shoot: "tesla_rifle_01" },
+            sound: { shoot: "tesla_rifle_01", reload: "tesla_rifle_reload_01", reloadDuration: 3.8 },
         },
         gravegun: {
             name: "Gravegun",
@@ -3795,7 +3797,7 @@ for (
             bulletCount: 16,
             shotSpread: 13,
             bulletType: "bullet_gravegun",
-            sound: { shoot: "gravegun_01" },
+            sound: { shoot: "gravegun_01", reload: "gravegun_reload_01", reloadDuration: 2.8 },
         },
     })
 ) {
@@ -3816,7 +3818,6 @@ for (
         speed: { equip: -1, attack: -2 },
         lootImg: { sprite: `loot-weapon-${type}.img`, uiSprite: `loot-weapon-${type}-icon.img` },
         worldImg: { sprite: `gun-${type}-top.img`, scale: { x: 0.5, y: 0.5 } },
-        sound: { ...gun.sound, reload: type === "gravegun" ? "usas_reload_01" : "ray_gun_reload_01" },
     });
 }
 

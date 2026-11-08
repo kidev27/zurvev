@@ -2064,6 +2064,7 @@ export class Player implements AbstractObject {
     ) {
         // Play action sound
         let actionSound = null;
+        let reloadDetune = 0;
         switch (this.m_action.type) {
             case Action.Reload:
             case Action.ReloadAlt:
@@ -2076,6 +2077,10 @@ export class Player implements AbstractObject {
                                 : actionItemDef.sound.reload,
                             channel: isActivePlayer ? "activePlayer" : "otherPlayers",
                         };
+                        const soundDuration = actionItemDef.sound.reloadDuration;
+                        if (soundDuration && this.m_action.duration > 0) {
+                            reloadDetune = 1200 * Math.log2(soundDuration / this.m_action.duration);
+                        }
                     }
                 }
                 break;
@@ -2100,6 +2105,7 @@ export class Player implements AbstractObject {
                 soundPos: this.m_pos,
                 fallOff: 2,
                 layer: this.layer,
+                detune: reloadDetune,
                 filter: "muffled",
             });
         }

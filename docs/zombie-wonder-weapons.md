@@ -21,16 +21,29 @@ The normal mystery-box reveal and pickup ownership checks still apply.
 
 - **Pressure Cannon:** one cone damage pass per shot, with 13 visual pressure
   trails. Range is 20 units and the cone is 72 degrees wide. Damage falls from
-  500 within 8 units to 120 at maximum range. Up to 24 walkers can be hit. Walls
+  220 within 8 units to 90 at maximum range. Up to 24 walkers can be hit. Walls
   and closed gates block the blast. Surviving targets are stunned briefly and
   pushed up to 5 units, with body collision checks and a stop before native
   stairs. Targets on another floor and human players receive no cone damage.
-- **Tesla Rifle:** a 450-damage bolt chains to at most five additional enemies
+- **Tesla Rifle:** a 180-damage bolt chains to at most five additional enemies
   within 7 units of the previous hit. Arcs require line of sight and compatible
   floors, skip already-hit targets, and use the existing short stun and immunity
   rules. The beam does not create additional damaging projectiles per hop.
-- **Gravegun:** 16 pellets at 28 base damage each, with shotgun spread and range
-  falloff. One trigger pull empties the chamber; the reload replaces its shell.
+- **Gravegun:** 16 pellets at 18 base damage each, for a maximum of 288 before
+  shotgun spread and range falloff. One trigger pull empties the chamber; the
+  reload replaces its shell.
+
+Damage stays fixed as rounds advance, matching the Ray Gun's progression:
+stronger zombies require more hits rather than receiving an automatic weapon
+damage increase. The values below exclude Double Tap; Gravegun totals assume
+every pellet hits before range falloff:
+
+| Weapon | Base damage | Mk II damage |
+|---|---:|---:|
+| Ray Gun | 180 direct, 45–90 nearby splash | No upgrade |
+| Pressure Cannon | 220 close / 90 at maximum range | 297 / 121.5 |
+| Tesla Rifle | 180 per target, up to 6 targets | 243 per target |
+| Gravegun | 18 × 16 pellets = 288 maximum | 24.3 × 16 = 388.8 maximum |
 
 The new guns use existing ammunition inventories and Max Ammo behavior. Max
 Ammo fills reserves without changing loaded magazines. All three are excluded
@@ -43,6 +56,25 @@ the same combat roles and receive the existing 1.35× damage and 1.5× magazine
 multipliers (rounded up): Pressure Cannon holds 3 shots, Tesla Rifle 5, Gravegun
 2. The Ray Gun's existing upgrade rule is unchanged. No acid conversion is
 included in this first weapon set.
+
+## Names and reload sounds
+
+Base names live in the `name` fields of the wonder-weapon definitions in
+`shared/defs/gameObjects/gunDefs.ts`. Mk II names live in
+`ZombiePackAPunchNames` in `shared/defs/maps/zombiePackAPunch.ts`. The HUD,
+interaction prompts and other weapon labels use the defined name when no
+localized `game-<weapon>` entry exists. Existing translated names still win.
+
+Each new weapon has its own reload recording:
+
+- Pressure Cannon: valve release, two canister insertions, and a pressure lock.
+- Tesla Rifle: cell removal and insertion, latch clicks, and a coil charge.
+- Gravegun: break-action opening, cartridge loading, and a heavy breech closure.
+
+The WAV files are in `client/public/audio/guns/*_reload_01.wav`. Their playback
+follows the actual reload timer, including Speed Cola. The sound's authored
+length is stored as `sound.reloadDuration`; update that field if the audio file
+length changes. Base and Mk II variants use the same weapon-specific recording.
 
 ## Editing and verification
 
@@ -61,8 +93,9 @@ cd tests
 bun run test --run zombieWonderWeapons zombieMode lastCall survivalMaps
 ```
 
-The weapon tests exercise actual firing, bounded Tesla chains, wall and floor
-isolation, safe knockback and stair stops, duplicate pickup/roll checks,
-Pack-a-Punch ownership, reserve refills, and Gravegun reloads. Inspect the held
-sprites, loot icons, effects and sounds in-game before changing their scales.
+The weapon tests exercise actual base and Mk II firing, Double Tap damage,
+bounded Tesla chains, wall and floor isolation, safe knockback and stair stops,
+duplicate pickup/roll checks, Pack-a-Punch ownership, reserve refills, and
+Gravegun reloads. Inspect the held sprites, loot icons, effects and sounds
+in-game before changing their scales.
 The initial damage, ammo and drop rates need longer cooperative balance testing.

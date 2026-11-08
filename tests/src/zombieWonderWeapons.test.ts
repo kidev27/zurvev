@@ -15,6 +15,12 @@ import { createGame } from "./gameTestHelpers.ts";
 
 const added = ZombieWonderWeapons.slice(1);
 const primary = GameConfig.WeaponSlot.Primary;
+const damageCases = [
+    { label: "base", upgraded: false, doubleTap: false, multiplier: 1 },
+    { label: "Mk II", upgraded: true, doubleTap: false, multiplier: 1.35 },
+    { label: "base with Double Tap", upgraded: false, doubleTap: true, multiplier: 1.25 },
+    { label: "Mk II with Double Tap", upgraded: true, doubleTap: true, multiplier: 1.35 * 1.25 },
+];
 
 function place(player: Player, pos: Vec2, layer = 0) {
     v2.set(player.pos, pos);
@@ -106,9 +112,9 @@ for (const map of ZombieMapPool) {
         expect(shooter.weapons[primary].ammo).toBe(1);
         const damage = game.bulletBarn.damages.filter((d) => d.obj === front);
         expect(damage).toHaveLength(1);
-        expect(damage[0].amount).toBe(ZombiePressureBlast.nearDamage);
+        expect(damage[0].amount).toBe(220);
         game.bulletBarn.update(0.35);
-        expect(front.health).toBe(0);
+        expect(front.health).toBe(front.maxHealth - 220);
         expect(front.pos.x).toBeGreaterThan(before.x);
         expect(lastCallWalkable(game, before, front.pos, front.rad, 0)).toBe(true);
         expect(front.layer).toBe(0);
@@ -131,39 +137,49 @@ test("pressure blast and Tesla arcs cannot damage through solid cover", () => {
     expect(covered.health).toBe(covered.maxHealth);
     const startHp = front.health;
     const chain = GameObjectDefs.typeToDef("bullet_tesla", "bullet").chain!;
-    ops.papChain(front, shooter, 450, chain, new Set(), "tesla_rifle");
+    ops.papChain(front, shooter, 180, chain, new Set(), "tesla_rifle");
     game.bulletBarn.update(0);
     expect(covered.health).toBe(covered.maxHealth);
     expect(front.health).toBe(startHp);
 });
 
-test("Tesla firing damages a bounded chain, with no repeated hits or cross-floor arcs", () => {
-    const { game, shooter, zombie } = arena();
-    const targets = Array.from({ length: 8 }, (_, i) => zombie(6 + i * 2.1));
-    const otherFloor = zombie(7, 0, 1);
-    shoot(shooter, "tesla_rifle");
-    for (let tick = 0; tick < 10; tick++) game.bulletBarn.update(0.02);
-    expect(targets.filter((target) => target.health < target.maxHealth)).toHaveLength(6);
-    for (const target of targets) expect(target.maxHealth - target.health).toBeLessThanOrEqual(450);
-    expect(otherFloor.health).toBe(otherFloor.maxHealth);
-    expect(shooter.weapons[primary].ammo).toBe(2);
-});
+for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
+    test(`Tesla ${label}: Ray Gun-level damage, bounded chain, no repeated hits or cross-floor arcs`, () => {
+        const { game, shooter, zombie } = arena();
+        const targets = Array.from({ length: 8 }, (_, i) => zombie(6 + i * 2.1));
+        const otherFloor = zombie(7, 0, 1);
+        if (doubleTap) shooter.addPerk("zombie_double_tap", false);
+        shoot(shooter, upgraded ? packAPunchType("tesla_rifle") : "tesla_rifle");
+        for (let tick = 0; tick < 10; tick++) game.bulletBarn.update(0.02);
+        for (const [i, target] of targets.entries()) {
+            const damage = i < 6 ? 180 * multiplier : 0;
+            expect(target.health).toBeCloseTo(Math.max(0, target.maxHealth - damage));
+        }
+        expect(otherFloor.health).toBe(otherFloor.maxHealth);
+        expect(shooter.weapons[primary].ammo).toBe(2);
+    });
 
-test("Gravegun fires a multi-pellet blast, empties its chamber, and reloads from reserve", () => {
-    const { game, shooter, zombie } = arena();
-    const target = zombie(6);
-    shoot(shooter, "gravegun");
-    const pellets = game.bulletBarn.newBullets.filter((b) => b.shotSourceType === "gravegun");
-    expect(pellets).toHaveLength(16);
-    expect(shooter.weapons[primary].ammo).toBe(0);
-    for (let tick = 0; tick < 10; tick++) game.bulletBarn.update(0.02);
-    expect(target.maxHealth - target.health).toBeGreaterThan(100);
-    shooter.invManager.set("12gauge", 5);
-    shooter.weaponManager.tryReload();
-    shooter.weaponManager.reload();
-    expect(shooter.weapons[primary].ammo).toBe(1);
-    expect(shooter.invManager.get("12gauge")).toBe(4);
-});
+    test(`Gravegun ${label}: pellet damage, empty chamber, and reserve reload`, () => {
+        const { game, shooter, zombie } = arena();
+        const target = zombie(6);
+        const type = upgraded ? packAPunchType("gravegun") : "gravegun";
+        if (doubleTap) shooter.addPerk("zombie_double_tap", false);
+        shoot(shooter, type);
+        const pellets = game.bulletBarn.newBullets.filter((b) => b.shotSourceType === type);
+        expect(pellets).toHaveLength(16);
+        for (const pellet of pellets) expect(pellet.damage).toBeCloseTo(18 * multiplier);
+        expect(pellets.reduce((total, pellet) => total + pellet.damage, 0)).toBeCloseTo(288 * multiplier);
+        expect(shooter.weapons[primary].ammo).toBe(0);
+        for (let tick = 0; tick < 10; tick++) game.bulletBarn.update(0.02);
+        expect(target.maxHealth - target.health).toBeGreaterThan(100);
+        shooter.invManager.set("12gauge", 5);
+        shooter.weaponManager.tryReload();
+        shooter.weaponManager.reload();
+        const loaded = upgraded ? 2 : 1;
+        expect(shooter.weapons[primary].ammo).toBe(loaded);
+        expect(shooter.invManager.get("12gauge")).toBe(5 - loaded);
+    });
+}
 
 test("pressure knockback stops before a native stair and keeps the enemy's floor", () => {
     const { game, shooter, ops, zombie } = arena();
@@ -215,18 +231,28 @@ for (const { type } of added) {
     });
 }
 
-test("pressure damage falls with distance and stops at its advertised range", () => {
-    const { game, shooter, ops, zombie } = arena();
-    const far = zombie(18);
-    const outside = zombie(21);
-    const outsidePos = v2.copy(outside.pos);
-    ops.pressureBlast(shooter, v2.create(1, 0), 1, "pressure_cannon");
-    game.bulletBarn.update(0);
-    expect(far.health).toBeGreaterThan(0);
-    expect(far.health).toBeLessThan(far.maxHealth);
-    expect(outside.health).toBe(outside.maxHealth);
-    expect(outside.pos).toEqual(outsidePos);
-});
+for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
+    test(`Pressure Cannon ${label}: damage falls from 220 to 90 and stops at its advertised range`, () => {
+        const { game, shooter, zombie } = arena();
+        const near = zombie(6);
+        const far = zombie(18);
+        const edge = zombie(20);
+        const outside = zombie(21);
+        const outsidePos = v2.copy(outside.pos);
+        if (doubleTap) shooter.addPerk("zombie_double_tap", false);
+        shoot(shooter, upgraded ? packAPunchType("pressure_cannon") : "pressure_cannon");
+        for (const [target, baseDamage] of [[near, 220], [far, 220 - 130 * 10 / 12], [edge, 90]] as const) {
+            const hits = game.bulletBarn.damages.filter((damage) => damage.obj === target);
+            expect(hits).toHaveLength(1);
+            expect(hits[0].amount).toBeCloseTo(baseDamage * multiplier);
+        }
+        game.bulletBarn.update(0);
+        expect(far.health).toBeGreaterThan(0);
+        expect(far.health).toBeLessThan(far.maxHealth);
+        expect(outside.health).toBe(outside.maxHealth);
+        expect(outside.pos).toEqual(outsidePos);
+    });
+}
 
 test("a buy gate blocks the pressure blast until the squad opens it", () => {
     const { game, shooter, ops, zombie } = arena("specops_complex");
@@ -248,3 +274,21 @@ test("a buy gate blocks the pressure blast until the squad opens it", () => {
     ops.pressureBlast(shooter, dir, 1, "pressure_cannon");
     expect(game.bulletBarn.damages.some((damage) => damage.obj === target)).toBe(true);
 });
+
+for (const { type } of added) {
+    test(`${type}: the custom reload recording matches its declared timing and Mk II variant`, async () => {
+        const { readFileSync } = await import("node:fs");
+        const { default: soundDefs } = await import("../../client/src/soundDefs.ts");
+        const base = GameObjectDefs.typeToDef(type, "gun");
+        const upgrade = GameObjectDefs.typeToDef(packAPunchType(type), "gun");
+        expect(upgrade.sound.reload).toBe(base.sound.reload);
+        expect(base.sound.reload).not.toBe("ray_gun_reload_01");
+        const sound = soundDefs.Sounds.players[base.sound.reload];
+        const wav = readFileSync(new URL(`../../client/public/${sound.path}`, import.meta.url));
+        expect(wav.toString("ascii", 0, 4)).toBe("RIFF");
+        expect(wav.toString("ascii", 8, 12)).toBe("WAVE");
+        const duration = wav.readUInt32LE(40) / wav.readUInt32LE(28);
+        expect(base.sound.reloadDuration).toBeCloseTo(duration, 4);
+        expect(upgrade.sound.reloadDuration).toBeCloseTo(duration, 4);
+    });
+}
