@@ -152,6 +152,7 @@ const Sounds: Record<string, Record<string, SoundDef>> = {
             volume: 1,
             maxInstances: 5,
         },
+        
         pressure_cannon_01: { path: "audio/guns/pressure_cannon_01.mp3", volume: 3.1, maxInstances: 4 },
 
         tesla_rifle_01: { path: "audio/guns/tesla_rifle_01.wav", volume: 4.3, maxInstances: 5 },
