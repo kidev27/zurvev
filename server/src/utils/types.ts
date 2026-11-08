@@ -11,7 +11,7 @@ export const zHandshakeBody = z.object({
     /** Server name, used when no geographic translation is available. */
     name: z.string().min(1).max(64).optional(),
     /** Geographic translation key for the Server dropdown. */
-    l10n: z.string().trim().min(1).max(64).optional(),
+    l10n: z.string().trim().min(1).max(128).optional(),
     /**
      * Player-facing endpoint: https://host, http://ip:port, or host[:port].
      * Used for pings / menu listing; match WS still comes from find_game.

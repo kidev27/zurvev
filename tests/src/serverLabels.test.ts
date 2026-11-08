@@ -92,3 +92,13 @@ test("compact geographic config survives normalization and a later config save",
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test("a maximum-length server id still accepts its generated localization key", () => {
+    const regionId = "x".repeat(64);
+    expect(zHandshakeBody.parse({
+        regionId,
+        name: "Community server",
+        l10n: `index-${regionId}`,
+        address: "127.0.0.1:8001",
+    }).l10n).toBe(`index-${regionId}`);
+});
