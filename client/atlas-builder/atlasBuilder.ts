@@ -253,7 +253,8 @@ export class AtlasManager {
                 this.imageCache.queueImage(file, hash);
             }
 
-            atlasHash += hash;
+            // Renames change the spritesheet frame keys even when the pixels match.
+            atlasHash += `${file}-${hash}`;
         }
 
         return hashBuff(Buffer.from(atlasHash));
