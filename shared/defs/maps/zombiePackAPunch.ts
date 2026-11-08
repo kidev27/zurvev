@@ -12,6 +12,9 @@
  * To make another gun upgradable, add it here.
  */
 export const ZombiePackAPunchNames: Record<string, string> = {
+    pressure_cannon: "Pressure Cannon Mk II",
+    tesla_rifle: "Tesla Rifle Mk II",
+    gravegun: "Gravegun Mk II",
     m9: "Nine Lives",
     mp5: "MP115 Kollider",
     mac10: "Mac Attack",

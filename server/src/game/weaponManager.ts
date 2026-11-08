@@ -935,7 +935,7 @@ export class WeaponManager {
         this.player.weapsDirty = true;
 
         const collisionLayer = util.toGroundLayer(this.player.layer);
-        const bulletLayer = this.player.aimLayer;
+        const bulletLayer = itemDef.pressureBlast ? collisionLayer : this.player.aimLayer;
 
         const gunOff = itemDef.isDual
             ? itemDef.dualOffset! * (offHand ? 1.0 : -1.0)
@@ -1075,11 +1075,17 @@ export class WeaponManager {
             distanceMult *= PerkProperties.high_velocity.distanceMult;
         }
 
+        if (itemDef.pressureBlast) {
+            this.player.game.specOps?.pressureBlast(this.player, direction, damageMult, weapon.type);
+        }
+
         const bulletCount = itemDef.bulletCount;
         const jitter = itemDef.jitter ?? 0.25;
 
         for (let i = 0; i < bulletCount; i++) {
-            const deviation = firstShotAccuracy
+            const deviation = itemDef.pressureBlast
+                ? -36 + 72 * i / (bulletCount - 1)
+                : firstShotAccuracy
                 ? 0
                 : util.random(-0.5, 0.5) * (spread || 0);
             const shotDir = v2.rotate(direction, math.deg2rad(deviation));
@@ -1115,6 +1121,12 @@ export class WeaponManager {
             if (itemDef.toMouseHit) {
                 distance = math.max(toMouseLen - gunLen, 0.0);
             }
+            if (itemDef.pressureBlast) {
+                distance = math.max(
+                    0,
+                    GameObjectDefs.typeToDef(bulletType, "bullet").distance - v2.distance(this.player.pos, shotPos),
+                );
+            }
 
             const params: BulletParams = {
                 playerId: this.player.__id,
@@ -1125,7 +1137,7 @@ export class WeaponManager {
                 dir: shotDir,
                 layer: bulletLayer,
                 distance,
-                clipDistance: itemDef.toMouseHit,
+                clipDistance: itemDef.toMouseHit || itemDef.pressureBlast,
                 damageMult,
                 speedMult,
                 distanceMult,
