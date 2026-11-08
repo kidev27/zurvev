@@ -36,10 +36,10 @@ export const PrivateRouter = new Hono<Context>()
     .use(privateMiddleware)
     .route("/moderation", ModerationRouter)
     .post("/handshake", validateParams(zHandshakeBody), (c) => {
-        const { regionId, name, url, address } = c.req.valid("json");
+        const { regionId, name, l10n, url, address } = c.req.valid("json");
 
         try {
-            server.registerRegion(regionId, { address, name, url });
+            server.registerRegion(regionId, { address, name, l10n, url });
         } catch (err) {
             const msg = err instanceof Error ? err.message : "register_failed";
             server.logger.warn(`Handshake rejected for "${regionId}": ${msg}`);

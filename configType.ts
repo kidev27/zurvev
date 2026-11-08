@@ -170,6 +170,7 @@ export interface ConfigType {
      * game: {
      *   id: "main"
      *   name: "Fireteam"
+     *   l10n: "index-north-america"
      *   url: "https://fireteam.example.com"
      *   address: "127.0.0.1:8001"
      * }
@@ -179,8 +180,7 @@ export interface ConfigType {
         string,
         {
             /**
-             * Display name in the Server dropdown (e.g. "US East", "Fireteam").
-             * Preferred over translating `l10n`.
+             * Server name used when no geographic translation is available.
              */
             name?: string;
             /**
@@ -204,7 +204,8 @@ export interface ConfigType {
              */
             publicAddress?: string;
             /**
-             * Optional translation key when `name` is omitted (e.g. "index-local").
+             * Geographic translation key (e.g. "index-north-america", "index-local").
+             * A known translation takes priority over the server name.
              */
             l10n?: string;
         }
