@@ -1,6 +1,7 @@
 import $ from "jquery";
 import {
     FireteamMapPool,
+    isZombieMapName,
     specOpsMapDisplayName,
     ZombieMapPool,
 } from "../../../shared/defs/maps/specOpsDefs.ts";
@@ -110,6 +111,7 @@ export class TeamMenu {
     serverSelect = $("#team-server-select");
     mapSelect = $("#team-map-select");
     difficultySelect = $("#team-difficulty-select");
+    waveModeField = $("#team-wave-mode-field");
     endlessToggle = $("#team-endless-toggle");
     waveWaitBtn = $("#btn-team-wave-wait");
     waveContinuousBtn = $("#btn-team-wave-continuous");
@@ -184,23 +186,24 @@ export class TeamMenu {
             if (this.applyingServerState) return;
             const mapName = this.mapSelect.find(":selected").val() as string;
             this.setRoomProperty("mapName", mapName);
+            this.syncWaveModeButtons(this.endlessToggle.prop("checked") === true);
         });
         this.endlessToggle.on("change", () => {
-            if (this.applyingServerState) return;
+            if (this.applyingServerState || this.endlessToggle.prop("disabled")) return;
             const endless = this.endlessToggle.prop("checked") === true;
             this.config.set("teamEndless", endless);
             this.setRoomProperty("endless", endless);
             this.syncWaveModeButtons(endless);
         });
         this.waveWaitBtn.on("click", () => {
-            if (this.applyingServerState || !this.isLeader) return;
+            if (this.applyingServerState || !this.isLeader || this.endlessToggle.prop("disabled")) return;
             this.endlessToggle.prop("checked", false);
             this.config.set("teamEndless", false);
             this.setRoomProperty("endless", false);
             this.syncWaveModeButtons(false);
         });
         this.waveContinuousBtn.on("click", () => {
-            if (this.applyingServerState || !this.isLeader) return;
+            if (this.applyingServerState || !this.isLeader || this.endlessToggle.prop("disabled")) return;
             this.endlessToggle.prop("checked", true);
             this.config.set("teamEndless", true);
             this.setRoomProperty("endless", true);
@@ -819,8 +822,21 @@ export class TeamMenu {
     }
 
     private syncWaveModeButtons(endless: boolean): void {
-        this.setModeButtonState(this.waveWaitBtn, !endless, this.isLeader);
-        this.setModeButtonState(this.waveContinuousBtn, endless, this.isLeader);
+        // Zombies always uses its own round timer; retain the Fireteam choice.
+        const visible = !isZombieMapName(this.roomData.mapName || "random");
+        const enabled = visible && this.isLeader;
+        this.waveModeField.css("display", visible ? "flex" : "none");
+        this.endlessToggle.prop("disabled", !enabled);
+        this.setModeButtonState(this.waveWaitBtn, !endless, enabled);
+        this.setModeButtonState(this.waveContinuousBtn, endless, enabled);
+        for (const button of [this.waveWaitBtn, this.waveContinuousBtn]) {
+            button.attr("tabindex", enabled ? "0" : "-1");
+            button.attr("aria-disabled", String(!enabled));
+            if (!visible) {
+                button.removeClass("menu-gamepad-focus");
+                button.trigger("blur");
+            }
+        }
     }
 
     private setModeButtonState(
@@ -1030,7 +1046,6 @@ export class TeamMenu {
                 this.difficultySelect.val(difficulty);
                 this.difficultySelect.prop("disabled", !this.isLeader);
                 this.endlessToggle.prop("checked", !!this.roomData.endless);
-                this.endlessToggle.prop("disabled", !this.isLeader);
                 this.syncWaveModeButtons(!!this.roomData.endless);
 
                 const squadSize = this.roomData.squadSize || this.siteInfo.info.maxSquadSize || 4;

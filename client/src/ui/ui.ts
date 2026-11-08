@@ -13,7 +13,6 @@ import {
     specOpsBuybackCost,
     specOpsBuybackSku,
     specOpsCanBuySelfRevive,
-    specOpsEventBossForWave,
     SpecOpsJoinLockFlag,
     SpecOpsMaxHealth,
     SpecOpsMaxSupportUnits,
@@ -67,6 +66,10 @@ import { SDK } from "../sdk/sdk.ts";
 import type { Localization } from "./localization.ts";
 import { setPerkTooltip } from "./perkTooltip.ts";
 import { PieTimer } from "./pieTimer.ts";
+import {
+    formatSpecOpsCountdownAnnouncement,
+    formatSpecOpsWaveAnnouncement,
+} from "./specOpsAnnouncements.ts";
 import type { Touch } from "./touch.ts";
 import type { UiManager2 } from "./ui2.ts";
 
@@ -2808,46 +2811,11 @@ export class UiManager {
             if (wave > 0 && wave !== this.lastSpecOpsWave) {
                 this.lastSpecOpsWave = wave;
                 this.lastSpecOpsStation = undefined;
-                let msg = `${this.localization.translate("game-specops-wave")} ${wave}`;
-                // Zombies is zombies only: no boss, mini-boss, glory, veteran or vest warnings.
-                if (!gameMode.zombieMode) {
-                    if (wave === 29) {
-                        msg += ` — ${this.localization.translate("game-specops-glory-horde")}`;
-                    }
-                    if (wave === 31) {
-                        msg += ` — ${this.localization.translate("game-specops-veteran-forces")}`;
-                    }
-                    if (wave % 10 === 0) {
-                        if (wave === 30) {
-                            msg += ` — ${this.localization.translate("game-specops-glory-truce")}`;
-                        } else if (wave > 30) {
-                            msg += ` — ${this.localization.translate("game-specops-cobalt-boss-warn")}`;
-                        } else {
-                            msg += ` — ${this.localization.translate("game-specops-boss-warn")}`;
-                        }
-                        const eventBoss = specOpsEventBossForWave(wave);
-                        if (eventBoss) {
-                            const key = `game-specops-event-${eventBoss}`;
-                            const label = this.localization.translate(key) || eventBoss;
-                            msg += ` — ${label}`;
-                        }
-                    } else if (wave % 7 === 0) {
-                        msg += ` — ${this.localization.translate("game-specops-miniboss-warn")}`;
-                    }
-                    if (wave % 5 === 0) {
-                        msg += ` — ${this.localization.translate("game-specops-vest-warn")}`;
-                    }
-                }
-                if (wave === SpecOpsStationUnlockWave.gear) {
-                    msg += ` — ${this.localization.translate("game-specops-unlock-gear")}`;
-                }
-                if (wave === SpecOpsStationUnlockWave.armor) {
-                    msg += ` — ${this.localization.translate("game-specops-unlock-armor")}`;
-                }
-                if (wave === SpecOpsStationUnlockWave.perk) {
-                    msg += ` — ${this.localization.translate("game-specops-unlock-perk")}`;
-                }
-                this.displayAnnouncement(msg);
+                this.displayAnnouncement(formatSpecOpsWaveAnnouncement(
+                    wave,
+                    gameMode,
+                    (key) => this.localization.translate(key),
+                ));
             } else if (wave <= 0) {
                 this.lastSpecOpsWave = 0;
             }
@@ -2985,21 +2953,13 @@ export class UiManager {
         switch (type) {
             case GasMode.Waiting: {
                 if (specOpsMode) {
-                    if (timeLeft <= 0) {
-                        message = this.localization.translate("game-specops-press-e");
-                        break;
-                    }
-                    message = this.localization.translate("game-specops-next-wave");
-                    message += ` ${Math.max(Math.floor(timeLeft), 0)} ${this.localization.translate("game-seconds")}`;
-                    // Zombies: only the opening countdown can be skipped.
-                    const zombies = !!this.game.m_map.getMapDef().gameMode.zombieMode;
-                    if (waveStarted && zombies) break;
-                    const hint = zombies
-                        ? "game-zombie-start-early"
-                        : this.specOpsOnBreak
-                        ? "game-specops-break-vote"
-                        : "game-specops-start-early";
-                    message += ` — ${this.localization.translate(hint)}`;
+                    message = formatSpecOpsCountdownAnnouncement(
+                        timeLeft,
+                        this.game.m_map.getMapDef().gameMode,
+                        waveStarted,
+                        this.specOpsOnBreak,
+                        (key) => this.localization.translate(key),
+                    );
                     break;
                 }
                 message = this.localization.translate("game-red-zone-advances");

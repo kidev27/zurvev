@@ -447,8 +447,9 @@ test("After Hours perk machines sell their fixed perks for cash", () => {
     expect(operator.health).toBe(250);
 });
 
-test("Zombie Survival automatically starts the next wave after an eight-second breather", () => {
+test.each([false, true])("Zombies keeps its eight-second breather with continuous waves set to %s", (endless) => {
     const game = createGame(TeamMode.Solo, "specops_complex");
+    game.specOps!.endless = endless;
     const operator = game.playerBarn.addTestPlayer({ name: "Operator" });
     game.update(0.1);
     game.specOps!.startNextWave();
