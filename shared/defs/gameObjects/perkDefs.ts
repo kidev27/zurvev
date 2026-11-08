@@ -96,7 +96,7 @@ export const PerkProperties = {
         bonusHealth: 50,
     },
     zombie_speed_cola: {
-        reloadMult: 0.65,
+        reloadMult: 0.585,
     },
     zombie_stamin_up: {
         speedBoost: 1.8,

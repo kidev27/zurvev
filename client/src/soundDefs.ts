@@ -152,7 +152,7 @@ const Sounds: Record<string, Record<string, SoundDef>> = {
             volume: 1,
             maxInstances: 5,
         },
-        
+
         pressure_cannon_01: { path: "audio/guns/pressure_cannon_01.mp3", volume: 3.1, maxInstances: 4 },
 
         tesla_rifle_01: { path: "audio/guns/tesla_rifle_01.wav", volume: 4.3, maxInstances: 5 },
@@ -160,7 +160,7 @@ const Sounds: Record<string, Record<string, SoundDef>> = {
         gravegun_01: { path: "audio/guns/gravegun_01.wav", volume: 3.4, maxInstances: 4 },
 
         pressure_cannon_reload_01: { path: "audio/guns/pressure_cannon_reload_01.mp3", volume: 3.1, maxInstances: 4 },
-        
+
         tesla_rifle_reload_01: { path: "audio/guns/tesla_rifle_reload_01.mp3", volume: 1, maxInstances: 4 },
 
         gravegun_reload_01: { path: "audio/guns/gravegun_reload_01.wav", volume: 1.1, maxInstances: 4 },
@@ -520,6 +520,25 @@ const Sounds: Record<string, Record<string, SoundDef>> = {
             path: "audio/guns/mp5_01.mp3",
             volume: 1,
             maxInstances: 5,
+        },
+        ppsh41_01: {
+            path: "audio/guns/ppsh41_01.wav",
+            volume: 1.1,
+            maxInstances: 6,
+        },
+        mp40_01: { path: "audio/guns/mp40_01.wav", volume: 1, maxInstances: 5 },
+        mp40_reload_01: { path: "audio/guns/mp40_reload_01.wav", volume: 1, maxInstances: 4 },
+        fal_01: { path: "audio/guns/fal_01.wav", volume: 1, maxInstances: 5 },
+        fal_reload_01: { path: "audio/guns/fal_reload_01.wav", volume: 1, maxInstances: 4 },
+        rpd_01: { path: "audio/guns/rpd_01.wav", volume: 1, maxInstances: 6 },
+        rpd_reload_01: { path: "audio/guns/rpd_reload_01.wav", volume: 1, maxInstances: 4 },
+        winchester1887_01: { path: "audio/guns/winchester1887_01.wav", volume: 1, maxInstances: 4 },
+        winchester1887_reload_01: { path: "audio/guns/winchester1887_reload_01.wav", volume: 1, maxInstances: 4 },
+        winchester1887_cycle_01: { path: "audio/guns/winchester1887_cycle_01.wav", volume: 1, maxInstances: 4 },
+        ppsh41_reload_01: {
+            path: "audio/guns/ppsh41_reload_01.wav",
+            volume: 1,
+            maxInstances: 4,
         },
         mp5_reload_01: {
             path: "audio/guns/mp5_reload_01.mp3",

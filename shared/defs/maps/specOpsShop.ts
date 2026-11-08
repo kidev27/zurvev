@@ -237,8 +237,6 @@ export const SpecOpsBuybackBaseCost = 1500;
 export const SpecOpsBuybackWaveCost = 250;
 export const SpecOpsBuybackPrefix = "specops_buyback_";
 
-
-
 /** Packed into the Spec Ops HUD wave id so clients can show lobby lock state. */
 export const SpecOpsJoinLockFlag = 0x8000;
 
@@ -702,6 +700,11 @@ const SpecOpsWeaponShopCosts: Record<string, number> = {
     mp5: 800,
     ump9: 1000,
     mac10: 1100,
+    ppsh41: 2600,
+    mp40: 1500,
+    fal: 3000,
+    rpd: 3600,
+    winchester1887: 2200,
     vector: 3000,
     vector45: 3100,
     scorpion: 3600,
@@ -1197,8 +1200,6 @@ export function specOpsEarlyStartBonus(secondsLeft: number): number {
     return Math.floor(Math.max(secondsLeft, 0)) * SpecOpsEarlyStartCashPerSecond;
 }
 
-
-
 /** Long break after every Nth cleared wave, from the start wave (15, 20, 25 …). Not in Endless. */
 export const SpecOpsBreakEveryWaves = 5;
 /** First wave that is followed by a long break. */
@@ -1226,7 +1227,6 @@ export function specOpsPackBreakVotes(ready: number, needed: number): number {
 export function specOpsUnpackBreakVotes(code: number): { ready: number; needed: number } {
     return { ready: (code >> 4) & 0xf, needed: code & 0xf };
 }
-
 
 /** Spec Ops inventory holds — sized for long waves; level 4 (backpack04) caps at 999. */
 export const SpecOpsBagSizes: Record<string, number[]> = {
