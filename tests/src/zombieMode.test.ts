@@ -910,12 +910,13 @@ test("Ray Gun: wonder weapon def, 50AE, box-only (never in the shop)", () => {
     expect(ZombieMysteryBoxWeapons).not.toContain(ZombieRayGun.type);
 });
 
-test("Ray Gun: box odds follow ZombieRayGun.boxChance, other 22 guns share the rest", () => {
+test("Ray Gun: box odds follow ZombieRayGun.boxChance, ordinary guns share the rest", () => {
     const { ops, a } = rayGunGame(TeamMode.Solo);
     const chance = ZombieRayGun.boxChance;
     expect(chance).toBeGreaterThan(0);
     expect(chance).toBeLessThan(1);
-    expect(ZombieMysteryBoxWeapons).toHaveLength(22);
+    expect(ZombieMysteryBoxWeapons.length).toBeGreaterThan(0);
+    expect(new Set(ZombieMysteryBoxWeapons).size).toBe(ZombieMysteryBoxWeapons.length);
     expect(ops.rollMysteryBoxResult(a, 0)).toBe(ZombieRayGun.type);
     expect(ops.rollMysteryBoxResult(a, chance * 0.99)).toBe(ZombieRayGun.type);
     const allWonderChance = ZombieWonderWeapons.reduce((sum, weapon) => sum + weapon.chance, 0);

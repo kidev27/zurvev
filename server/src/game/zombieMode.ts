@@ -94,6 +94,7 @@ export function zombieBuyGateCost(type: string): number | undefined {
 /** Guns with normal ammo and pickup behavior that work cleanly in the box. */
 export const ZombieMysteryBoxWeapons = [
     "mp5",
+    "ppsh41",
     "mac10",
     "ump9",
     "vector",

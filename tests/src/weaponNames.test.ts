@@ -11,6 +11,7 @@ const names = [
     ["pressure_cannon", "Pressure Cannon"],
     ["tesla_rifle", "Tesla Rifle"],
     ["gravegun", "Gravegun"],
+    ["ppsh41", "PPSh-41"],
 ] as const;
 
 for (const [type, name] of names) {

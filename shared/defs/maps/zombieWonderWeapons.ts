@@ -1,9 +1,9 @@
 /** Mystery-box chances are absolute; an ineligible result falls back to a normal gun. */
 export const ZombieWonderWeapons = [
-    { type: "raygun", chance: 0.04 },
-    { type: "pressure_cannon", chance: 0.02 },
-    { type: "tesla_rifle", chance: 0.02 },
-    { type: "gravegun", chance: 0.02 },
+    { type: "raygun", chance: 0.03 },
+    { type: "pressure_cannon", chance: 0.04 },
+    { type: "tesla_rifle", chance: 0.04 },
+    { type: "gravegun", chance: 0.03 },
 ] as const;
 
 export const ZombiePressureBlast = {
