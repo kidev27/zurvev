@@ -55,7 +55,8 @@ const PracticeGunExclude = new Set([
 /** Every regular gun (no dual pistols, skins or event weapons), in the game's own order. */
 export const PracticeGuns: string[] = Object.keys(BaseDefs).filter((type) => {
     const def = BaseDefs[type];
-    return def.type === "gun" && !def.isDual && !PracticeGunExclude.has(type);
+    // Pressure blasts require the Zombies-only damage handler.
+    return def.type === "gun" && !def.isDual && !def.pressureBlast && !PracticeGunExclude.has(type);
 });
 
 export function isPracticeGun(type: string): boolean {

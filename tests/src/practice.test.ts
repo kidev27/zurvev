@@ -5,7 +5,7 @@ import { practiceInterceptPoint } from "../../server/src/game/practiceCombat.ts"
 import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { MapDefs } from "../../shared/defs/mapDefs.ts";
 import { isPracticeMapName, PracticeMapPool } from "../../shared/defs/maps/practiceDefs.ts";
-import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
+import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { BitStream } from "../../shared/net/net.ts";
 import { PracticeGiveMsg, PracticeSettingsMsg, PracticeStatsMsg } from "../../shared/net/practiceMsg.ts";
 import {
@@ -700,3 +700,72 @@ test("Practice spawning rejects invalid items and never runs outside practice", 
     regular.specOps!.givePracticeItem(human, "awc", 1, true);
     expect(regular.lootBarn.loots.length).toBe(before);
 });
+
+test.each(["pressure_cannon", "pressure_cannon_pap"])(
+    "%s is rejected in saved Practice settings and direct item-spawn requests",
+    type => {
+        expect(PracticeGuns).not.toContain(type);
+        const { game, player } = startPractice({
+            primary: type,
+            secondary: type,
+            bots: [{ ...defaultPracticeBot(), gun: type, secondary: type, shootsBack: false }],
+        });
+        expect(player.weapons[0].type).toBe(defaultPracticeSettings().primary);
+        expect(player.weapons[1].type).toBe("");
+        expect(bots(game)[0].weapons[0].type).toBe(defaultPracticeBot().gun);
+        expect(bots(game)[0].weapons[1].type).toBe("");
+        const before = game.lootBarn.loots.length;
+        game.specOps!.givePracticeItem(player, type, 1, false);
+        expect(game.lootBarn.loots.length).toBe(before);
+    },
+);
+
+test("random Practice loadouts cannot select a Zombies-only pressure blast", () => {
+    expect(PracticeGuns).not.toContain("pressure_cannon");
+    for (const type of PracticeGuns) expect(GunDefs[type].pressureBlast).not.toBe(true);
+    const { game } = startPractice({
+        bots: [{ ...defaultPracticeBot(), gun: PracticeRandomGun, secondary: PracticeRandomGun, shootsBack: false }],
+    });
+    for (const weapon of bots(game)[0].weapons.slice(0, 2)) {
+        expect(PracticeGuns).toContain(weapon.type);
+        expect(GunDefs[weapon.type].pressureBlast).not.toBe(true);
+    }
+});
+
+test.each(["ppsh41", "mp40", "fal", "rpd", "winchester1887", "pkp", "raygun", "tesla_rifle", "gravegun"])(
+    "%s remains usable in Practice with native ammo, damage and reloads",
+    type => {
+        expect(PracticeGuns).toContain(type);
+        const { game, player } = startPractice({
+            primary: type,
+            bots: [{ ...defaultPracticeBot(), gun: type, health: 280, armor: 0, shootsBack: false }],
+        });
+        const target = bots(game)[0];
+        expect(target.weapons[0].type).toBe(type);
+        v2.set(player.pos, v2.create(30, 30));
+        v2.set(target.pos, v2.create(36, 30));
+        v2.set(player.dir, v2.create(1, 0));
+        player.layer = target.layer = 0;
+        game.grid.updateObject(player);
+        game.grid.updateObject(target);
+        const def = GunDefs[type];
+        expect(player.weapons[0].ammo).toBe(def.maxClip);
+        const hp = target.health;
+        player.weaponManager.fireWeapon(false);
+        expect(player.weapons[0].ammo).toBe(def.maxClip - 1);
+        for (let i = 0; i < 20; i++) game.bulletBarn.update(0.02);
+        expect(target.health).toBeLessThan(hp);
+
+        player.cancelAction();
+        player.weapons[0].cooldown = 0;
+        player.weapons[0].ammo = 0;
+        player.invManager.set(def.ammo as InventoryItem, def.maxClip + 10);
+        player.weaponManager.tryReload();
+        expect(player.action.duration).toBeCloseTo(def.reloadTime);
+        for (let t = 0; t < def.reloadTime + 0.1; t += 0.05) game.update(0.05);
+        expect(player.weapons[0].ammo).toBe(Math.min(def.maxClip, def.maxReload));
+
+        game.specOps!.givePracticeItem(player, type, 1, false);
+        expect(game.lootBarn.loots.some(loot => loot.type === type && !loot.destroyed)).toBe(true);
+    },
+);
