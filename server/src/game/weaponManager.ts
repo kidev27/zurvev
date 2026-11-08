@@ -439,7 +439,10 @@ export class WeaponManager {
             this.player.cancelAction();
 
             this.player.playAnim(GameConfig.Anim.Melee, attack.cooldownTime);
-            weapon.cooldown = attack.cooldownTime;
+            weapon.cooldown =
+            player.specOpsKind === "enemy" && player.game.specOps?.zombieMode
+                ? 0.5
+                : attack.cooldownTime;
             this.meleeAttacks = [...attack.damageTimes];
         }
 
