@@ -13,7 +13,7 @@ change wonder-weapon probabilities or use their legendary pickup treatment.
 | Firing interval | 0.067 seconds, approximately 896 RPM | Same |
 | Reload definition | 3.5 seconds | Same |
 | Zombie operator reload | 3.15 seconds | Same |
-| With Speed Cola | 2.0475 seconds | Same |
+| With Speed Cola | 1.84275 seconds | Same |
 
 It uses the existing 7.62 mm inventory pool and spawns with 213 reserve rounds.
 Range is 86 units, with damage falling toward 70% at maximum range. Its spread

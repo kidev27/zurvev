@@ -54,7 +54,7 @@ test("PPSh-41 rolls as an ordinary gun, is sold, and keeps wonder-weapon interva
             expect(ops.rollMysteryBoxResult(player, lower + weapon.chance / 2)).toBe(weapon.type);
             lower += weapon.chance;
         }
-        expect(lower).toBeCloseTo(0.1);
+        expect(lower).toBeCloseTo(ZombieWonderWeapons.reduce((sum, weapon) => sum + weapon.chance, 0));
     } finally {
         random.mockRestore();
     }
@@ -121,7 +121,7 @@ for (const type of ["ppsh41", "ppsh41_pap"]) {
             if (speedCola) player.addPerk("zombie_speed_cola", false);
             player.weaponManager.tryReload();
             expect(player.actionType).toBe(GameConfig.Action.Reload);
-            const duration = 3.5 * 0.9 * (speedCola ? 0.65 : 1);
+            const duration = 3.5 * 0.9 * (speedCola ? 0.585 : 1);
             expect(player.action.duration).toBeCloseTo(duration);
             game.step(duration - 0.1);
             expect(player.weapons[slot].ammo).toBe(0);

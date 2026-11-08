@@ -1400,6 +1400,7 @@ export const BaseDefs: Record<string, GunDef> = {
         sound: {
             shoot: "pkp_01",
             reload: "pkp_reload_01",
+            reloadDuration: 5.075,
             pickup: "gun_pickup_01",
             empty: "empty_fire_02",
             deploy: "pkp_switch_01",
@@ -3784,6 +3785,77 @@ export const BaseDefs: Record<string, GunDef> = {
         },
     },
 };
+
+BaseDefs.mp40 = defineGunSkin("mp5", {
+    name: "MP40",
+    maxClip: 32,
+    maxReload: 32,
+    extendedClip: 40,
+    extendedReload: 40,
+    ammoSpawnCount: 96,
+    reloadTime: 2.6,
+    fireDelay: 0.11,
+    moveSpread: 5.5,
+    shotSpread: 2.5,
+    bulletType: "bullet_mp40",
+    lootImg: { sprite: "loot-weapon-mp40.img", tint: 0xffffff },
+    worldImg: { sprite: "gun-mp40-top.img", scale: { x: 0.5, y: 0.5 }, tint: 0xffffff, leftHandOffset: { x: 4, y: 0 } },
+    sound: { shoot: "mp40_01", reload: "mp40_reload_01", reloadDuration: 2.05 },
+});
+BaseDefs.fal = defineGunSkin("scar", {
+    name: "FN FAL",
+    ammoSpawnCount: 100,
+    reloadTime: 2.9,
+    fireDelay: 0.13,
+    barrelLength: 3.6,
+    shotSpread: 1.75,
+    moveSpread: 5.5,
+    bulletType: "bullet_fal",
+    lootImg: { sprite: "loot-weapon-fal.img", tint: 0xffffff },
+    worldImg: { sprite: "gun-fal-top.img", scale: { x: 0.5, y: 0.5 }, leftHandOffset: { x: 6, y: 0 }, recoil: 1.6 },
+    sound: { shoot: "fal_01", reload: "fal_reload_01", reloadDuration: 2.35 },
+});
+BaseDefs.rpd = defineGunSkin("dp28", {
+    name: "RPD",
+    maxClip: 100,
+    maxReload: 100,
+    extendedClip: 150,
+    extendedReload: 150,
+    ammoSpawnCount: 200,
+    reloadTime: 5,
+    fireDelay: 0.092,
+    barrelLength: 3.8,
+    moveSpread: 8,
+    shotSpread: 2.75,
+    bulletType: "bullet_rpd",
+    speed: { equip: -0.5, attack: -2 },
+    lootImg: { sprite: "loot-weapon-rpd.img", tint: 0xffffff },
+    worldImg: { sprite: "gun-rpd-top.img", scale: { x: 0.5, y: 0.5 } },
+    sound: { shoot: "rpd_01", reload: "rpd_reload_01", reloadDuration: 4.05 },
+});
+delete BaseDefs.rpd.worldImg.magImg;
+BaseDefs.winchester1887 = defineGunSkin("m870", {
+    name: "Winchester 1887",
+    maxClip: 6,
+    extendedClip: 8,
+    ammoSpawnCount: 24,
+    reloadTime: 0.8,
+    fireDelay: 0.8,
+    pullDelay: 0.8,
+    barrelLength: 3.3,
+    bulletCount: 8,
+    shotSpread: 11,
+    bulletType: "bullet_winchester1887",
+    lootImg: { sprite: "loot-weapon-winchester1887.img", tint: 0xffffff },
+    worldImg: { sprite: "gun-winchester1887-top.img", scale: { x: 0.5, y: 0.5 }, tint: 0xffffff, recoil: 1.8 },
+    sound: {
+        shoot: "winchester1887_01",
+        reload: "winchester1887_reload_01",
+        reloadDuration: 0.72,
+        cycle: "winchester1887_cycle_01",
+        pull: "winchester1887_cycle_01",
+    },
+});
 
 const SkinDefs: Record<string, GunDef> = {
     svd_winter: defineGunSkin("svd", {

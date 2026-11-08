@@ -95,6 +95,7 @@ export function zombieBuyGateCost(type: string): number | undefined {
 export const ZombieMysteryBoxWeapons = [
     "mp5",
     "ppsh41",
+    "mp40",
     "mac10",
     "ump9",
     "vector",
@@ -103,8 +104,10 @@ export const ZombieMysteryBoxWeapons = [
     "m4a1",
     "ak47",
     "scar",
+    "fal",
     "an94",
     "m870",
+    "winchester1887",
     "m1100",
     "saiga",
     "spas12",
@@ -114,6 +117,8 @@ export const ZombieMysteryBoxWeapons = [
     "sv98",
     "awc",
     "dp28",
+    "rpd",
+    "pkp",
     "m249",
     "qbb97",
 ] as const;

@@ -994,4 +994,9 @@ export const BaseDefs: Record<string, BulletDef> = {
     },
 };
 
+BaseDefs.bullet_mp40 = { ...BaseDefs.bullet_mp5, damage: 14, distance: 80, falloff: 0.72 };
+BaseDefs.bullet_fal = { ...BaseDefs.bullet_scar, damage: 23, distance: 160, speed: 112, falloff: 0.82 };
+BaseDefs.bullet_rpd = { ...BaseDefs.bullet_dp28, damage: 14, distance: 185, speed: 105, falloff: 0.85 };
+BaseDefs.bullet_winchester1887 = { ...BaseDefs.bullet_buckshot, damage: 14, distance: 29, speed: 68, falloff: 0.35 };
+
 export const BulletDefs: Record<string, BulletDef> = { ...BaseDefs };

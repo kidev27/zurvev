@@ -12,6 +12,11 @@ const names = [
     ["tesla_rifle", "Tesla Rifle"],
     ["gravegun", "Gravegun"],
     ["ppsh41", "PPSh-41"],
+    ["mp40", "MP40"],
+    ["fal", "FN FAL"],
+    ["rpd", "RPD"],
+    ["winchester1887", "Winchester 1887"],
+    ["pkp", "PKP Pecheneg"],
 ] as const;
 
 for (const [type, name] of names) {

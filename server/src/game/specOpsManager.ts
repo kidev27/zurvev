@@ -7430,6 +7430,7 @@ export class SpecOpsManager implements PracticeHost {
         player.zombiePowerUpsDirty = true;
         if (!player.chest) player.chest = "chest01";
         if (!player.helmet) player.helmet = "helmet01";
+        if (this.zombieMode && player.getGearLevel(player.backpack) < 1) player.backpack = "backpack01";
         player.invManager.give("bandage", 10);
         player.invManager.give("soda", 4);
         player.setDirty();
