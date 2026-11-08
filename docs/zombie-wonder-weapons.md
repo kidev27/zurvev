@@ -1,5 +1,19 @@
 # Zombie wonder weapons
 
+## Practice compatibility
+
+The Pressure Cannon uses a Zombies-only cone-damage handler; its visible
+projectiles deal no damage. Practice excludes it from player and bot loadouts,
+random bot selection, and the item spawner. The server also rejects direct spawn
+requests for both the base gun and its Mk II version. Old saved loadouts fall
+back to the normal Practice defaults.
+
+The Ray Gun, Tesla Rifle and Gravegun retain their existing Practice selections
+and normal damage paths. PPSh-41, MP40, FN FAL, RPD, Winchester 1887 and PKP also
+remain available, using Practice's native magazines and reload timers.
+
+
+
 The mystery box can roll three additional weapons alongside the Ray Gun. Each
 has original top-down, floor and HUD sprites and an original firing sound.
 

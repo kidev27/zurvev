@@ -105,6 +105,7 @@ class GameServer {
                 json: {
                     regionId: this.regionId,
                     name: this.region.name,
+                    l10n: this.region.l10n,
                     url: this.region.url
                         || (this.region.publicAddress
                             ? `${this.region.https ? "https" : "http"}://${this.region.publicAddress}`

@@ -244,8 +244,10 @@ type CompactGameSection = {
     /** Server id (handshake / dropdown). Alias of thisRegion. */
     id?: string;
     thisRegion?: string;
-    /** Display name in the Server dropdown. */
+    /** Server name, used when no geographic translation is available. */
     name?: string;
+    /** Geographic translation key, e.g. "index-north-america". */
+    l10n?: string;
     /** Player-facing URL (https://host). */
     url?: string;
     /** Host:port the master API uses to reach this game manager. */
@@ -388,7 +390,7 @@ function applyServiceSections(local: RawLocalConfig): void {
             local.thisRegion = id;
         }
 
-        const hasFlatIdentity = !!(g.name || g.url || g.address || id);
+        const hasFlatIdentity = !!(g.name || g.l10n || g.url || g.address || id);
         if (hasFlatIdentity) {
             const regionId = id
                 || Object.keys(local.regions ?? {})[0]
@@ -405,7 +407,7 @@ function applyServiceSections(local: RawLocalConfig): void {
                 ...(g.name != null ? { name: g.name } : {}),
                 ...(g.url != null ? { url: g.url } : {}),
                 ...(prev.publicAddress ? { publicAddress: prev.publicAddress } : {}),
-                ...(prev.l10n ? { l10n: prev.l10n } : {}),
+                ...(g.l10n != null ? { l10n: g.l10n } : {}),
             };
         }
 
@@ -938,7 +940,7 @@ export function getConfig(isProduction: boolean, dir: string) {
 
         const named = region.name?.trim();
         region.name = named || titleCaseServerId(id);
-        if (!region.l10n) region.l10n = `index-${id}`;
+        region.l10n = region.l10n?.trim() || `index-${id}`;
     }
 
     const googleLogin = !!(

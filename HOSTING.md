@@ -92,6 +92,31 @@ curl -fsSL https://bun.sh/install | bash
 source ~/.bashrc
 ```
 
+### Geographic server labels
+
+Set `game.l10n` on each game host to its geographic translation key. For the
+North America deployment, keep the existing id and endpoints and add:
+
+```hjson
+game: {
+  id: "main"
+  name: "Fireteam"
+  l10n: "index-north-america"
+  // Keep the rest of the current game configuration.
+}
+```
+
+The main and squad selectors display `North America [0 players]`, with the count
+refreshed from live server data. Other built-in keys include `index-europe`,
+`index-asia`, `index-south-america`, `index-russia`, `index-korea`, and
+`index-local`. Choose each node's actual location; an unknown key falls back to
+its configured name.
+
+This metadata is carried through game-node registration and survives config
+saves. Older nodes that omit it keep the master's configured key. After updating
+an existing deployment's config, restart its game process so it registers the
+new key. No region id, address, URL, or matchmaking value needs to change.
+
 ### Database (optional)
 
 Needed only for accounts / OAuth-backed features. Spec Ops leaderboards work on SQLite without Postgres.
