@@ -9904,7 +9904,7 @@ export class SpecOpsManager implements PracticeHost {
         if (!this.practice || player.specOpsAi || player.dead) return;
         if (clear) player.clearInventoryForPractice();
         const def = GameObjectDefs.typeToDefSafe(item);
-        if (!def || !("lootImg" in def)) return;
+        if (!def || !("lootImg" in def) || (def.type === "gun" && def.pressureBlast)) return;
         const stackable = ["ammo", "heal", "boost", "throwable"].includes(def.type);
         const amount = stackable && Number.isFinite(count) ? math.clamp(Math.round(count), 1, 999) : 1;
         let pos = v2.copy(player.pos);

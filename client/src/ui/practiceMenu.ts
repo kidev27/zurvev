@@ -142,7 +142,7 @@ function itemLabel(type: string): string {
 function giveItemGroups(): Array<{ label: string; items: string[] }> {
     const all = GameObjectDefs.getAllTypes().filter((type) => {
         const def = GameObjectDefs.typeToDefSafe(type);
-        return !!def && "lootImg" in def;
+        return !!def && "lootImg" in def && (def.type !== "gun" || !def.pressureBlast);
     });
     return GiveCategories.map(([cat, label]) => ({
         label,
