@@ -156,6 +156,12 @@ import {
 
 export type SpecOpsKind = "enemy" | "ally" | "sentry";
 
+interface EnemySpawnPoint {
+    pos: Vec2;
+    /** Enemy spawn candidates are validated on the surface. */
+    layer: 0;
+}
+
 interface BuildingStationSlot {
     building: Building;
     size: "small" | "medium" | "large";
@@ -8322,7 +8328,7 @@ export class SpecOpsManager implements PracticeHost {
         humans: Player[],
         indexInSquad = 0,
         squadSize = 1,
-    ): Vec2 | undefined {
+    ): EnemySpawnPoint | undefined {
         if (this.zombieMode && lastCallBlock(this.game)) {
             // Zombies climb in through the windows (and manholes) of opened rooms only.
             const open = lastCallOpenZones(this.game);
@@ -8342,7 +8348,7 @@ export class SpecOpsManager implements PracticeHost {
                         const pos = attempt === 0
                             ? v2.copy(entry.pos)
                             : v2.add(entry.pos, util.randomPointInCircle(attempt < 6 ? 2.5 : 5.5));
-                        if (this.enemySpawnOk(pos, origin, minDist, host, humans, 2.4)) return pos;
+                        if (this.enemySpawnOk(pos, origin, minDist, host, humans, 2.4)) return { pos, layer: 0 };
                     }
                 }
             }
@@ -8352,12 +8358,12 @@ export class SpecOpsManager implements PracticeHost {
         }
 
         const map = this.game.map;
-        const tryPos = (angle: number, radius: number): Vec2 | undefined => {
+        const tryPos = (angle: number, radius: number): EnemySpawnPoint | undefined => {
             const pos = v2.add(
                 origin,
                 v2.create(Math.cos(angle) * radius, Math.sin(angle) * radius),
             );
-            if (this.enemySpawnOk(pos, origin, minRad, host, humans)) return pos;
+            if (this.enemySpawnOk(pos, origin, minRad, host, humans)) return { pos, layer: 0 };
             return undefined;
         };
 
@@ -8399,7 +8405,7 @@ export class SpecOpsManager implements PracticeHost {
         );
         map.clampToMapBounds(fallback, 10);
         if (this.enemySpawnOk(fallback, origin, minRad, host, humans)) {
-            return fallback;
+            return { pos: fallback, layer: 0 };
         }
         // Last resort: walk toward the map center until we are clear of operators.
         const dir = v2.normalizeSafe(v2.sub(map.center, origin), v2.create(1, 0));
@@ -8407,7 +8413,7 @@ export class SpecOpsManager implements PracticeHost {
             const pos = v2.add(origin, v2.mul(dir, step));
             map.clampToMapBounds(pos, 10);
             if (this.enemySpawnOk(pos, origin, minRad, host, humans)) {
-                return pos;
+                return { pos, layer: 0 };
             }
         }
         // Tight starting rooms can lack a legal point at the normal outdoor
@@ -8421,7 +8427,7 @@ export class SpecOpsManager implements PracticeHost {
                         origin,
                         v2.create(Math.cos(angle) * radius, Math.sin(angle) * radius),
                     );
-                    if (this.enemySpawnOk(pos, origin, 4, host, humans)) return pos;
+                    if (this.enemySpawnOk(pos, origin, 4, host, humans)) return { pos, layer: 0 };
                 }
             }
         }
@@ -8466,7 +8472,7 @@ export class SpecOpsManager implements PracticeHost {
         }
         if (maxRad < minRad + 6) maxRad = minRad + 6;
 
-        const pos = this.pickEnemySpawn(
+        const spawn = this.pickEnemySpawn(
             origin,
             approachAngle,
             minRad,
@@ -8476,7 +8482,7 @@ export class SpecOpsManager implements PracticeHost {
             indexInSquad,
             squadSize,
         );
-        if (!pos) {
+        if (!spawn) {
             this.game.logger.warn(`No reachable spawn point for ${kind}`);
             return undefined;
         }
@@ -8486,7 +8492,7 @@ export class SpecOpsManager implements PracticeHost {
         let player: Player;
         try {
             player = this.game.playerBarn.addTestPlayer({
-                pos,
+                pos: spawn.pos,
                 name: template.name,
                 team: this.aiTeam,
                 specOpsAi: true,
@@ -8496,6 +8502,7 @@ export class SpecOpsManager implements PracticeHost {
             return undefined;
         }
 
+        player.layer = spawn.layer;
         this.equipAi(player, { ...template, gun }, "enemy", kind);
         const brain = new AiBrain(player, { ...template, gun }, this.wave, "enemy", -1, kind);
         brain.anchor = host;
@@ -10278,7 +10285,7 @@ export class SpecOpsManager implements PracticeHost {
             brain.resolveAnchor(this);
             const origin = brain.anchor?.pos ?? this.centroid(humans);
             const angle = (i / spread) * Math.PI * 2 + util.random(-0.2, 0.2);
-            const pos = this.pickEnemySpawn(
+            const spawn = this.pickEnemySpawn(
                 origin,
                 angle,
                 MinRelocateDist,
@@ -10288,24 +10295,26 @@ export class SpecOpsManager implements PracticeHost {
                 i,
                 stuck.length,
             );
-            if (!pos) {
+            if (!spawn) {
                 brain.relocateCooldown = 2;
                 continue;
             }
-            v2.set(brain.player.pos, pos);
+            v2.set(brain.player.pos, spawn.pos);
+            brain.player.layer = spawn.layer;
             brain.player.game.grid.updateObject(brain.player);
             brain.player.setDirty();
             brain.detourPos = undefined;
             brain.coverPos = undefined;
+            brain.stairTarget = undefined;
             brain.stuckStrikes = 0;
             brain.idleTicker = 0;
-            brain.idleSample = v2.copy(pos);
-            brain.lastPos = v2.copy(pos);
+            brain.idleSample = v2.copy(spawn.pos);
+            brain.lastPos = v2.copy(spawn.pos);
             brain.trail.length = 0;
             brain.failedWaypoints.length = 0;
             brain.relocateCooldown = 6;
             brain.pathSideSign *= -1;
-            this.nav.penalize(pos, 1.2);
+            this.nav.penalize(spawn.pos, 1.2);
         }
     }
 }

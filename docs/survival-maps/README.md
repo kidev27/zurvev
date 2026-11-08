@@ -45,6 +45,10 @@ leave transit layers. Room caches include floors, and navigation samples both
 floors while rejecting polygon voids. Body-clear direct pursuit stops generic
 wall avoidance from steering away from a player near a wall.
 
+Stuck-enemy recovery uses the same opened-room surface entries as spawning and
+applies the destination position and floor together. It clears the old stair
+target so a recovered zombie can route toward operators on either floor.
+
 Mystery-box relocation respects opened rooms and transfers the obstacle's real
 layer. Stations and melee check floors, preventing use or attacks through a
 ceiling. The original After Hours spawn fallback and all its rules are retained.
@@ -60,9 +64,10 @@ bun run test --run survivalMaps lastCall zombieMode
 The focused suite checks every entry and open doorway, station approaches,
 power, closed-zone spawning, spawning while operators are downstairs, both
 native player stair transitions, actual zombie down-and-up pursuit at both
-stairs, and cross-floor melee isolation. Type checks cover shared, server and
-client code. The new objects, atlases and generated SVGs have separate asset
-validation tests.
+stairs, cross-floor melee isolation, recovery from basement and stair transit
+layers, and advancing a wave after shooting its recovered last zombie. Type
+checks cover shared, server and client code. The new objects, atlases and
+generated SVGs have separate asset validation tests.
 
 Generated concept illustrations are art-direction references, not screenshots
 or collision plans. The implemented game geometry and SVGs are authoritative.

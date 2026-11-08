@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { Game } from "../../server/src/game/game.ts";
-import { lastCallOpenZones, lastCallWalkable } from "../../server/src/game/lastCallNav.ts";
+import {
+    lastCallNavPoints,
+    lastCallOpenZones,
+    lastCallPosReachable,
+    lastCallWalkable,
+} from "../../server/src/game/lastCallNav.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
 import { MapNavGraph } from "../../server/src/game/specOpsNav.ts";
 import { MapDefs } from "../../shared/defs/mapDefs.ts";
@@ -17,7 +22,7 @@ import {
 } from "../../shared/defs/maps/survival/layout.ts";
 import { ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { MapObjectDefs } from "../../shared/defs/register.ts";
-import { TeamMode } from "../../shared/gameConfig.ts";
+import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
 import { ObjectType } from "../../shared/net/objectSerializeFns.ts";
 import { collider } from "../../shared/utils/collider.ts";
 import { util } from "../../shared/utils/util.ts";
@@ -208,6 +213,77 @@ for (const layout of SurvivalLayouts) {
             game.specOps!.drainWaveSpawnQueuePublic();
             expect(game.specOps!.livingEnemies().length).toBeGreaterThan(0);
             expect(game.specOps!.livingEnemies().every(zombie => zombie.layer === 0)).toBe(true);
+        });
+
+        test.each([
+            { fromLayer: 1, targetLayer: 0 },
+            { fromLayer: 2, targetLayer: 0 },
+            { fromLayer: 3, targetLayer: 0 },
+            { fromLayer: 1, targetLayer: 1 },
+        ])("recovery from layer $fromLayer reaches an operator on layer $targetLayer", ({ fromLayer, targetLayer }) => {
+            const { game, operator } = open(layout);
+            const ops = game.specOps!;
+            const stair = game.map.structures.find(s => s.type === structureType(layout))!.stairs[0];
+            const zombie = ops.spawnEnemyPublic("zombie_walker");
+            const basement = lastCallNavPoints(game, 1).find(p => lastCallWalkable(game, p, p, zombie.rad, 1))!;
+            expect(basement).toBeDefined();
+            if (targetLayer === 1) place(operator, v2.add(stair.center, v2.mul(stair.downDir, 8)), 1);
+            place(zombie, fromLayer === 1 ? basement : stair.center, fromLayer);
+            const brain = ops.getBrainPublic(zombie)!;
+            brain.stairTarget = stair;
+            brain.detourPos = v2.copy(stair.center);
+
+            ops.forceRelocateEnemyPublic(zombie);
+
+            expect(zombie.layer).toBe(0);
+            expect(lastCallWalkable(game, zombie.pos, zombie.pos, zombie.rad, zombie.layer)).toBe(true);
+            expect(lastCallPosReachable(game, zombie.pos, undefined, zombie.layer)).toBe(true);
+            expect(brain.stairTarget).toBeUndefined();
+            const graph = ops.ensureNavGraph();
+            expect(graph.path(game, zombie.pos, operator.pos, zombie.layer, targetLayer)).not.toBeNull();
+            const recoveredAt = v2.copy(zombie.pos);
+            for (let i = 0; i < 10; i++) game.update(0.05);
+            expect(zombie.layer).toBe(0);
+            expect(lastCallWalkable(game, zombie.pos, zombie.pos, zombie.rad, zombie.layer)).toBe(true);
+            expect(v2.distance(zombie.pos, recoveredAt)).toBeGreaterThan(0.1);
+        });
+
+        test("the recovered last zombie can be shot on its real floor and the wave completes", () => {
+            const { game, operator } = open(layout);
+            const ops = game.specOps!;
+            ops.startNextWave();
+            ops.drainWaveSpawnQueuePublic();
+            const [last, ...others] = ops.livingEnemies();
+            expect(last).toBeDefined();
+            for (const enemy of others) {
+                enemy.damage({
+                    amount: 9999,
+                    damageType: GameConfig.DamageType.Player,
+                    dir: v2.create(1, 0),
+                    source: operator,
+                });
+            }
+            expect(ops.livingEnemies()).toEqual([last]);
+            const basement = lastCallNavPoints(game, 1).find(p => lastCallWalkable(game, p, p, last.rad, 1))!;
+            place(last, basement, 1);
+            ops.forceRelocateEnemyPublic(last);
+            expect(last.layer).toBe(0);
+            const approach = [v2.create(6, 0), v2.create(-6, 0), v2.create(0, 6), v2.create(0, -6)]
+                .map(offset => v2.add(last.pos, offset))
+                .find(pos => lastCallWalkable(game, pos, last.pos, operator.rad, 0));
+            expect(approach).toBeDefined();
+            place(operator, approach!, 0);
+            operator.dir = v2.normalizeSafe(v2.sub(last.pos, operator.pos));
+            operator.weaponManager.setWeapon(GameConfig.WeaponSlot.Primary, "raygun", 20);
+            operator.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Primary);
+            operator.weaponManager.fireWeapon(false);
+            for (let i = 0; i < 20 && !last.dead; i++) game.update(0.05);
+            expect(last.dead).toBe(true);
+            game.update(0.05);
+            expect(ops.phase).toBe("intermission");
+            game.step(8.1);
+            expect(ops.wave).toBe(2);
+            expect(ops.phase).toBe("combat");
         });
 
         test("a zombie cannot melee through the floor but can hurt an operator on its own floor", () => {
