@@ -1,4 +1,5 @@
 import $ from "jquery";
+import { COMMUNITY_DISCORD_URL } from "../graphicsQuality.ts";
 import type { Application } from "../main";
 import type { SDKManager as BaseSDKManager } from "./sdk-manager";
 
@@ -126,10 +127,16 @@ export class SDKManager implements BaseSDKManager {
             $("#btn-start-fullscreen").hide();
 
             $("#left-column").hide();
-            if (!this.isSpellSync) $("#btn-discord-top-right").show();
+            $("#btn-discord-home").toggle(!this.isSpellSync);
             $(".surviv-shirts")
                 .css("background-image", "url(./img/discord-promo.png)")
-                .html(`<a href="https://discord.gg/6uRdCdkTPt" target="_blank"></a>`);
+                .empty()
+                .append($("<a/>", {
+                    href: COMMUNITY_DISCORD_URL,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    "aria-label": "Zurvev Discord",
+                }));
 
             if (this.isSpellSync) {
                 $("a[href='changelogRec.html']").hide();

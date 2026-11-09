@@ -2937,10 +2937,6 @@ body.steam-deck .specops-start .specops-lb-sidebar {
   background-size: 960px 720px;
 }
 
-.specops-start #btn-discord-top-right {
-  display: none !important;
-}
-
 /* Every dropdown on the menu is dark, including the open option list. */
 .specops-start select.specops-select,
 .specops-start select.specops-select.menu-option {
@@ -3696,4 +3692,50 @@ body[data-home-mode="zombies"] {
   border: 0 !important;
   border-radius: 3px !important;
   color: var(--kit-text) !important;
+}
+
+/* Keep the community entry beside the footer controls on desktop and phones. */
+.specops-start #start-bottom-left {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.specops-start .specops-footer-discord {
+  align-items: center;
+  background: var(--kit-tile);
+  border: 1px solid var(--kit-line);
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--kit-text);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  line-height: 1.2;
+  min-height: 36px;
+  padding: 8px 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.specops-start .specops-footer-discord:hover {
+  border-color: var(--kit-gold);
+  color: var(--kit-gold);
+}
+
+.specops-start .specops-footer-discord:focus-visible,
+.specops-start .specops-footer-discord.menu-gamepad-focus {
+  outline: 2px solid var(--kit-gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .specops-start .specops-footer-discord {
+    padding: 8px;
+  }
+
+  .specops-start .specops-footer-discord [data-l10n] {
+    display: none;
+  }
 }

@@ -4,9 +4,9 @@
 
 [Play Zurvev](https://52-162-233-43.sslip.io/)
 
-- Fireteam release: **1.7** (final official release)
+- Zurvev release: **1.0**
 - Built on Survev **0.3.12**
-- Discord: TBD
+- [Zurvev Discord](https://discord.gg/RJ6PDuZC9n) — suggest features, report bugs, and find people to play with.
 
 
 ## Game modes

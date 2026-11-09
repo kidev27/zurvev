@@ -30,9 +30,6 @@ import { Game } from "./game.ts";
 import {
     advancedDefaultsForQuality,
     clampRenderScale,
-    COMMUNITY_ANNOUNCEMENT_ENABLED,
-    COMMUNITY_ANNOUNCEMENT_SNOOZE_MS,
-    COMMUNITY_ANNOUNCEMENT_VERSION,
     parseGraphicsQuality,
     pixiResolution,
     resolveGraphicsProfile,
@@ -67,6 +64,7 @@ import { ResourceManager } from "./resources.ts";
 import { SDK } from "./sdk/sdk.ts";
 import { resolveServerId, SiteInfo } from "./siteInfo.ts";
 import { focusGameCanvas, requestSteamDeckFullscreen, setupSteamDeck } from "./steamDeck.ts";
+import { setupCommunityAnnouncement } from "./ui/communityAnnouncement.ts";
 import { LoadoutMenu } from "./ui/loadoutMenu.ts";
 import { Localization } from "./ui/localization.ts";
 import Menu from "./ui/menu.ts";
@@ -555,64 +553,9 @@ export class Application {
             this.onConfigModified();
             this.config.addModifiedListener(this.onConfigModified.bind(this));
             loadStaticDomImages();
-            this.setupCommunityAnnouncement();
+            setupCommunityAnnouncement(this.communityAnnounceModal, this.config, () => this.active);
 
             SDK.gameLoadComplete();
-        }
-    }
-
-    private communityAnnounceSessionKey() {
-        return `specops_announce_session_${COMMUNITY_ANNOUNCEMENT_VERSION}`;
-    }
-
-    private shouldShowCommunityAnnouncement() {
-        if (!COMMUNITY_ANNOUNCEMENT_ENABLED) return false;
-        try {
-            if (sessionStorage.getItem(this.communityAnnounceSessionKey()) === "1") {
-                return false;
-            }
-        } catch (_e) {}
-        const hideUntil = Number(this.config.get("announcementHideUntil") || 0);
-        const seenVer = Number(this.config.get("announcementVersionSeen") || 0);
-        if (
-            seenVer >= COMMUNITY_ANNOUNCEMENT_VERSION
-            && hideUntil > Date.now()
-        ) {
-            return false;
-        }
-        return true;
-    }
-
-    setupCommunityAnnouncement() {
-        $("#btn-community-announce-close").on("click", () => {
-            try {
-                sessionStorage.setItem(this.communityAnnounceSessionKey(), "1");
-            } catch (_e) {}
-            this.communityAnnounceModal.hide();
-        });
-        $("#btn-community-announce-snooze").on("click", () => {
-            this.config.set(
-                "announcementHideUntil",
-                Date.now() + COMMUNITY_ANNOUNCEMENT_SNOOZE_MS,
-            );
-            this.config.set("announcementVersionSeen", COMMUNITY_ANNOUNCEMENT_VERSION);
-            try {
-                sessionStorage.setItem(this.communityAnnounceSessionKey(), "1");
-            } catch (_e) {}
-            this.communityAnnounceModal.hide();
-        });
-        this.communityAnnounceModal.onHide(() => {
-            try {
-                sessionStorage.setItem(this.communityAnnounceSessionKey(), "1");
-            } catch (_e) {}
-        });
-        if (this.shouldShowCommunityAnnouncement()) {
-            // Slight delay so the start menu paints first.
-            setTimeout(() => {
-                if (this.active && this.shouldShowCommunityAnnouncement()) {
-                    this.communityAnnounceModal.show(true);
-                }
-            }, 600);
         }
     }
 
