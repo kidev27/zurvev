@@ -10,7 +10,7 @@ Workflow:
 
 Copy `survev-config.production.example.hjson` if you are starting from scratch.
 
-Discord: https://discord.gg/w2MDPCpYqC
+Zurvev Discord: https://discord.gg/RJ6PDuZC9n
 
 ## Architecture
 

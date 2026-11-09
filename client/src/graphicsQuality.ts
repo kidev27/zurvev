@@ -258,9 +258,9 @@ export function explosionRippleMult(highResTex: boolean): number {
 }
 
 /** Set to true to show the start-menu Discord announcement again. */
-export const COMMUNITY_ANNOUNCEMENT_ENABLED = false;
+export const COMMUNITY_ANNOUNCEMENT_ENABLED = true;
 /** Bump when announcement copy changes so snoozed users see the new note. */
-export const COMMUNITY_ANNOUNCEMENT_VERSION = 5;
+export const COMMUNITY_ANNOUNCEMENT_VERSION = 6;
 export const COMMUNITY_ANNOUNCEMENT_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
-export const COMMUNITY_DISCORD_URL = "https://discord.gg/w2MDPCpYqC";
+export const COMMUNITY_DISCORD_URL = "https://discord.gg/RJ6PDuZC9n";
 export const COMMUNITY_CHANGELOG_URL = "changelogRec.html";

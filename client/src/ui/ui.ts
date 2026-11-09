@@ -53,6 +53,7 @@ import { device } from "../device.ts";
 import { errorLogManager } from "../errorLogs.ts";
 import type { Game } from "../game.ts";
 import { type Gas, GasRenderer, GasSafeZoneRenderer } from "../gas.ts";
+import { COMMUNITY_DISCORD_URL } from "../graphicsQuality.ts";
 import { helpers } from "../helpers.ts";
 import type { InputBinds, InputBindUi } from "./../inputBinds.ts";
 import type { SoundHandle } from "../lib/createJS.ts";
@@ -2094,9 +2095,9 @@ export class UiManager {
             support.append(
                 $("<a/>", {
                     class: "menu-option btn-darken ui-specops-wait-link",
-                    href: "https://discord.gg/w2MDPCpYqC",
+                    href: COMMUNITY_DISCORD_URL,
                     target: "_blank",
-                    rel: "noopener",
+                    rel: "noopener noreferrer",
                     html: this.localization.translate("game-specops-wait-discord"),
                 }),
             );
