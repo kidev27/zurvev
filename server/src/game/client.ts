@@ -451,6 +451,7 @@ export class Client {
     private _bootstrapSent = false;
     /** Player ids whose PlayerInfo has already been sent to this client. */
     private _sentPlayerInfoIds = new Set<number>();
+    private _pendingDeletedPlayerIds = new Set<number>();
     visibleObjects = new Set<GameObject>();
     private _visibleObjectsScratch = new Set<GameObject>();
     visibleMapIndicators = new Set<MapIndicator>();
@@ -586,48 +587,42 @@ export class Client {
         this._bootstrapSent = true;
     }
 
-    /**
-     * Spec Ops can have hundreds of AI players. Dumping all PlayerInfos on the
-     * first Update overflows the 8-bit array and bloated packets stall reconnect.
-     * Send humans up front; attach AI infos the first time they enter visibility.
-     */
+    /** Keep allied status metadata available, including support outside visibility. */
     private collectPlayerInfos(
-        playerBarn: { players: Player[]; newPlayers: Player[] },
-        fullObjects: Array<{ __id: number; __type: ObjectType }>,
+        playerBarn: { players: Player[] },
+        visibleObjects: Iterable<GameObject>,
+        teamId: number,
     ): Player[] {
         const out: Player[] = [];
         const pushInfo = (p: Player) => {
-            if (this._sentPlayerInfoIds.has(p.__id)) return;
+            if (
+                out.length >= 255
+                || this._pendingDeletedPlayerIds.has(p.__id)
+                || this._sentPlayerInfoIds.has(p.__id)
+            ) return;
             this._sentPlayerInfoIds.add(p.__id);
             out.push(p);
         };
 
-        if (this._firstUpdate) {
-            const players = playerBarn.players;
-            for (let i = 0; i < players.length; i++) {
-                const p = players[i];
-                if (this.game.map.specOpsMode && p.specOpsAi) continue;
-                pushInfo(p);
-            }
-        } else {
-            const news = playerBarn.newPlayers;
-            for (let i = 0; i < news.length; i++) {
-                pushInfo(news[i]);
-            }
+        for (const p of playerBarn.players) {
+            if (this.game.map.specOpsMode && p.specOpsAi && p.teamId !== teamId) continue;
+            pushInfo(p);
         }
-
-        for (let i = 0; i < fullObjects.length; i++) {
-            const obj = fullObjects[i];
-            if (obj.__type !== ObjectType.Player) continue;
-            pushInfo(obj as Player);
+        // Retry visible metadata on later updates if the 8-bit batch filled up.
+        for (const obj of visibleObjects) {
+            if (obj.__type === ObjectType.Player) pushInfo(obj);
         }
-
         return out;
     }
 
     sendMsgs(): void {
         const player = this.spectating ?? this.player;
         if (!player) return;
+
+        for (const id of this.game.playerBarn.deletedPlayers) {
+            this._sentPlayerInfoIds.delete(id);
+            this._pendingDeletedPlayerIds.add(id);
+        }
 
         if (this.socket.isBackpressured()) {
             this._consecutiveBackpressure++;
@@ -792,13 +787,22 @@ export class Client {
         }
         this.lastPlayerId = player.__id;
 
-        updateMsg.playerInfos = this.collectPlayerInfos(playerBarn, updateMsg.fullObjects);
+        updateMsg.deletedPlayerIds = [...this._pendingDeletedPlayerIds].slice(0, 255);
+        for (const id of updateMsg.deletedPlayerIds) {
+            this._pendingDeletedPlayerIds.delete(id);
+        }
+        updateMsg.playerInfos = this.collectPlayerInfos(
+            playerBarn,
+            this.visibleObjects,
+            player.teamId,
+        );
 
-        updateMsg.deletedPlayerIds = playerBarn.deletedPlayers;
-
-        if (!minimalSync && playerBarn.playerStatusTicker > playerBarn.playerStatusRate) {
-            let statuses = player.getPlayerStatus();
-            updateMsg.playerStatus = statuses;
+        if (
+            !minimalSync
+            && this._pendingDeletedPlayerIds.size === 0
+            && playerBarn.playerStatusTicker > playerBarn.playerStatusRate
+        ) {
+            updateMsg.playerStatus = player.getPlayerStatus();
             updateMsg.playerStatusDirty = true;
         }
 
