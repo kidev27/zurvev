@@ -137,7 +137,7 @@ export const PrivateRouter = new Hono<Context>()
 
         if (!Config.database.enabled) {
             try {
-                insertLocalMatchData(matchData);
+                insertLocalMatchData(matchData, data.context);
             } catch (err) {
                 server.logger.error("Failed to save game to local SQLite", err);
                 return c.json({ error: "save_failed" }, 500);

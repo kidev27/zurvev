@@ -9,6 +9,7 @@ import {
     resolveLeaderboardLimit,
 } from "../../../../shared/types/stats.ts";
 import { leaderboardRunDetails } from "../../../../shared/utils/leaderboard.ts";
+import type { MatchContext } from "../../../../shared/utils/matchContext.ts";
 import { Config } from "../../config.ts";
 import type { SaveGameBody } from "../../utils/types.ts";
 import { isMongo } from "./dialect.ts";
@@ -73,6 +74,12 @@ function getDb() {
             difficulty TEXT NOT NULL DEFAULT '',
             synced INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (game_id, player_id)
+        )`);
+        // One context row per finished game; old player records need no rewrite.
+        sqlite.exec(`CREATE TABLE IF NOT EXISTS local_match_context (
+            game_id TEXT PRIMARY KEY,
+            map_name TEXT NOT NULL,
+            game_mode TEXT NOT NULL
         )`);
         sqlite.exec(
             `CREATE INDEX IF NOT EXISTS idx_local_match_leaderboard
@@ -162,7 +169,7 @@ function rowToMatchInsert(row: MatchRow) {
     };
 }
 
-export function insertLocalMatchData(rows: MatchRow[]) {
+export function insertLocalMatchData(rows: MatchRow[], context?: MatchContext) {
     if (!rows.length) return;
 
     const database = getDb();
@@ -180,6 +187,11 @@ export function insertLocalMatchData(rows: MatchRow[]) {
         )`,
     );
 
+    const insertContext = context
+        ? database.prepare(`INSERT INTO local_match_context (game_id, map_name, game_mode)
+            VALUES (?, ?, ?)
+            ON CONFLICT(game_id) DO UPDATE SET map_name = excluded.map_name, game_mode = excluded.game_mode`)
+        : null;
     const tx = database.transaction((batch: MatchRow[]) => {
         for (const row of batch) {
             insert.run({
@@ -216,6 +228,11 @@ export function insertLocalMatchData(rows: MatchRow[]) {
                 $gameVersion: row.gameVersion ?? "",
                 $difficulty: row.difficulty ?? "",
             } as Record<string, string | number | null>);
+        }
+        if (context && insertContext) {
+            for (const gameId of new Set(batch.map((row) => row.gameId))) {
+                insertContext.run(gameId, context.mapName, context.mode);
+            }
         }
     });
 

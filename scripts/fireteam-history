@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Finished match history from the Azure Compose service.
+# Usage: fireteam-history [number of matches, default 20]
+set -euo pipefail
+
+history_count="${1:-20}"
+if [[ ! "$history_count" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Usage: fireteam-history [positive match count, maximum 500]" >&2
+  exit 2
+fi
+
+history_repo="${FIRETEAM_REPO_DIR:-$HOME/fireteam}"
+history_source="$history_repo/scripts/fireteam-history.mjs"
+if [[ ! -r "$history_source" ]]; then
+  echo "Missing $history_source; pull the latest repository first." >&2
+  exit 1
+fi
+
+history_code="$(cat -- "$history_source")"
+cd "${FIRETEAM_COMPOSE_DIR:-$history_repo/deploy/azure}"
+docker compose exec -T -e N="$history_count" fireteam bun -e "$history_code"$'\nawait runHistory();'
