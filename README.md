@@ -129,6 +129,8 @@ secrets: {
 
 ## Docs
 
+- [VM match history](docs/match-history.md) — install `fireteam-history` with saved map and game mode.
+
 - `HOSTING.md` — VPS, nginx, systemd, master/child nodes
 - `COMMIT_FORMAT.md` — commit messages
 - `CODE_OF_CONDUCT.md` — community rules
