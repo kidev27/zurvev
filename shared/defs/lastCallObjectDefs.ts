@@ -1,7 +1,7 @@
 import type { AABB } from "../utils/coldet.ts";
 import { collider } from "../utils/collider.ts";
 import { v2, type Vec2 } from "../utils/v2.ts";
-import type { BuildingDef, MapObjectDef, ObstacleDef } from "./mapObjectsTyping.ts";
+import type { BuildingDef, DecalDef, MapObjectDef, ObstacleDef } from "./mapObjectsTyping.ts";
 import {
     LastCallBaseProps,
     LastCallBenchPos,
@@ -9,6 +9,7 @@ import {
     LastCallBuildingType,
     LastCallDoors,
     LastCallEntries,
+    LastCallFlickerLampPos,
     LastCallFloorPixelsPerUnit,
     LastCallPerkMachines,
     LastCallPowerSwitchPos,
@@ -219,6 +220,7 @@ function buildingMapObjects(): BuildingDef["mapObjects"] {
     // A gentle amber flicker lights only the sign island, below players.
     const sign = LastCallBaseProps.find((p) => p.type === "lastcall_sign_island")!;
     add("lastcall_motel_sign_glow", at(lastCallScalePoint(sign.pos)));
+    add("lastcall_lamp_flicker", at(LastCallFlickerLampPos));
     // Zombies climb in at these (boarded windows are painted on the walls).
     for (const e of LastCallEntries) add("zombie_spawn_point", at(e.pos));
 
@@ -319,7 +321,24 @@ function lastCallDefs(): Record<string, MapObjectDef> {
             ignoreAdjust: true,
         },
     };
+    // Flickering sodium lamp over the Motor Court's north-east corner (baked pool + this flicker).
+    defs.lastcall_lamp_flicker = {
+        ...defs.lastcall_motel_sign_glow,
+        img: {
+            ...(defs.lastcall_motel_sign_glow as DecalDef).img,
+            scale: 0.22,
+            alpha: 0.22,
+            tint: 0xffb84d,
+            flickerMin: 0.35,
+            flickerRate: 0.18,
+        },
+    } as DecalDef;
     defs.lastcall_planter = lastCallSolidBlock({ extents: v2.create(1.5, 1.5), height: 1 });
+    // Low cover added for the detail pass. Painted into the floor art; these are only colliders.
+    defs.lastcall_sandbags = lastCallSolidBlock({ extents: v2.create(3.6, 1), height: 0.5 });
+    defs.lastcall_jersey_barrier = lastCallSolidBlock({ extents: v2.create(3.75, 0.8), height: 0.5 });
+    defs.lastcall_bell_cart = lastCallSolidBlock({ extents: v2.create(3.5, 1.6), metal: true, height: 0.5 });
+    defs.lastcall_vending = lastCallSolidBlock({ extents: v2.create(2.1, 1.3), metal: true, height: 1 });
     defs.lastcall_pallet = lastCallSolidBlock({ extents: v2.create(2.25, 2.25) });
     defs.lastcall_ice_machine = lastCallSolidBlock({ extents: v2.create(1.5, 1.25), metal: true, height: 1 });
 

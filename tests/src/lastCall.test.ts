@@ -5,6 +5,7 @@ import { lastCallOpenZones, lastCallWalkable } from "../../server/src/game/lastC
 import type { Obstacle } from "../../server/src/game/objects/obstacle.ts";
 import { MapNavGraph } from "../../server/src/game/specOpsNav.ts";
 import {
+    LastCallBenchPos,
     LastCallBoxSpots,
     LastCallBuildingType,
     LastCallDoors,
@@ -12,6 +13,7 @@ import {
     lastCallFromLocal,
     LastCallPerkMachines,
     LastCallPlayerSpawns,
+    LastCallPowerSwitchPos,
     LastCallProps,
     lastCallToLocal,
     lastCallWalls,
@@ -21,7 +23,7 @@ import {
 } from "../../shared/defs/maps/lastCallLayout.ts";
 import { ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { MapObjectDefs } from "../../shared/defs/register.ts";
-import { TeamMode } from "../../shared/gameConfig.ts";
+import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
 import { ObjectType } from "../../shared/net/objectSerializeFns.ts";
 import { collider } from "../../shared/utils/collider.ts";
 import { v2, type Vec2 } from "../../shared/utils/v2.ts";
@@ -248,6 +250,45 @@ describe("After Hours rooms", () => {
             const approach = world(v2.create(spot.pos.x, spot.pos.y + 3.2));
             expect(lastCallWalkable(game, approach, approach, 1.1), `${spot.zone} box approach`).toBe(true);
             expectRoute(game, from, approach, `${spot.zone} box approach`);
+        }
+    });
+
+    test("low cover stays clear of doors, windows, stations, box spots and spawns", () => {
+        const cover = new Set([
+            "lastcall_sandbags",
+            "lastcall_jersey_barrier",
+            "lastcall_bell_cart",
+            "lastcall_vending",
+        ]);
+        const props = LastCallProps.filter((p) => cover.has(p.type));
+        expect(props.length).toBeGreaterThanOrEqual(6);
+        /** Distance from a point to the prop's footprint (plan units, y down). */
+        const gap = (prop: (typeof props)[number], q: Vec2) => {
+            const def = MapObjectDefs.typeToDef(prop.type, "obstacle");
+            const e = collider.toAabb(def.collision).max;
+            const [ex, ey] = (prop.ori ?? 0) % 2 ? [e.y, e.x] : [e.x, e.y];
+            const dx = Math.max(Math.abs(q.x - prop.pos.x) - ex, 0);
+            const dy = Math.max(Math.abs(q.y - prop.pos.y) - ey, 0);
+            return Math.hypot(dx, dy);
+        };
+        const keepClear: Array<[string, Vec2, number]> = [
+            ...LastCallDoors.map((d) => [`door ${d.id}`, doorCenter(d.id), 4] as [string, Vec2, number]),
+            ...LastCallEntries.map((e) => [`entry ${e.zone}`, e.pos, 3] as [string, Vec2, number]),
+            ...LastCallPerkMachines.map((m) => [m.type, m.pos, 4] as [string, Vec2, number]),
+            ...LastCallBoxSpots.map((b) => [`box ${b.zone}`, b.pos, 6.5] as [string, Vec2, number]),
+            ...LastCallPlayerSpawns.map((p) => ["spawn", p, 4] as [string, Vec2, number]),
+            ["power switch", LastCallPowerSwitchPos, 4],
+            ["upgrade bench", LastCallBenchPos, 5],
+        ];
+        for (const prop of props) {
+            const def = MapObjectDefs.typeToDef(prop.type, "obstacle");
+            // Real cover: solid and tall enough to stop bullets.
+            expect(def.collidable, prop.type).toBe(true);
+            expect(def.height, prop.type).toBeGreaterThanOrEqual(GameConfig.bullet.height);
+            for (const [label, q, min] of keepClear) {
+                const where = `${prop.type} at ${prop.pos.x},${prop.pos.y} vs ${label}`;
+                expect(gap(prop, q), where).toBeGreaterThanOrEqual(min);
+            }
         }
     });
 });

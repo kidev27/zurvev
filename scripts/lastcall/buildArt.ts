@@ -26,6 +26,7 @@ import {
     type LastCallZoneId,
     LastCallZones,
 } from "../../shared/defs/maps/lastCallLayout.ts";
+import { LastCallDetailDefs, lastCallFloorDetail } from "./detail.ts";
 
 const outDir = path.join(import.meta.dirname, "../../client/public/img/map");
 const PX = LastCallFloorPixelsPerUnit;
@@ -108,6 +109,7 @@ function floorSvg(): string {
             rect(0, 0, 2.8, 12, palette.office[0])
         }${line(.1, 0, .1, 12, palette.office[1])}${line(0, 7, 2.8, 7, "#574b3e", .1)}</pattern>`,
     ];
+    defs.push(...LastCallDetailDefs);
     const s = [rect(-A, -A, W + 2 * A, H + 2 * A, C.street)];
     // The apron stays subtle. Curb slabs follow the actual irregular building footprint.
     for (const z of LastCallZones) {
@@ -203,6 +205,9 @@ function floorSvg(): string {
     for (let y = garage.y0 + 13; y < garage.y1 - 6; y += 30) s.push(arrow(garage.x0 + 10, y));
     s.push(text(garage.x0 + 3, garage.y1 - 4, "SERVICE GARAGE", 1.35, C.paper, `opacity=".55"`));
 
+    // Wear, story decals and baked lamp light (scripts/lastcall/detail.ts).
+    s.push(lastCallFloorDetail());
+
     // Subtle, flat evidence of abandonment, placed relative to the authored props.
     for (const p of LastCallProps) {
         if (p.type === "zombie_garage_car") {
@@ -285,6 +290,37 @@ function floorSvg(): string {
             body = rect(x, y, w, h, "#a3a697", `stroke="${C.edge}" stroke-width=".2"`)
                 + rect(x + .3, y + .3, w - .6, h - .6, "#5e746e")
                 + text(0, .4, "ICE", .8, C.paper, `text-anchor="middle"`);
+        } else if (p.type === "lastcall_sandbags") {
+            // Two staggered rows of bags filling the collision box.
+            body = "";
+            const bagW = w / 5.5;
+            for (let i = 0; i < 5; i++) {
+                const bx = x + i * bagW * 1.1;
+                body += rect(bx, y + h * .42, bagW, h * .56, "#8b8059", `rx=".4" stroke="#3b3726" stroke-width=".14"`);
+            }
+            for (let i = 0; i < 4; i++) {
+                const bx = x + bagW * .55 + i * bagW * 1.1;
+                body += rect(bx, y + .02, bagW, h * .5, "#9a8f66", `rx=".4" stroke="#3b3726" stroke-width=".14"`);
+            }
+        } else if (p.type === "lastcall_jersey_barrier") {
+            body = rect(x + .2, y + .26, w, h, C.ink, `opacity=".5"`)
+                + rect(x, y, w, h, "#a7a596", `stroke="#3a3c35" stroke-width=".16"`)
+                + line(x + .3, 0, x + w - .3, 0, "#8c8b7d", .32);
+            for (let a = x + 1.4; a < x + w - .8; a += 2) body += line(a, y + .1, a + .9, y + h - .1, C.red, .38);
+        } else if (p.type === "lastcall_bell_cart") {
+            // A luggage cart tipped on its side.
+            body = rect(x + .2, y + .26, w, h, C.ink, `opacity=".5"`)
+                + rect(x, y, w, h, "#5b5f57", `rx=".3" stroke="${C.edge}" stroke-width=".18"`);
+            for (let k = 1; k <= 3; k++) {
+                const ry = y + (h * k) / 4;
+                body += line(x + .4, ry, x + w - .4, ry, "#7c8178", .2);
+            }
+            body += circle(x + .6, y + h - .1, .5, C.edge) + circle(x + w - .6, y + h - .1, .5, C.edge);
+        } else if (p.type === "lastcall_vending") {
+            body = rect(x + .2, y + .26, w, h, C.ink, `opacity=".5"`)
+                + rect(x, y, w, h, "#7d2e2a", `stroke="${C.edge}" stroke-width=".18"`)
+                + rect(x + .35, y + .35, w * .58, h - .7, "#d9e6e2", `opacity=".5"`)
+                + rect(x + w * .72, y + .4, w * .16, h - .8, "#2d2b28");
         } else if (p.type.includes("luggage")) {
             body = rect(x, y, w, h, "#8a6548", `rx=".2" stroke="${C.edge}" stroke-width=".2"`)
                 + line(-w * .2, y, -w * .2, y + h, "#bba781", .15)
