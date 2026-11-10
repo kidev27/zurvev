@@ -1315,17 +1315,17 @@ export class Game {
             this.m_activeId = msg.activePlayerId;
         }
         // Update player infos
+        // Apply deletes before infos: an id can be recycled in the same update.
+        for (let i = 0; i < msg.deletedPlayerIds.length; i++) {
+            const playerId = msg.deletedPlayerIds[i];
+            this.m_playerBarn.deletePlayerInfo(playerId);
+        }
         for (let i = 0; i < msg.playerInfos.length; i++) {
             const info = msg.playerInfos[i];
             this.m_playerBarn.setPlayerInfo(info);
             if (info.playerId === this.m_localId && info.name) {
                 touchActiveMatchIdentity(info.playerId, info.name);
             }
-        }
-        // Delete player infos
-        for (let i = 0; i < msg.deletedPlayerIds.length; i++) {
-            const playerId = msg.deletedPlayerIds[i];
-            this.m_playerBarn.deletePlayerInfo(playerId);
         }
         if (msg.playerInfos.length > 0 || msg.deletedPlayerIds.length > 0) {
             this.m_playerBarn.recomputeTeamData();
@@ -1336,7 +1336,7 @@ export class Game {
             this.m_playerBarn.updatePlayerStatus(
                 teamId,
                 msg.playerStatus,
-                this.m_map.factionMode || this.m_map.specOpsMode,
+                this.m_map.factionMode,
             );
         }
 

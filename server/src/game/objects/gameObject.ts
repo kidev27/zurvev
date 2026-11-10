@@ -75,6 +75,7 @@ export class ObjectRegister {
             for (let i = 0; i < amount; i++) {
                 const id = this.idNext++;
                 this.freeLists[type][i] = id;
+                this.idToType[id] = type;
             }
         };
 
@@ -92,40 +93,18 @@ export class ObjectRegister {
     }
 
     allocId(type: ObjectType) {
-        let id = 1;
         if (this.idNext < MAX_ID) {
-            id = this.idNext++;
-        } else {
-            const freeList = this.freeLists[type] || [];
-            if (freeList.length > 0) {
-                id = freeList.shift()!;
-            } else {
-                // Prefer a free slot of this type, then an unused id (idToType 0).
-                // Avoid cross-type scavenging: if a client missed a delete, reusing
-                // an id as a different ObjectType crashes Obstacle/Loot update paths.
-                // Spec Ops waves recycle thousands of AI — never hard-fail the match.
-                let found = 0;
-                for (let i = 1; i < MAX_ID; i++) {
-                    if (this.idToObj[i] !== null) continue;
-                    if (this.idToType[i] === type || this.idToType[i] === 0) {
-                        found = i;
-                        break;
-                    }
-                }
-                // Last resort: any free slot (cross-type). Client m_updateObjFull
-                // replaces mismatched types, but prefer same-type when possible.
-                if (!found) {
-                    for (let i = 1; i < MAX_ID; i++) {
-                        if (this.idToObj[i] === null) {
-                            found = i;
-                            break;
-                        }
-                    }
-                }
-                assert(found > 0, `Ran out of ids for type ${type}`);
-                id = found;
-            }
+            return this.idNext++;
         }
+
+        let freeList = this.freeLists[type];
+        if (!freeList?.length) {
+            // Borrow through the owning list so it cannot hand out this id again.
+            freeList = Object.values(this.freeLists).find((ids) => ids.length > 0)!;
+        }
+        const id = freeList?.shift();
+        assert(id !== undefined, `Ran out of ids for type ${type}`);
+        assert(this.idToObj[id] === null, `Object id ${id} is still in use`);
         return id;
     }
 
@@ -160,7 +139,6 @@ export class ObjectRegister {
 
         this.freeId(obj.__type, obj.__id);
 
-        this.idToType[obj.__id] = 0;
         this.dirtyPart[obj.__id] = 0;
         this.dirtyFull[obj.__id] = 0;
 

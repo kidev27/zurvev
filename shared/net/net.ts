@@ -24,6 +24,8 @@ export const Constants = {
     MapObjectMaxScale: 2.5,
     MaxPerks: 64,
     MaxMapIndicators: 16,
+    // shortcut: 8-bit status count; widen the protocol before supporting larger teams.
+    MaxPlayerStatus: 255,
 };
 
 const getBits = (n: number) => Math.ceil(Math.log2(n));
