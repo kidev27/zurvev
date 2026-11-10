@@ -6,6 +6,7 @@ import { FIRETEAM_VERSION } from "../../../shared/fireteamVersion.ts";
 import { TeamMode } from "../../../shared/gameConfig.ts";
 import type { GameWsDisconnectReason } from "../../../shared/types/api.ts";
 import { Logger } from "../../../shared/utils/logger.ts";
+import { type MatchContext, matchContextForMap } from "../../../shared/utils/matchContext.ts";
 import { insertLocalMatchData } from "../api/db/localMatchStore.ts";
 import { Config } from "../config.ts";
 import { apiPrivateRouter, checkIp } from "../utils/apiRouter.ts";
@@ -72,12 +73,12 @@ function stopGame() {
 // This ensures that waiting for the network request doesn't prevent the game instance from being GC'd
 //
 
-async function saveGame(gameId: string, values: SaveGameBody["matchData"]) {
+async function saveGame(gameId: string, values: SaveGameBody["matchData"], context: MatchContext) {
     // Local SQLite backup on game nodes / hosts without a primary DB engine.
     // Gameplay stays on this node; only stats are pushed to the API host below.
     if (!Config.database.enabled) {
         try {
-            insertLocalMatchData(values);
+            insertLocalMatchData(values, context);
             procLogger.info(`Saved game ${gameId} to local SQLite (${values.length} players)`);
         } catch (err) {
             procLogger.error(`Failed to save game to local SQLite:`, err);
@@ -94,6 +95,7 @@ async function saveGame(gameId: string, values: SaveGameBody["matchData"]) {
         res = await apiPrivateRouter.save_game.$post({
             json: {
                 matchData: values,
+                context,
             },
         });
     } catch (err) {
@@ -247,7 +249,7 @@ class ServerGame extends Game {
         // Spec Ops solo matches should still count on the local leaderboard.
         const minPlayers = this.map.specOpsMode ? 1 : 2;
         if (values.length < minPlayers) return;
-        saveGame(this.id, values);
+        saveGame(this.id, values, matchContextForMap(this.mapName, this.map.mapDef.gameMode));
     }
 
     override sendQuestProgress(userId: string, progress: Array<{ id: string; delta: number }>) {

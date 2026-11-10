@@ -3,6 +3,7 @@ import type { MapDefKey } from "../../../shared/defs/mapDefs.ts";
 import type { SpecOpsDifficulty } from "../../../shared/defs/maps/specOpsShop.ts";
 import { TeamMode } from "../../../shared/gameConfig.ts";
 import { type FindGamePrivateError, loadoutSchema } from "../../../shared/types/api.ts";
+import type { MatchContext } from "../../../shared/utils/matchContext.ts";
 import type { MatchDataTable } from "../api/db/schema.ts";
 
 export const zHandshakeBody = z.object({
@@ -54,6 +55,8 @@ export const zSetClientThemeBody = z.object({
 });
 
 export interface SaveGameBody {
+    /** Optional for compatibility with older game nodes. Stored by the local history logger. */
+    context?: MatchContext;
     matchData: (MatchDataTable & {
         ip: string;
         findGameIp: string;

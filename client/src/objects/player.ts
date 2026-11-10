@@ -13,6 +13,7 @@ import { ZombiePackAPunchColors } from "../../../shared/defs/maps/zombiePackAPun
 import type { ZombiePowerUpTimers } from "../../../shared/defs/maps/zombiePowerUps.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
 import { Action, Anim, GameConfig, HasteType, Input, WeaponSlot } from "../../../shared/gameConfig.ts";
+import { Constants } from "../../../shared/net/net.ts";
 import type { ObjectData, ObjectType } from "../../../shared/net/objectSerializeFns.ts";
 import {
     getPlayerStatusUpdateRate,
@@ -3009,7 +3010,8 @@ export class PlayerBarn {
         // In factionMode, playerStatus refers to all playerIds in the game.
         // In all other modes, playerStatus refers to only playerIds in our team.
         const team = this.getTeamInfo(teamId);
-        const playerIds = factionMode ? this.playerIds : team?.playerIds;
+        const playerIds = (factionMode ? this.playerIds : team?.playerIds)
+            ?.slice(0, Constants.MaxPlayerStatus);
         if (!playerIds) return;
 
         if (playerIds.length != playerStatus.length) {

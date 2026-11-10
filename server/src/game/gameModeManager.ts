@@ -1,4 +1,5 @@
 import { GameConfig, TeamMode } from "../../../shared/gameConfig.ts";
+import { Constants } from "../../../shared/net/net.ts";
 import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
 import { collider } from "../../../shared/utils/collider.ts";
 import { util } from "../../../shared/utils/util.ts";
@@ -202,7 +203,10 @@ export class GameModeManager {
 
     getPlayerStatusPlayers(player: Player): Player[] {
         if (this.specOps) {
-            return [...this.game.playerBarn.players].sort((a, b) => a.__id - b.__id);
+            return this.game.playerBarn.players
+                .filter((p) => p.teamId === player.teamId)
+                .sort((a, b) => a.__id - b.__id)
+                .slice(0, Constants.MaxPlayerStatus);
         }
         switch (this.mode) {
             case GameMode.Solo:
