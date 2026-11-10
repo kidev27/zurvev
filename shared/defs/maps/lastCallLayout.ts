@@ -302,6 +302,16 @@ export const LastCallBaseProps: LastCallProp[] = [
     { type: "zombie_garage_car", pos: v2.create(139.5, 36) },
     { type: "zombie_garage_car", pos: v2.create(139.5, 90) },
     { type: "zombie_garage_car", pos: v2.create(120.5, 32), ori: 2 },
+    // Low cover: a few pieces per big room, clear of doors, windows, stations, box spots and spawns.
+    { type: "lastcall_sandbags", pos: v2.create(52, 76) },
+    { type: "lastcall_jersey_barrier", pos: v2.create(88, 62) },
+    { type: "lastcall_bell_cart", pos: v2.create(62, 86) },
+    { type: "lastcall_sandbags", pos: v2.create(58, 38) },
+    { type: "lastcall_jersey_barrier", pos: v2.create(86, 31), ori: 1 },
+    { type: "lastcall_jersey_barrier", pos: v2.create(121, 80), ori: 1 },
+    { type: "lastcall_sandbags", pos: v2.create(135, 75) },
+    { type: "lastcall_vending", pos: v2.create(48, 91.5) },
+    { type: "lastcall_vending", pos: v2.create(38.5, 47), ori: 1 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -376,6 +386,8 @@ export const LastCallPerkMachines = BasePerkMachines.map((machine) => ({
 }));
 export const LastCallBoxSpots = BaseBoxSpots.map((b) => ({ ...b, pos: lastCallPlace(b.pos) }));
 export const LastCallPowerSwitchPos = lastCallPlace(BasePowerSwitchPos);
+/** Motor Court lamp that flickers (matches the baked lamp in scripts/lastcall/detail.ts). */
+export const LastCallFlickerLampPos = lastCallScalePoint(v2.create(98, 52));
 export const LastCallBenchPos = lastCallPlace(BaseBenchPos);
 export const LastCallProps: LastCallProp[] = LastCallBaseProps.map((p) => ({
     ...p,
