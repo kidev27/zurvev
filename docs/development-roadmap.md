@@ -44,7 +44,7 @@ Last updated: 2026-11-11 (base `6eab92c`).
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: table, cap, and spawned zombies per difficulty | In-game feel. Base speed 0.51 Recruit, 0.55 Regular, 0.59 Hardened, 0.64 Veteran; capped at 0.75 |
+| ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: table, cap, and spawned zombies per difficulty | In-game feel. Base speed 0.51 Recruit, 0.55 Regular, 0.59 Hardened, 0.64 Veteran; capped at 0.75; rush +15% |
 | ZOM-003 | Pack-a-Punch timer by difficulty | Zombies | P1 | Needs Playtesting | None | `shared/defs/maps/zombiePackAPunch.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` covers every difficulty; Zombies suites unchanged | In-game feel. Claim window 12 s on every difficulty; upgrade 3 s Recruit, 5 s Regular, 7 s Hardened, 9 s Veteran |
 | ZOM-002 | Ammunition scarcity | Zombies | P2 | Investigating | ZOM-004/005 ammo model | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts`, `shared/defs/maps/zombiePowerUps.ts` | Not started | Economy survey, then design approval |
 
@@ -61,7 +61,7 @@ Last updated: 2026-11-11 (base `6eab92c`).
 
 - Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
   `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
-  (0.75). Kill-heat rush still adds up to +38% on top during heavy killing, as before.
+  (0.75). Kill-heat rush adds up to +15% on top in Zombies (`ZombieRushSpeedBonus`); Fireteam keeps +38%.
 - The Pressure Cannon, Tesla Rifle and Gravegun inherit `ammo: "50AE"` from the Ray Gun, the same pool
   as the Deagle.
 - Box guns follow standard pickup rules: they replace the held gun slot and drop the old gun,

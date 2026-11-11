@@ -57,7 +57,7 @@ import { InventoryManager } from "../inventoryManager.ts";
 import { QuestManager } from "../questManager.ts";
 import { NoOpSocket } from "../socket.ts";
 import { WeaponManager } from "../weaponManager.ts";
-import { ZombieEconomy } from "../zombieMode.ts";
+import { ZombieEconomy, ZombieRushSpeedBonus } from "../zombieMode.ts";
 import type { Building } from "./building.ts";
 import { BaseGameObject, type DamageParams, type GameObject } from "./gameObject.ts";
 import type { Loot } from "./loot.ts";
@@ -5513,7 +5513,8 @@ export class Player extends BaseGameObject {
             this.speed *= this.specOpsSpeedMult;
             if (this.specOpsKind === "enemy") {
                 const push = this.game.specOps?.pushPressure ?? 0;
-                this.speed *= 1 + push * 0.38;
+                const rush = this.game.specOps?.zombieMode ? ZombieRushSpeedBonus : 0.38;
+                this.speed *= 1 + push * rush;
             }
         }
     }

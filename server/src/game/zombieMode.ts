@@ -62,6 +62,12 @@ export const ZombieSpeedByDifficulty: Record<SpecOpsDifficulty, number> = {
     veteran: 0.64,
 };
 
+/**
+ * Kill-heat rush in Zombies: at full push pressure zombies move this much faster
+ * (Fireteam keeps its own +38%).
+ */
+export const ZombieRushSpeedBonus = 0.15;
+
 /** Hard cap on a zombie's base speed so fast types stay within what navigation handles. */
 export const ZombieMaxSpeedMult = 0.75;
 
