@@ -804,6 +804,11 @@ export class Client {
         ) {
             updateMsg.playerStatus = player.getPlayerStatus();
             updateMsg.playerStatusDirty = true;
+            updateMsg.enemyMarkers = this.game.modeManager.getEnemyMarkerPlayers(player).map((p) => ({
+                playerId: p.__id,
+                pos: p.pos,
+                downed: p.downed,
+            }));
         }
 
         if (!minimalSync && player.groupStatusDirty) {
