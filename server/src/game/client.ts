@@ -478,6 +478,9 @@ export class Client {
      * not keep stale instances after server id reuse.
      */
     private _pendingDelObjIds: number[] = [];
+    /** Visible objects whose changes were skipped during backpressure, resent on the next update. */
+    private _missedFullObjs = new Set<GameObject>();
+    private _missedPartObjs = new Set<GameObject>();
 
     constructor(
         game: Game,
@@ -643,6 +646,15 @@ export class Client {
                     this.visibleObjects.delete(obj);
                 }
             }
+            // Nothing is sent this sync and flush() clears the dirty flags, so remember
+            // which visible objects changed and resend them on the next update.
+            const register = this.game.objectRegister;
+            for (const obj of this.visibleObjects) {
+                const id = obj.__id;
+                if (id <= 0) continue;
+                if (register.dirtyFull[id]) this._missedFullObjs.add(obj);
+                else if (register.dirtyPart[id]) this._missedPartObjs.add(obj);
+            }
             // Still deliver Joined+Map so reconnect clients are not stuck on an
             // empty HUD while the Update waits for a clear send window.
             if (!this._bootstrapSent) {
@@ -656,7 +668,6 @@ export class Client {
         const playerBarn = game.playerBarn;
         msgStream.stream.index = 0;
 
-        const thinSync = this._consecutiveBackpressure > 0;
         const minimalSync = this._consecutiveBackpressure >= 2;
 
         if (!this._bootstrapSent) {
@@ -717,20 +728,18 @@ export class Client {
 
         for (const obj of newVisibleObjects) {
             const needsFull = !this.visibleObjects.has(obj)
-                || game.objectRegister.dirtyFull[obj.__id];
+                || game.objectRegister.dirtyFull[obj.__id]
+                || this._missedFullObjs.has(obj);
             if (needsFull) {
-                // Slow clients: skip re-sending full state for already-visible objects.
-                if (thinSync && this.visibleObjects.has(obj)) {
-                    if (game.objectRegister.dirtyPart[obj.__id]) {
-                        updateMsg.partObjects.push(obj);
-                    }
-                } else {
-                    updateMsg.fullObjects.push(obj);
-                }
-            } else if (game.objectRegister.dirtyPart[obj.__id]) {
+                // Always send full state, even to slow clients: dirtyFull is cleared every
+                // flush, so a skipped change (floor, death, weapon) would never be resent.
+                updateMsg.fullObjects.push(obj);
+            } else if (game.objectRegister.dirtyPart[obj.__id] || this._missedPartObjs.has(obj)) {
                 updateMsg.partObjects.push(obj);
             }
         }
+        this._missedFullObjs.clear();
+        this._missedPartObjs.clear();
 
         // Swap buffers to avoid allocating a new Set every net sync tick.
         this._visibleObjectsScratch = this.visibleObjects;
