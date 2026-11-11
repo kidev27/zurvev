@@ -6450,6 +6450,7 @@ export class SpecOpsManager implements PracticeHost {
         loot.isPreloadedGun = true;
         loot.mysteryBoxLocked = locked;
         loot.mysteryBoxId = state.box.__id;
+        loot.fromMysteryBox = true;
         loot.mysteryBoxOwnerId = state.ownerId;
         loot.ignoreObstacleId = state.box.__id;
         state.loot = loot;

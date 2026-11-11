@@ -4206,13 +4206,22 @@ export class Player extends BaseGameObject {
         }
 
         // if none are found use active weapon if its a gun
-        if (GameConfig.WeaponType[this.curWeapIdx] === "gun") {
+        let replaceIdx: number | null = GameConfig.WeaponType[this.curWeapIdx] === "gun"
+            ? this.curWeapIdx
+            : null;
+        // A Mystery Box roll can always be taken: holding melee or a throwable, it
+        // replaces the gun held last.
+        if (replaceIdx === null && obj.fromMysteryBox) {
+            const last = this.weaponManager.lastWeaponIdx;
+            replaceIdx = GameConfig.WeaponType[last] === "gun" ? last : GameConfig.WeaponSlot.Primary;
+        }
+        if (replaceIdx !== null) {
             const newGunDef = GameObjectDefs.typeToDef(obj.type, "gun");
             return {
-                slot: this.curWeapIdx,
+                slot: replaceIdx,
                 isDual: false,
-                cause: this.activeWeapon === obj.type
-                        || newGunDef.dualWieldType === this.weapons[this.curWeapIdx].type
+                cause: this.weapons[replaceIdx].type === obj.type
+                        || newGunDef.dualWieldType === this.weapons[replaceIdx].type
                     ? net.PickupMsgType.AlreadyOwned
                     : net.PickupMsgType.Success,
             };
@@ -4372,7 +4381,8 @@ export class Player extends BaseGameObject {
                             oldWeapDef.dualWieldType // verifies it's a dual wieldable pistol
                             && this.weapons[newGunIdx].type == obj.type // verifies the old gun and new gun are the same
                         );
-                        if (shouldDrop) {
+                        // Mystery Box rolls replace the old gun outright (Zombies): no floor drop.
+                        if (shouldDrop && !obj.fromMysteryBox) {
                             this.weaponManager.dropGun(newGunIdx);
                         }
                     }
