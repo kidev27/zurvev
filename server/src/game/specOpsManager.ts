@@ -5315,15 +5315,16 @@ class AiBrain {
         );
         this.clearingHouse = selfBuilding === goal;
 
-        const doors = entryFixtures(goal, "door");
-        const windows = entryFixtures(goal, "window");
-
         if (this.clearingHouse) {
             this.assaultRole = "entry";
             this.assaultHold = 0;
             this.assaultDest = this.engageDest(target);
             return;
         }
+
+        // Only needed outside the building: skip the scans for units already inside.
+        const doors = entryFixtures(goal, "door");
+        const windows = entryFixtures(goal, "window");
 
         if (!this.assaultRole) this.assaultRole = this.pickAssaultRole(windows.length > 0);
         this.assaultHold = math.max(this.assaultHold - dt, 0);
