@@ -16,6 +16,7 @@ import {
     ZombieMysteryBoxRollDuration,
     ZombieMysteryBoxWeapons,
     ZombieRayGun,
+    ZombieRushSpeedBonus,
     ZombieSpeedByDifficulty,
     zombieSpeedMult,
     ZombieUpgradeCost,
@@ -768,6 +769,27 @@ test("Spawned zombies move at their difficulty's speed", () => {
         speeds.push(zombie.speed);
     }
     for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1]);
+});
+
+test("Kill-heat rush speeds up zombies by 15% and Fireteam enemies by 38% at full pressure", () => {
+    const rushRatio = (map: "zombie_dead_air" | "test_specops", kind: "zombie_walker" | "militia") => {
+        const game = createGame(TeamMode.Solo, map);
+        game.playerBarn.addTestPlayer({ name: "A" });
+        game.update(0.1);
+        const ops = game.specOps!;
+        // Hold pressure where the test puts it instead of letting kills drive it.
+        (ops as unknown as { refreshPushPressure: () => void }).refreshPushPressure = () => {};
+        const enemy = ops.spawnEnemyPublic(kind, true);
+        ops.pushPressure = 0;
+        game.update(0.01);
+        const calm = enemy.speed;
+        ops.pushPressure = 1;
+        game.update(0.01);
+        return enemy.speed / calm;
+    };
+    expect(ZombieRushSpeedBonus).toBe(0.15);
+    expect(rushRatio("zombie_dead_air", "zombie_walker")).toBeCloseTo(1.15, 5);
+    expect(rushRatio("test_specops", "militia")).toBeCloseTo(1.38, 5);
 });
 
 test("Zombie wave one spawns unarmed melee walkers with cash bounties", () => {
