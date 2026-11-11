@@ -6,7 +6,7 @@ developer: shared changes go through a pull request for review before merge.
 Statuses: Not Started, Investigating, Ready, In Progress, Needs Playtesting, Completed, Blocked.
 A task is Completed only after its pull request is merged and its acceptance criteria pass.
 
-Last updated: 2026-11-11 (base `d36aceb`).
+Last updated: 2026-11-11 (base `6eab92c`).
 
 ## Phase 1: Critical fixes
 
@@ -44,7 +44,7 @@ Last updated: 2026-11-11 (base `d36aceb`).
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Ready | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Not started | Speed values per difficulty need approval |
+| ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: table, cap, and spawned zombies per difficulty | In-game feel. Base speed 0.51 Recruit, 0.55 Regular, 0.59 Hardened, 0.64 Veteran; capped at 0.75 |
 | ZOM-003 | Pack-a-Punch timer by difficulty | Zombies | P1 | Needs Playtesting | None | `shared/defs/maps/zombiePackAPunch.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` covers every difficulty; Zombies suites unchanged | In-game feel. Claim window 12 s on every difficulty; upgrade 3 s Recruit, 5 s Regular, 7 s Hardened, 9 s Veteran |
 | ZOM-002 | Ammunition scarcity | Zombies | P2 | Investigating | ZOM-004/005 ammo model | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts`, `shared/defs/maps/zombiePowerUps.ts` | Not started | Economy survey, then design approval |
 
@@ -59,8 +59,9 @@ Last updated: 2026-11-11 (base `d36aceb`).
 
 ### Notes
 
-- Zombie speed today is one value, `speedMult: 0.53` on `zombie_walker`. `SpecOpsDifficultyMods` is
-  shared with Fireteam, so zombie values go in a Zombies-only table.
+- Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
+  `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
+  (0.75). Kill-heat rush still adds up to +38% on top during heavy killing, as before.
 - The Pressure Cannon, Tesla Rifle and Gravegun inherit `ammo: "50AE"` from the Ray Gun, the same pool
   as the Deagle.
 - Box guns follow standard pickup rules: they replace the held gun slot and drop the old gun,
