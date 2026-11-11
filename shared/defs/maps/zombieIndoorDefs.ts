@@ -7,6 +7,20 @@ import { LastCallDisplayName } from "./lastCallLayout.ts";
 import { SpecOps } from "./specOpsDefs.ts";
 
 /**
+ * Zombies ammo caps (players always carry a level-1 bag here). Max Ammo fills to these and
+ * box/Pack-a-Punch reserve is capped by them. Fireteam keeps `SpecOpsBagSizes`.
+ */
+export const ZombieAmmoBagSizes: Record<string, number[]> = {
+    "9mm": [300, 300, 300, 300, 300],
+    "762mm": [270, 270, 270, 270, 270],
+    "556mm": [270, 270, 270, 270, 270],
+    "45acp": [270, 270, 270, 270, 270],
+    "12gauge": [40, 40, 40, 40, 40],
+    "50AE": [84, 84, 84, 84, 84],
+    "308sub": [36, 36, 36, 36, 36],
+};
+
+/**
  * Shared settings for indoor Zombie Survival maps: zombie rules, a small dark
  * map with no rivers, and one building placed in the middle.
  */
@@ -20,6 +34,9 @@ const zombieIndoorBase = util.mergeDeep(
             zombieMode: true,
             maxPlayers: 4,
             killLeaderEnabled: true,
+        },
+        gameConfig: {
+            bagSizes: ZombieAmmoBagSizes,
         },
         biome: {
             colors: {

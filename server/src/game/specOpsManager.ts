@@ -87,6 +87,7 @@ import {
     ZombieNukeCash,
     ZombieNukeHealthFraction,
     ZombiePowerUpDrops,
+    zombiePowerUpKillChance,
     type ZombiePowerUpTimers,
     type ZombiePowerUpType,
     ZombiePowerUpTypes,
@@ -6066,11 +6067,7 @@ export class SpecOpsManager implements PracticeHost {
             }
         }
 
-        if (rand < ZombiePowerUpDrops.killChance / scale) earned++;
-
-        // todo: add wave balancing for later rounds
-        // -> round 35: 0.02 -> 0.015
-        // -> round 50+: -> 0.015 -> 0.01
+        if (rand < zombiePowerUpKillChance(this.wave) / scale) earned++;
 
         const owed = earned + this.zombiePendingDrops;
         if (!owed) return;
