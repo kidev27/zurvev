@@ -218,6 +218,22 @@ export class GameModeManager {
         }
     }
 
+    /**
+     * Spec Ops hostiles drawn as red map dots for this viewer: every living player on another
+     * team, downed included. Kept apart from team status so status stays team-only.
+     */
+    getEnemyMarkerPlayers(player: Player): Player[] {
+        if (!this.specOps) return [];
+        const enemies = this.game.playerBarn.livingPlayers.filter(
+            (p) => p.teamId !== player.teamId && !p.dead,
+        );
+        if (enemies.length > Constants.MaxEnemyMarkers) {
+            enemies.sort((a, b) => v2.distance(a.pos, player.pos) - v2.distance(b.pos, player.pos));
+            enemies.length = Constants.MaxEnemyMarkers;
+        }
+        return enemies;
+    }
+
     getPlayerAlivePlayersContext(player: Player): Player[] {
         if (this.specOps && player.specOpsAi) {
             return this.game.playerBarn.livingPlayers.filter(

@@ -53,6 +53,7 @@ import type { SoundHandle } from "../lib/createJS.ts";
 import type { Map } from "../map.ts";
 import type { Renderer } from "../renderer.ts";
 import type { UiManager2 } from "../ui/ui2.ts";
+import { EnemyMarkers } from "./enemyMarkers.ts";
 import { Pool } from "./objectPool.ts";
 import type { Obstacle } from "./obstacle.ts";
 import type { Emitter, ParticleBarn } from "./particles.ts";
@@ -2750,6 +2751,8 @@ export class PlayerBarn {
     > = {};
 
     playerStatus: Record<number, PlayerStatus> = {};
+    /** Spec Ops hostile map dots. Separate from team status. */
+    enemyMarkers = new EnemyMarkers();
     anonPlayerNames = false;
 
     m_update(
@@ -2886,6 +2889,9 @@ export class PlayerBarn {
             }
             status.minimapVisible = status.minimapAlpha > 0.01;
         }
+
+        // Glide enemy dots between status updates.
+        this.enemyMarkers.update(dt, statusUpdateRate);
     }
 
     m_render(camera: Camera, debug: DebugRenderOpts) {

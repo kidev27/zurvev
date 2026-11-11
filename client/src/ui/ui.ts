@@ -1397,6 +1397,23 @@ export class UiManager {
             }
         }
 
+        // Spec Ops hostiles: red dots, same look as before they left team status.
+        const enemyDotScale = (device.uiLayout == device.UiLayout.Sm ? 0.15 : 0.2) * 1.15;
+        const enemyMarkers = playerBarn.enemyMarkers.markers;
+        for (const key of Object.keys(enemyMarkers)) {
+            const playerId = Number(key);
+            const marker = enemyMarkers[playerId];
+            addSprite(
+                marker.pos,
+                enemyDotScale,
+                1,
+                true,
+                65535 + playerId * 2,
+                marker.downed ? "player-map-downed.img" : "player-map-inner.img",
+                0xff3a3a,
+            );
+        }
+
         // Hide any sprites that weren't used
         for (let i = this.playerMapSprites.length - 1; i >= spriteIdx; i--) {
             this.playerMapSprites[i].visible = false;

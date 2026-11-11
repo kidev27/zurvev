@@ -216,6 +216,26 @@ function deserializePlayerStatus(s: BitStream): PlayerStatus[] {
     return players;
 }
 
+/** Spec Ops hostiles for the map dots. Sent with player status; empty in other modes. */
+function serializeEnemyMarkers(s: BitStream, markers: EnemyMarker[]) {
+    s.writeArray(markers, 8, (marker) => {
+        s.writeUint16(marker.playerId);
+        s.writeMapPos(marker.pos, 11);
+        s.writeBoolean(marker.downed);
+    });
+    s.writeAlignToNextByte();
+}
+
+function deserializeEnemyMarkers(s: BitStream): EnemyMarker[] {
+    const markers = s.readArray(8, () => ({
+        playerId: s.readUint16(),
+        pos: s.readMapPos(11),
+        downed: s.readBoolean(),
+    }));
+    s.readAlignToNextByte();
+    return markers;
+}
+
 function serializeGroupStatus(s: BitStream, players: GroupStatus[]) {
     s.writeArray(players, 8, (status) => {
         s.writeFloat(status.health, 0, 100, 7);
@@ -348,6 +368,7 @@ export class UpdateMsg implements AbstractMsg {
 
     playerStatus: PlayerStatus[] = [];
     playerStatusDirty = false;
+    enemyMarkers: EnemyMarker[] = [];
 
     groupStatus: GroupStatus[] = [];
     groupStatusDirty = false;
@@ -426,6 +447,7 @@ export class UpdateMsg implements AbstractMsg {
 
         if (this.playerStatusDirty) {
             serializePlayerStatus(s, this.playerStatus);
+            serializeEnemyMarkers(s, this.enemyMarkers);
             flags |= UpdateExtFlags.PlayerStatus;
         }
 
@@ -644,6 +666,7 @@ export class UpdateMsg implements AbstractMsg {
 
         if ((flags & UpdateExtFlags.PlayerStatus) != 0) {
             this.playerStatus = deserializePlayerStatus(s);
+            this.enemyMarkers = deserializeEnemyMarkers(s);
             this.playerStatusDirty = true;
         }
 
@@ -948,6 +971,12 @@ export interface PlayerStatus {
     minimapAlpha?: number;
     minimapVisible?: boolean;
     hasData: boolean;
+}
+
+export interface EnemyMarker {
+    playerId: number;
+    pos: Vec2;
+    downed: boolean;
 }
 
 export interface GroupStatus {

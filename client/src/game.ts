@@ -1338,6 +1338,7 @@ export class Game {
                 msg.playerStatus,
                 this.m_map.factionMode,
             );
+            this.m_playerBarn.enemyMarkers.set(msg.enemyMarkers);
         }
 
         // Update group status
