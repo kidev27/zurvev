@@ -26,6 +26,9 @@ export const Constants = {
     MaxMapIndicators: 16,
     // shortcut: 8-bit status count; widen the protocol before supporting larger teams.
     MaxPlayerStatus: 255,
+    // Covers every max health (Spec Ops enemies reach 280). Same ~1 HP step as the old 250/8-bit range.
+    MaxActivePlayerHealth: 500,
+    ActivePlayerHealthBits: 9,
 };
 
 const getBits = (n: number) => Math.ceil(Math.log2(n));
