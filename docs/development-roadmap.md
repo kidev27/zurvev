@@ -12,23 +12,27 @@ Last updated: 2026-11-11 (base `5c48da6`).
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| BUG-001 | Active-player health over 250 disconnects spectators | Shared (net) | P0 | Needs Playtesting | None | `shared/net/updateMsg.ts`, `shared/net/net.ts`, `shared/gameConfig.ts` | `activePlayerHealth.test.ts` (3) passes; cross-mode suites unchanged | Review and merge of `fix/active-player-health-range` |
-| BUG-003 | Enemy dots missing from the map | Shared (Zombies and Fireteam) | P0 | Ready | Review of the design | `server/src/game/gameModeManager.ts`, `server/src/game/client.ts`, `client/src/game.ts`, `client/src/objects/player.ts`, `client/src/ui/ui.ts` | Not started | Restores Fireteam enemy dots too, so it needs Fireteam review |
-| BUG-002 | Enemies invisible but attacking in late Fireteam rounds | Shared (net) | P0 | Investigating | BUG-001 merged, to rule it out | `server/src/game/client.ts`, `server/src/game/objects/gameObject.ts`, `client/src/objects/objectPool.ts` | Long-run simulation with client decode planned | No reproduction yet |
+| BUG-001 | Active-player health over 250 disconnects spectators | Shared (net) | P2 | Needs Playtesting | None | `shared/net/updateMsg.ts`, `shared/net/net.ts`, `shared/gameConfig.ts` | `activePlayerHealth.test.ts` (4) passes, including a Zombies duo; cross-mode suites unchanged | PR #43 review; ship together with PR #45 |
+| BUG-003 | Enemy dots missing from the map | Shared (Zombies, Fireteam, Practice) | P0 | Needs Playtesting | PR #43 (stacked) | `shared/net/updateMsg.ts`, `server/src/game/gameModeManager.ts`, `server/src/game/client.ts`, `client/src/objects/enemyMarkers.ts`, `client/src/ui/ui.ts` | `specOpsEnemyMarkers.test.ts` (6) passes; cross-mode suites unchanged; not yet seen in a browser | PR #45 review, including the Fireteam owner |
+| BUG-002 | Enemies invisible but attacking in late Fireteam rounds | Shared (net) | P0 | Investigating | None (BUG-001 ruled out: it only affects spectators) | `server/src/game/client.ts`, `server/src/game/objects/gameObject.ts`, `client/src/objects/objectPool.ts` | Long-run simulation with client decode planned | No reproduction yet |
 | BUG-004 | Missing drop animations | Unknown | P1 | Blocked | None | Unknown | None | Needs a description: which item, which mode |
 
 ### Notes
 
 - **BUG-001.** Root cause: active-player health was written as 0-250 in 8 bits. Spec Ops enemies, and
-  zombies from about round 49 on Regular, sit at 280 (`SpecOpsEnemyMaxHealth`). A dead player spectating
-  one triggered the `writeFloat` assert. Production runs the server from source, so the assert is live
-  and the spectator was disconnected. The fix sends 0-500 in 9 bits (same step size) and bumps the
-  protocol to 1037. Known follow-up: the HUD reads `280 / 200` while spectating an enemy, because the
-  client assumes operator max health.
+  full-health zombies from round 43 on Regular (37 Hardened, 34 Veteran), exceed 250. When the last
+  living teammate dies, a dead player spectating them is moved to the killer two seconds later, which
+  triggered the `writeFloat` assert. Production runs the server from source, so the assert is live and
+  the spectator was disconnected. Impact is low: the match-over message arrives first and the client
+  ignores the disconnect, so it shows up as an ERROR in logs. The fix sends 0-500 in 9 bits (same step
+  size). Known follow-up: the HUD reads `280 / 200` while spectating an enemy, because the client
+  assumes operator max health.
 - **BUG-003.** Root cause: PR #38 limited Spec Ops player status to teammates (`gameModeManager.ts`)
   and the client stopped treating Spec Ops status as all-player (`client/src/game.ts`). The map draws red
   enemy dots from that status list (`client/src/ui/ui.ts`), so the dots disappeared in every Spec Ops
-  mode.
+  mode. The fix (PR #45) sends hostiles as a separate list after team status, so team status stays
+  team-only.
+- **Protocol.** PR #43 bumps to 1037 and PR #45 to 1038. Deploy them together so players refresh once.
 - **BUG-002.** Leading hypothesis: under socket backpressure, thin sync skips full re-sends for objects
   already visible (`server/src/game/client.ts`, `thinSync`). A missed layer or appearance change can
   leave an enemy drawn wrongly or not at all. Object ID reuse is the second suspect. Not yet reproduced.
