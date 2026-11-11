@@ -48,44 +48,51 @@ test("active-player health round-trips to within one point from 0 to the wire ma
     expect(roundTripHealth(Constants.MaxActivePlayerHealth)).toBe(Constants.MaxActivePlayerHealth);
 });
 
-test("a dead operator watching the last teammate stays connected when the view moves to a 280 HP killer", () => {
-    const game = createGame(TeamMode.Duo, "test_specops");
-    const watcher = game.playerBarn.addTestPlayer({ name: "A" });
-    const teammate = game.playerBarn.addTestPlayer({ name: "B" });
-    game.update(0.1);
-    game.netSync();
+const spectateCases = [
+    { map: "test_specops", enemy: "militia" },
+    { map: "zombie_dead_air", enemy: "zombie_walker" },
+] as const;
 
-    const enemy = game.specOps!.spawnEnemyPublic("militia", true);
-    enemy.health = enemy.maxHealth;
-    expect(enemy.health).toBe(SpecOpsEnemyMaxHealth);
-    const killBy = (target: typeof watcher) =>
-        target.kill({
-            damageType: GameConfig.DamageType.Player,
-            source: enemy,
-            amount: 9999,
-            dir: v2.randomUnit(),
-        });
+for (const { map, enemy: enemyKind } of spectateCases) {
+    test(`${map}: a dead operator watching the last teammate stays connected after a 280 HP ${enemyKind} kill`, () => {
+        const game = createGame(TeamMode.Duo, map);
+        const watcher = game.playerBarn.addTestPlayer({ name: "A" });
+        const teammate = game.playerBarn.addTestPlayer({ name: "B" });
+        game.update(0.1);
+        game.netSync();
 
-    killBy(watcher);
-    const spectate = new SpectateMsg();
-    spectate.action = SpectateAction.Begin;
-    watcher.client.handleMsg(MsgType.Spectate, spectate);
-    expect(watcher.client.spectating).toBe(teammate);
+        const enemy = game.specOps!.spawnEnemyPublic(enemyKind, true);
+        enemy.health = enemy.maxHealth;
+        expect(enemy.health).toBe(SpecOpsEnemyMaxHealth);
+        const killBy = (target: typeof watcher) =>
+            target.kill({
+                damageType: GameConfig.DamageType.Player,
+                source: enemy,
+                amount: 9999,
+                dir: v2.randomUnit(),
+            });
 
-    killBy(teammate);
-    const disconnect = vi.spyOn(watcher.client, "disconnect");
-    const error = vi.spyOn(game.logger, "error").mockImplementation(() => {});
-    try {
-        // The view moves to the teammate's killer two seconds after the death.
-        for (let i = 0; i < 240; i++) {
-            game.update(0.01);
-            if (i % 3 === 0) game.netSync();
+        killBy(watcher);
+        const spectate = new SpectateMsg();
+        spectate.action = SpectateAction.Begin;
+        watcher.client.handleMsg(MsgType.Spectate, spectate);
+        expect(watcher.client.spectating).toBe(teammate);
+
+        killBy(teammate);
+        const disconnect = vi.spyOn(watcher.client, "disconnect");
+        const error = vi.spyOn(game.logger, "error").mockImplementation(() => {});
+        try {
+            // The view moves to the teammate's killer two seconds after the death.
+            for (let i = 0; i < 240; i++) {
+                game.update(0.01);
+                if (i % 3 === 0) game.netSync();
+            }
+            expect(watcher.client.spectating).toBe(enemy);
+            expect(error).not.toHaveBeenCalled();
+            expect(disconnect).not.toHaveBeenCalled();
+        } finally {
+            disconnect.mockRestore();
+            error.mockRestore();
         }
-        expect(watcher.client.spectating).toBe(enemy);
-        expect(error).not.toHaveBeenCalled();
-        expect(disconnect).not.toHaveBeenCalled();
-    } finally {
-        disconnect.mockRestore();
-        error.mockRestore();
-    }
-});
+    });
+}
