@@ -6,7 +6,7 @@ developer: shared changes go through a pull request for review before merge.
 Statuses: Not Started, Investigating, Ready, In Progress, Needs Playtesting, Completed, Blocked.
 A task is Completed only after its pull request is merged and its acceptance criteria pass.
 
-Last updated: 2026-11-11 (base `baff7e0`).
+Last updated: 2026-11-11 (base `d36aceb`).
 
 ## Phase 1: Critical fixes
 
@@ -14,7 +14,7 @@ Last updated: 2026-11-11 (base `baff7e0`).
 |---|---|---|---|---|---|---|---|---|
 | BUG-001 | Active-player health over 250 disconnects spectators | Shared (net) | P2 | Completed | None | `shared/net/updateMsg.ts`, `shared/net/net.ts`, `shared/gameConfig.ts` | `activePlayerHealth.test.ts` (4) passes, including a Zombies duo; merged in PR #43 | None |
 | BUG-003 | Enemy dots missing from the map | Shared (Zombies, Fireteam, Practice) | P0 | Completed | PR #43 | `shared/net/updateMsg.ts`, `server/src/game/gameModeManager.ts`, `server/src/game/client.ts`, `client/src/objects/enemyMarkers.ts`, `client/src/ui/ui.ts` | `specOpsEnemyMarkers.test.ts` (6) passes; merged in PR #45; browser check pending | None |
-| BUG-002 | Enemies invisible but attacking in late Fireteam rounds | Shared (net) | P0 | Needs Playtesting | None | `server/src/game/client.ts` | `netSyncBackpressure.test.ts` (4) fails on `main`, passes with the fix; wave-47 harness: stale fields 11,787 to 0 | PR #46 review, including the Fireteam owner |
+| BUG-002 | Enemies invisible but attacking in late Fireteam rounds | Shared (net) | P0 | Completed | None | `server/src/game/client.ts` | `netSyncBackpressure.test.ts` (4) passes; merged in PR #46; live check on a slow connection pending | None |
 
 ### Notes
 
@@ -37,15 +37,15 @@ Last updated: 2026-11-11 (base `baff7e0`).
   good. A backpressured sync sends nothing, the following thin sync sent only partial updates, and
   `objectRegister.flush()` clears dirty flags every sync. An enemy that changed floor in that window
   stayed drawn on its old floor: invisible but still shooting. Object ID recycling was ruled out (0
-  missing, ghost or wrong-type objects in long runs with IDs exhausted). Fix in PR #46: resend missed
-  changes on the next update; +0.21% bytes under 10% simulated backpressure, identical output without it.
+  missing, ghost or wrong-type objects in long runs with IDs exhausted). Fixed in PR #46 (merged): resend
+  missed changes on the next update; +0.21% bytes under 10% simulated backpressure, identical output without it.
 
 ## Phase 2: Zombies balancing
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
 | ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Ready | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Not started | Speed values per difficulty need approval |
-| ZOM-003 | Pack-a-Punch timer by difficulty | Zombies | P1 | Ready | None | `shared/defs/maps/zombiePackAPunch.ts`, `server/src/game/specOpsManager.ts` | Not started | None. Decided: claim window 12 s on every difficulty; upgrade time 3 s Recruit, 5 s Regular, 7 s Hardened, 9 s Veteran |
+| ZOM-003 | Pack-a-Punch timer by difficulty | Zombies | P1 | Needs Playtesting | None | `shared/defs/maps/zombiePackAPunch.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` covers every difficulty; Zombies suites unchanged | In-game feel. Claim window 12 s on every difficulty; upgrade 3 s Recruit, 5 s Regular, 7 s Hardened, 9 s Veteran |
 | ZOM-002 | Ammunition scarcity | Zombies | P2 | Investigating | ZOM-004/005 ammo model | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts`, `shared/defs/maps/zombiePowerUps.ts` | Not started | Economy survey, then design approval |
 
 ## Phase 3: Zombies content

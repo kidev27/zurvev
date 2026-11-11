@@ -20,13 +20,14 @@ import {
 import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { MapDefs } from "../../shared/defs/mapDefs.ts";
 import { FireteamMapPool, ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
-import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
+import { SpecOpsDifficulties, type SpecOpsDifficulty, SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
 import {
     packAPunchArcBulletType,
     packAPunchBulletType,
     packAPunchSpecialFor,
     packAPunchType,
     packAPunchUpgradeFor,
+    packAPunchUpgradeTime,
     ZombiePackAPunchArcBullet,
     ZombiePackAPunchNames,
     ZombiePackAPunchSpecials,
@@ -539,8 +540,8 @@ test("After Hours power opens the garage and enables Pack-a-Punch", () => {
     expect(machine.button?.canUse).toBe(true);
 });
 
-function packAPunchGame(teamMode = TeamMode.Solo) {
-    const game = createGame(teamMode, "specops_complex");
+function packAPunchGame(teamMode = TeamMode.Solo, difficulty: SpecOpsDifficulty = "regular") {
+    const game = createGame(teamMode, "specops_complex", { difficulty });
     const a = game.playerBarn.addTestPlayer({ name: "A" });
     const b = game.playerBarn.addTestPlayer({ name: "B" });
     game.update(0.1);
@@ -601,7 +602,7 @@ test("Pack-a-Punch: gun goes in, works, pops out for the payer, who takes it", (
     machine.interact(b);
     expect(b.specOpsCash).toBe(bCash);
 
-    game.step(ZombiePackAPunchStats.upgradeTime + 0.2);
+    game.step(packAPunchUpgradeTime("regular") + 0.2);
     const loot = machineLoot(game, machine)!;
     expect(loot.type).toBe("ak47_pap");
     expect(loot.mysteryBoxOwnerId).toBe(a.__id);
@@ -631,7 +632,7 @@ test("Pack-a-Punch: an unclaimed gun is lost after the claim window", () => {
     const { game, ops, a, machine } = packAPunchGame();
     ops.grantCash(a, ZombieUpgradeCost);
     machine.interact(a);
-    game.step(ZombiePackAPunchStats.upgradeTime + 0.2);
+    game.step(packAPunchUpgradeTime("regular") + 0.2);
     const loot = machineLoot(game, machine)!;
     expect(loot).toBeDefined();
     game.step(ZombiePackAPunchStats.claimTime - 1);
@@ -646,6 +647,30 @@ test("Pack-a-Punch: an unclaimed gun is lost after the claim window", () => {
     a.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Primary);
     ops.grantCash(a, ZombieUpgradeCost);
     expect(ops.tryUpgradeZombieWeapon(a, machine)).toBe(true);
+});
+
+test("Pack-a-Punch timings: upgrade grows 2 s per difficulty step, claim window is always 12 s", () => {
+    expect(SpecOpsDifficulties.map((difficulty) => packAPunchUpgradeTime(difficulty))).toEqual([3, 5, 7, 9]);
+    expect(ZombiePackAPunchStats.claimTime).toBe(12);
+
+    for (const difficulty of SpecOpsDifficulties) {
+        const { game, ops, a, machine } = packAPunchGame(TeamMode.Solo, difficulty);
+        const upgradeTime = packAPunchUpgradeTime(difficulty);
+        ops.grantCash(a, ZombieUpgradeCost * 2);
+        expect(ops.tryUpgradeZombieWeapon(a, machine)).toBe(true);
+
+        game.step(upgradeTime - 0.3);
+        expect(machineLoot(game, machine), `${difficulty}: still working`).toBeUndefined();
+        game.step(0.5);
+        const loot = machineLoot(game, machine)!;
+        expect(loot, `${difficulty}: gun ready`).toBeDefined();
+
+        game.step(ZombiePackAPunchStats.claimTime - 0.5);
+        expect(loot.destroyed, `${difficulty}: still claimable`).toBe(false);
+        game.step(1);
+        expect(loot.destroyed, `${difficulty}: lost after the claim window`).toBe(true);
+        expect(machine.button!.onOff).toBe(false);
+    }
 });
 
 test("Pack-a-Punch: refuses Mark II guns, non-upgradable guns, no power, or no cash", () => {

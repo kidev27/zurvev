@@ -8,7 +8,7 @@ import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { PerkProperties } from "../../shared/defs/gameObjects/perkDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
-import { ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
+import { packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { PracticeGuns } from "../../shared/practice.ts";
@@ -118,7 +118,7 @@ for (const weapon of weapons) {
         ops.setCashForDebug(player, 10000);
         bench.interact(player);
         expect(player.weapons[slot].type).toBe("");
-        game.step(3.1);
+        game.step(packAPunchUpgradeTime(ops.difficulty) + 0.1);
         bench.interact(player);
         expect(player.weapons[slot].type).toBe(`${weapon.type}_pap`);
         expect(player.weaponManager.getAmmoStats(GunDefs[`${weapon.type}_pap`]).maxClip).toBe(weapon.upgradedClip);
