@@ -4206,22 +4206,13 @@ export class Player extends BaseGameObject {
         }
 
         // if none are found use active weapon if its a gun
-        let replaceIdx: number | null = GameConfig.WeaponType[this.curWeapIdx] === "gun"
-            ? this.curWeapIdx
-            : null;
-        // A Mystery Box roll can always be taken: holding melee or a throwable, it
-        // replaces the gun held last.
-        if (replaceIdx === null && obj.fromMysteryBox) {
-            const last = this.weaponManager.lastWeaponIdx;
-            replaceIdx = GameConfig.WeaponType[last] === "gun" ? last : GameConfig.WeaponSlot.Primary;
-        }
-        if (replaceIdx !== null) {
+        if (GameConfig.WeaponType[this.curWeapIdx] === "gun") {
             const newGunDef = GameObjectDefs.typeToDef(obj.type, "gun");
             return {
-                slot: replaceIdx,
+                slot: this.curWeapIdx,
                 isDual: false,
-                cause: this.weapons[replaceIdx].type === obj.type
-                        || newGunDef.dualWieldType === this.weapons[replaceIdx].type
+                cause: this.activeWeapon === obj.type
+                        || newGunDef.dualWieldType === this.weapons[this.curWeapIdx].type
                     ? net.PickupMsgType.AlreadyOwned
                     : net.PickupMsgType.Success,
             };

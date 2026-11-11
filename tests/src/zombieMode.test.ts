@@ -911,6 +911,11 @@ test("Mystery Box charges once, synchronizes its roll, and replaces the held gun
     expect(box.button?.canUse).toBe(true);
 
     buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "glock", 17);
+    buyer.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
+    box.interact(buyer);
+    expect(preview.destroyed).toBe(false);
+    expect(box.button?.canUse).toBe(true);
+
     const replacedSlot = GameConfig.WeaponSlot.Secondary;
     buyer.weaponManager.setCurWeapIndex(replacedSlot);
     box.interact(buyer);
@@ -940,24 +945,30 @@ function rollMysteryBox(game: ReturnType<typeof createGame>, buyer: Player) {
     return { box, prize };
 }
 
-test("Mystery Box with two guns while holding fists replaces the gun held last", () => {
+test("Mystery Box with two guns can't be taken while holding a grenade or melee", () => {
     const game = createGame(TeamMode.Solo, "specops_complex");
     const buyer = game.playerBarn.addTestPlayer({ name: "Buyer" });
     game.update(0.1);
     buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Primary, "m9", 15);
     buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "glock", 17);
-    buyer.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Secondary);
-    buyer.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
+    buyer.invManager.set("frag", 2);
+    buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Throwable, "frag", 0);
     const { box, prize } = rollMysteryBox(game, buyer);
-    expect(["m9", "glock"]).not.toContain(prize.type);
 
-    box.interact(buyer);
-
-    expect(prize.destroyed).toBe(true);
-    expect(buyer.weapons[GameConfig.WeaponSlot.Secondary].type).toBe(prize.type);
+    for (const slot of [GameConfig.WeaponSlot.Throwable, GameConfig.WeaponSlot.Melee]) {
+        buyer.weaponManager.setCurWeapIndex(slot);
+        box.interact(buyer);
+        expect(prize.destroyed, `slot ${slot}`).toBe(false);
+    }
     expect(buyer.weapons[GameConfig.WeaponSlot.Primary].type).toBe("m9");
-    expect(buyer.curWeapIdx).toBe(GameConfig.WeaponSlot.Secondary);
-    expect(game.lootBarn.loots.some((loot) => !loot.destroyed && loot.type === "glock")).toBe(false);
+    expect(buyer.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("glock");
+
+    // Switching to a gun takes it, replacing that gun with no floor drop.
+    buyer.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Primary);
+    box.interact(buyer);
+    expect(prize.destroyed).toBe(true);
+    expect(buyer.weapons[GameConfig.WeaponSlot.Primary].type).toBe(prize.type);
+    expect(game.lootBarn.loots.some((loot) => !loot.destroyed && loot.type === "m9")).toBe(false);
 });
 
 test("Ordinary gun pickups outside the Mystery Box still drop the replaced gun", () => {

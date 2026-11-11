@@ -62,7 +62,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| ZOM-006 | Mystery Box weapon replacement | Zombies | P2 | Needs Playtesting | None | `server/src/game/objects/player.ts`, `server/src/game/objects/loot.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: held gun replaced with no floor drop; fists with two guns replace the gun held last; ordinary pickups still drop | In-game feel. Old gun and its loaded rounds are gone; reserve ammo stays |
+| ZOM-006 | Mystery Box weapon replacement | Zombies | P2 | Needs Playtesting | None | `server/src/game/objects/player.ts`, `server/src/game/objects/loot.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: held gun replaced with no floor drop; with two guns, holding a grenade or melee blocks the take; ordinary pickups still drop | In-game feel. Old gun and its loaded rounds are gone; reserve ammo stays |
 | ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Blocked | Shared ammo design with ZOM-005 | `shared/defs/gameObjects/gunDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts` | Not started | Capacity, refill and drop rules need approval |
 | ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Blocked | Shared ammo design with ZOM-004 | Same as ZOM-004 | Not started | Same as ZOM-004 |
 | ZOM-007 | Additional zombie types | Zombies | P3 | Investigating | ZOM-001 (per-class speed) | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Benchmark before raising counts | Design proposal for two variants first (see issue #19) |
