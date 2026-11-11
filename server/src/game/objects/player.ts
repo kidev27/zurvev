@@ -4372,7 +4372,8 @@ export class Player extends BaseGameObject {
                             oldWeapDef.dualWieldType // verifies it's a dual wieldable pistol
                             && this.weapons[newGunIdx].type == obj.type // verifies the old gun and new gun are the same
                         );
-                        if (shouldDrop) {
+                        // Mystery Box rolls replace the old gun outright (Zombies): no floor drop.
+                        if (shouldDrop && !obj.fromMysteryBox) {
                             this.weaponManager.dropGun(newGunIdx);
                         }
                     }

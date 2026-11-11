@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 
+import type { Player } from "../../server/src/game/objects/player.ts";
 import { ZombieWaveIntermissionTime } from "../../server/src/game/specOpsManager.ts";
 import { WeaponManager } from "../../server/src/game/weaponManager.ts";
 import {
@@ -922,12 +923,65 @@ test("Mystery Box charges once, synchronizes its roll, and replaces the held gun
     expect(buyer.weapons[replacedSlot].type).toBe(preview.type);
     expect(buyer.weapons[replacedSlot].ammo).toBeGreaterThan(0);
     expect(buyer.weapons[GameConfig.WeaponSlot.Primary].type).toBe("m9");
+    // With two guns the held one is replaced, not dropped on the floor.
+    expect(game.lootBarn.loots.some((loot) => !loot.destroyed && loot.type === "glock")).toBe(false);
 
     game.update(0.1);
     expect(box.button?.onOff).toBe(false);
     expect(box.button?.canUse).toBe(false);
     game.step(ZombieMysteryBoxCooldown + 0.1);
     expect(box.button?.canUse).toBe(true);
+});
+
+/** Roll the box for `buyer` and return the revealed gun. */
+function rollMysteryBox(game: ReturnType<typeof createGame>, buyer: Player) {
+    const box = game.map.obstacles.find((obstacle) => obstacle.type === "zombie_mystery_box")!;
+    v2.set(buyer.pos, v2.add(box.pos, v2.create(0, -4.5)));
+    game.grid.updateObject(buyer);
+    game.specOps!.grantCash(buyer, ZombieMysteryBoxCost);
+    box.interact(buyer);
+    game.step(ZombieMysteryBoxRollDuration + 0.2);
+    const prize = game.lootBarn.loots.find((loot) => loot.mysteryBoxId === box.__id && !loot.destroyed)!;
+    return { box, prize };
+}
+
+test("Mystery Box with two guns can't be taken while holding a grenade or melee", () => {
+    const game = createGame(TeamMode.Solo, "specops_complex");
+    const buyer = game.playerBarn.addTestPlayer({ name: "Buyer" });
+    game.update(0.1);
+    buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Primary, "m9", 15);
+    buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "glock", 17);
+    buyer.invManager.set("frag", 2);
+    buyer.weaponManager.setWeapon(GameConfig.WeaponSlot.Throwable, "frag", 0);
+    const { box, prize } = rollMysteryBox(game, buyer);
+
+    for (const slot of [GameConfig.WeaponSlot.Throwable, GameConfig.WeaponSlot.Melee]) {
+        buyer.weaponManager.setCurWeapIndex(slot);
+        box.interact(buyer);
+        expect(prize.destroyed, `slot ${slot}`).toBe(false);
+    }
+    expect(buyer.weapons[GameConfig.WeaponSlot.Primary].type).toBe("m9");
+    expect(buyer.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("glock");
+
+    // Switching to a gun takes it, replacing that gun with no floor drop.
+    buyer.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Primary);
+    box.interact(buyer);
+    expect(prize.destroyed).toBe(true);
+    expect(buyer.weapons[GameConfig.WeaponSlot.Primary].type).toBe(prize.type);
+    expect(game.lootBarn.loots.some((loot) => !loot.destroyed && loot.type === "m9")).toBe(false);
+});
+
+test("Ordinary gun pickups outside the Mystery Box still drop the replaced gun", () => {
+    const game = createGame(TeamMode.Solo, "test_specops");
+    const player = game.playerBarn.addTestPlayer({ name: "Operator" });
+    game.update(0.1);
+    player.weaponManager.setWeapon(GameConfig.WeaponSlot.Primary, "m9", 15);
+    player.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "glock", 17);
+    player.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Secondary);
+    const loot = game.lootBarn.addLoot("mp5", v2.copy(player.pos), player.layer, 1, { pushSpeed: 0 })!;
+    player.pickupLoot(loot);
+    expect(player.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mp5");
+    expect(game.lootBarn.loots.some((l) => !l.destroyed && l.type === "glock")).toBe(true);
 });
 
 test("Mystery Box fills an empty gun slot when the player takes it while holding fists", () => {

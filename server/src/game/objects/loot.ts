@@ -268,6 +268,8 @@ export class Loot extends BaseGameObject {
     /** Mystery Box previews render as loot but cannot be collected until revealed. */
     mysteryBoxLocked = false;
     mysteryBoxId = 0;
+    /** A Mystery Box roll: with two guns it replaces the held gun instead of dropping it. */
+    fromMysteryBox = false;
     /** Player who paid for this Mystery Box roll; only they can claim it. */
     mysteryBoxOwnerId = 0;
     /** Wonder weapons: the player who dropped this one (blocks them re-rolling it). */

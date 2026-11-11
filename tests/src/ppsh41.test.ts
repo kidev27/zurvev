@@ -8,7 +8,7 @@ import { ZombieMysteryBoxWeapons } from "../../server/src/game/zombieMode.ts";
 import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
-import { ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
+import { packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
@@ -157,7 +157,7 @@ test("Pack-a-Punch returns the new Mk II and Max Ammo refills reserves without t
     ops.setCashForDebug(player, 10000);
     machine.interact(player);
     expect(player.weapons[slot].type).toBe("");
-    game.step(3.1);
+    game.step(packAPunchUpgradeTime(ops.difficulty) + 0.1);
     machine.interact(player);
     expect(player.weapons[slot].type).toBe("ppsh41_pap");
     expect(player.weaponManager.getAmmoStats(GunDefs.ppsh41_pap).maxClip).toBe(107);
