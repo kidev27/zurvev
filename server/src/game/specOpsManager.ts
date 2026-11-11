@@ -74,6 +74,7 @@ import { packAPunchBaseType } from "../../../shared/defs/maps/zombiePackAPunch.t
 import {
     packAPunchArtOffset,
     packAPunchUpgradeFor,
+    packAPunchUpgradeTime,
     ZombiePackAPunchSprite,
     ZombiePackAPunchStats,
     ZombiePackAPunchStunImmunity,
@@ -6719,8 +6720,9 @@ export class SpecOpsManager implements PracticeHost {
 
     /**
      * Pack-a-Punch (BO2 style): pay, the held gun goes into the machine, it works
-     * for `upgradeTime`, then the Mark II gun pops out for the payer only. Unclaimed
-     * guns are lost after `claimTime`. Interacting again during the reveal takes it.
+     * for `packAPunchUpgradeTime(difficulty)`, then the Mark II gun pops out for the
+     * payer only. Unclaimed guns are lost after `claimTime`. Interacting again during
+     * the reveal takes it.
      */
     tryUpgradeZombieWeapon(player: Player, machine: Obstacle): boolean {
         if (
@@ -6766,7 +6768,7 @@ export class SpecOpsManager implements PracticeHost {
         this.packAPunchState = {
             machine,
             phase: "working",
-            ticker: ZombiePackAPunchStats.upgradeTime,
+            ticker: packAPunchUpgradeTime(this.difficulty),
             ownerId: player.__id,
             result: upgraded,
         };

@@ -5,7 +5,7 @@ import { stairAtPos } from "../../server/src/game/specOpsNav.ts";
 import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
-import { packAPunchType, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
+import { packAPunchType, packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { ZombiePressureBlast, ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
@@ -213,7 +213,7 @@ for (const { type } of added) {
         machine.interact(shooter);
         expect(shooter.weapons[primary].type).toBe("");
         expect(ops.canGetWonderWeapon(shooter, type)).toBe(false);
-        game.step(3.1);
+        game.step(packAPunchUpgradeTime(ops.difficulty) + 0.1);
         const loot = game.lootBarn.loots.find((l) => l.type === packAPunchType(type) && !l.destroyed)!;
         expect(loot).toBeDefined();
         expect(ops.canGetWonderWeapon(shooter, type)).toBe(false);

@@ -1,3 +1,5 @@
+import type { SpecOpsDifficulty } from "./specOpsShop.ts";
+
 /**
  * Zombies: Pack-a-Punch.
  *
@@ -156,11 +158,21 @@ export const ZombiePackAPunchStats = {
     cost: 5000,
     damageMult: 1.35,
     magazineMult: 1.5,
-    /** Seconds the machine works on the gun. */
-    upgradeTime: 3,
-    /** Seconds the owner has to take the upgraded gun before it is lost. */
-    claimTime: 15,
+    /** Seconds the owner has to take the upgraded gun before it is lost. Same on every difficulty. */
+    claimTime: 12,
 } as const;
+
+/** Seconds the machine works on the gun, by difficulty: 2 s longer per step above Recruit. */
+export const ZombiePackAPunchUpgradeTime: Record<SpecOpsDifficulty, number> = {
+    recruit: 3,
+    regular: 5,
+    hardened: 7,
+    veteran: 9,
+};
+
+export function packAPunchUpgradeTime(difficulty: SpecOpsDifficulty): number {
+    return ZombiePackAPunchUpgradeTime[difficulty] ?? ZombiePackAPunchUpgradeTime.regular;
+}
 
 /** Upgraded guns' floor/HUD glow, camo and tracer colors (client only). */
 export const ZombiePackAPunchColors = {
