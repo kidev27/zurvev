@@ -48,43 +48,40 @@ test("active-player health round-trips to within one point from 0 to the wire ma
     expect(roundTripHealth(Constants.MaxActivePlayerHealth)).toBe(Constants.MaxActivePlayerHealth);
 });
 
-test("spectating a full-health Spec Ops enemy keeps the spectator connected", () => {
-    const game = createGame(TeamMode.Solo, "test_specops");
-    const human = game.playerBarn.addTestPlayer({ name: "A" });
+test("a dead operator watching the last teammate stays connected when the view moves to a 280 HP killer", () => {
+    const game = createGame(TeamMode.Duo, "test_specops");
+    const watcher = game.playerBarn.addTestPlayer({ name: "A" });
+    const teammate = game.playerBarn.addTestPlayer({ name: "B" });
     game.update(0.1);
     game.netSync();
 
     const enemy = game.specOps!.spawnEnemyPublic("militia", true);
     enemy.health = enemy.maxHealth;
     expect(enemy.health).toBe(SpecOpsEnemyMaxHealth);
-
-    human.damage({
-        damageType: GameConfig.DamageType.Player,
-        source: enemy,
-        amount: 9999,
-        dir: v2.randomUnit(),
-    });
-    // A downed operator still needs finishing in Spec Ops.
-    if (!human.dead) {
-        human.damage({
+    const killBy = (target: typeof watcher) =>
+        target.kill({
             damageType: GameConfig.DamageType.Player,
             source: enemy,
             amount: 9999,
             dir: v2.randomUnit(),
         });
-    }
-    expect(human.dead).toBe(true);
 
+    killBy(watcher);
     const spectate = new SpectateMsg();
     spectate.action = SpectateAction.Begin;
-    human.client.handleMsg(MsgType.Spectate, spectate);
-    expect(human.client.spectating).toBe(enemy);
+    watcher.client.handleMsg(MsgType.Spectate, spectate);
+    expect(watcher.client.spectating).toBe(teammate);
 
-    const disconnect = vi.spyOn(human.client, "disconnect");
+    killBy(teammate);
+    const disconnect = vi.spyOn(watcher.client, "disconnect");
     const error = vi.spyOn(game.logger, "error").mockImplementation(() => {});
     try {
-        game.update(0.01);
-        game.netSync();
+        // The view moves to the teammate's killer two seconds after the death.
+        for (let i = 0; i < 240; i++) {
+            game.update(0.01);
+            if (i % 3 === 0) game.netSync();
+        }
+        expect(watcher.client.spectating).toBe(enemy);
         expect(error).not.toHaveBeenCalled();
         expect(disconnect).not.toHaveBeenCalled();
     } finally {
