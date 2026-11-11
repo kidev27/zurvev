@@ -151,6 +151,7 @@ import {
     ZombieMysteryBoxRollDuration,
     ZombieMysteryBoxWeapons,
     ZombieRayGun,
+    zombieSpeedMult,
     ZombieUpgradeCost,
     zombieWaveCount,
 } from "./zombieMode.ts";
@@ -10068,7 +10069,9 @@ export class SpecOpsManager implements PracticeHost {
             : loadout.outfit;
         player.setOutfit(outfit);
         player.loadout.outfit = outfit;
-        player.specOpsSpeedMult = loadout.speedMult;
+        player.specOpsSpeedMult = isZombieClass(classId)
+            ? zombieSpeedMult(classId, this.difficulty)
+            : loadout.speedMult;
         player.specOpsDamageMult = kind === "enemy"
             ? enemyDamageMult(this.wave || 1, this.difficulty)
             : 1;

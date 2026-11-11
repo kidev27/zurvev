@@ -7,6 +7,8 @@ import {
     composeZombieWave,
     ZombieEconomy,
     zombieEnemyHealth,
+    ZombieLoadouts,
+    ZombieMaxSpeedMult,
     ZombieMysteryBoxClaimDuration,
     ZombieMysteryBoxCooldown,
     ZombieMysteryBoxCost,
@@ -14,6 +16,8 @@ import {
     ZombieMysteryBoxRollDuration,
     ZombieMysteryBoxWeapons,
     ZombieRayGun,
+    ZombieSpeedByDifficulty,
+    zombieSpeedMult,
     ZombieUpgradeCost,
     zombieWaveCount,
 } from "../../server/src/game/zombieMode.ts";
@@ -728,6 +732,42 @@ test("After Hours relocates the Mystery Box after repeated uses", () => {
 
     expect(v2.distance(box.pos, startingPos)).toBeGreaterThan(4);
     expect(box.button?.canUse).toBe(true);
+});
+
+test("Zombie speed scales with difficulty and stays under the navigation cap", () => {
+    expect(SpecOpsDifficulties.map((difficulty) => ZombieSpeedByDifficulty[difficulty])).toEqual([
+        0.51,
+        0.55,
+        0.59,
+        0.64,
+    ]);
+    for (const difficulty of SpecOpsDifficulties) {
+        expect(zombieSpeedMult("zombie_walker", difficulty)).toBe(ZombieSpeedByDifficulty[difficulty]);
+        expect(zombieSpeedMult("zombie_walker", difficulty)).toBeLessThanOrEqual(ZombieMaxSpeedMult);
+    }
+
+    // A future fast type is clamped instead of outrunning the navigation.
+    const walker = ZombieLoadouts.zombie_walker;
+    walker.speedScale = 5;
+    try {
+        expect(zombieSpeedMult("zombie_walker", "veteran")).toBe(ZombieMaxSpeedMult);
+    } finally {
+        delete walker.speedScale;
+    }
+});
+
+test("Spawned zombies move at their difficulty's speed", () => {
+    const speeds: number[] = [];
+    for (const difficulty of SpecOpsDifficulties) {
+        const game = createGame(TeamMode.Solo, "zombie_dead_air", { difficulty });
+        game.playerBarn.addTestPlayer({ name: "A" });
+        game.update(0.1);
+        const zombie = game.specOps!.spawnEnemyPublic("zombie_walker", true);
+        expect(zombie.specOpsSpeedMult, difficulty).toBe(ZombieSpeedByDifficulty[difficulty]);
+        game.update(0.01);
+        speeds.push(zombie.speed);
+    }
+    for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThan(speeds[i - 1]);
 });
 
 test("Zombie wave one spawns unarmed melee walkers with cash bounties", () => {

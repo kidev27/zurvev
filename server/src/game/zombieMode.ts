@@ -20,7 +20,10 @@ export interface ZombieLoadout {
     melee: string;
     range: number;
     holdRange: number;
+    /** Fallback only: zombies move at `zombieSpeedMult(class, difficulty)`. Kept at the Regular speed. */
     speedMult: number;
+    /** Speed relative to a walker on the same difficulty (default 1). For future zombie types. */
+    speedScale?: number;
     turnRate: number;
     aimError: number;
     reaction: number;
@@ -42,7 +45,7 @@ export const ZombieLoadouts: Record<ZombieClass, ZombieLoadout> = {
         melee: "fists",
         range: 3,
         holdRange: 2.2,
-        speedMult: 0.53,
+        speedMult: 0.55,
         turnRate: 150,
         aimError: 0,
         reaction: 0.18,
@@ -50,6 +53,22 @@ export const ZombieLoadouts: Record<ZombieClass, ZombieLoadout> = {
         burstPause: 0.42,
     },
 };
+
+/** Zombie move speed (x base player speed) by difficulty, before kill-heat rush. */
+export const ZombieSpeedByDifficulty: Record<SpecOpsDifficulty, number> = {
+    recruit: 0.51,
+    regular: 0.55,
+    hardened: 0.59,
+    veteran: 0.64,
+};
+
+/** Hard cap on a zombie's base speed so fast types stay within what navigation handles. */
+export const ZombieMaxSpeedMult = 0.75;
+
+export function zombieSpeedMult(kind: ZombieClass, difficulty: SpecOpsDifficulty = "regular"): number {
+    const base = ZombieSpeedByDifficulty[difficulty] ?? ZombieSpeedByDifficulty.regular;
+    return Math.min(ZombieMaxSpeedMult, base * (ZombieLoadouts[kind].speedScale ?? 1));
+}
 
 /**
  * Zombies economy (Black Ops style). Difficulty still scales starting cash.
