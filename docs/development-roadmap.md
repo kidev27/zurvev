@@ -6,16 +6,15 @@ developer: shared changes go through a pull request for review before merge.
 Statuses: Not Started, Investigating, Ready, In Progress, Needs Playtesting, Completed, Blocked.
 A task is Completed only after its pull request is merged and its acceptance criteria pass.
 
-Last updated: 2026-11-11 (base `5c48da6`).
+Last updated: 2026-11-11 (base `baff7e0`).
 
 ## Phase 1: Critical fixes
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| BUG-001 | Active-player health over 250 disconnects spectators | Shared (net) | P2 | Needs Playtesting | None | `shared/net/updateMsg.ts`, `shared/net/net.ts`, `shared/gameConfig.ts` | `activePlayerHealth.test.ts` (4) passes, including a Zombies duo; cross-mode suites unchanged | PR #43 review; ship together with PR #45 |
-| BUG-003 | Enemy dots missing from the map | Shared (Zombies, Fireteam, Practice) | P0 | Needs Playtesting | PR #43 (stacked) | `shared/net/updateMsg.ts`, `server/src/game/gameModeManager.ts`, `server/src/game/client.ts`, `client/src/objects/enemyMarkers.ts`, `client/src/ui/ui.ts` | `specOpsEnemyMarkers.test.ts` (6) passes; cross-mode suites unchanged; not yet seen in a browser | PR #45 review, including the Fireteam owner |
+| BUG-001 | Active-player health over 250 disconnects spectators | Shared (net) | P2 | Completed | None | `shared/net/updateMsg.ts`, `shared/net/net.ts`, `shared/gameConfig.ts` | `activePlayerHealth.test.ts` (4) passes, including a Zombies duo; merged in PR #43 | None |
+| BUG-003 | Enemy dots missing from the map | Shared (Zombies, Fireteam, Practice) | P0 | Completed | PR #43 | `shared/net/updateMsg.ts`, `server/src/game/gameModeManager.ts`, `server/src/game/client.ts`, `client/src/objects/enemyMarkers.ts`, `client/src/ui/ui.ts` | `specOpsEnemyMarkers.test.ts` (6) passes; merged in PR #45; browser check pending | None |
 | BUG-002 | Enemies invisible but attacking in late Fireteam rounds | Shared (net) | P0 | Investigating | None (BUG-001 ruled out: it only affects spectators) | `server/src/game/client.ts`, `server/src/game/objects/gameObject.ts`, `client/src/objects/objectPool.ts` | Long-run simulation with client decode planned | No reproduction yet |
-| BUG-004 | Missing drop animations | Unknown | P1 | Blocked | None | Unknown | None | Needs a description: which item, which mode |
 
 ### Notes
 
@@ -32,7 +31,8 @@ Last updated: 2026-11-11 (base `5c48da6`).
   enemy dots from that status list (`client/src/ui/ui.ts`), so the dots disappeared in every Spec Ops
   mode. The fix (PR #45) sends hostiles as a separate list after team status, so team status stays
   team-only.
-- **Protocol.** PR #43 bumps to 1037 and PR #45 to 1038. Deploy them together so players refresh once.
+- **Protocol.** `main` is now at protocol 1038 (PRs #43 and #45). Players must refresh after the next deploy.
+- **BUG-004** (missing drop animations) was dropped from the backlog on 2026-11-11.
 - **BUG-002.** Leading hypothesis: under socket backpressure, thin sync skips full re-sends for objects
   already visible (`server/src/game/client.ts`, `thinSync`). A missed layer or appearance change can
   leave an enemy drawn wrongly or not at all. Object ID reuse is the second suspect. Not yet reproduced.
