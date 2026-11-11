@@ -8,6 +8,7 @@ import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { PerkProperties } from "../../shared/defs/gameObjects/perkDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
+import { ZombieAmmoBagSizes } from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
@@ -132,7 +133,7 @@ for (const map of ZombieMapPool) {
         const second = game.playerBarn.addTestPlayer({ name: "Second" });
         expect(first.backpack).toBe("backpack01");
         expect(second.backpack).toBe("backpack01");
-        expect(first.invManager.getMaxCapacity("762mm")).toBe(450);
+        expect(first.invManager.getMaxCapacity("762mm")).toBe(ZombieAmmoBagSizes["762mm"][1]);
         game.update(0.1);
         expect(game.specOps!.spawnEnemyPublic("zombie_walker").backpack).toBe("backpack00");
     });

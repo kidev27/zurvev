@@ -43,12 +43,21 @@ export function isZombiePowerUpType(type: string): type is ZombiePowerUpType {
  * chance divided by `zombieDropTeamScale` to keep drops per round the same.
  */
 export const ZombiePowerUpDrops = {
-    // Tuned for hit + kill cash: about 1.5 drops per round from round 8 on.
-    pointStart: 1500,
-    pointGrowth: 1.08,
+    // Black Ops values: the point target starts at 2000 and grows 14% per point-earned drop.
+    pointStart: 2000,
+    pointGrowth: 1.14,
     killChance: 0.02,
+    /** The per-kill chance shrinks this much each round after round 1, down to `killChanceMin`. */
+    killChanceDecayPerRound: 0.0005,
+    killChanceMin: 0.01,
     roundCap: 4,
 };
+
+/** Per-kill drop chance for a round (before the team-size scale). */
+export function zombiePowerUpKillChance(round: number): number {
+    const { killChance, killChanceDecayPerRound, killChanceMin } = ZombiePowerUpDrops;
+    return Math.max(killChanceMin, killChance - killChanceDecayPerRound * Math.max(0, round - 1));
+}
 
 /** Point target after `drops` point-earned drops. */
 export function zombiePowerUpPointTarget(drops: number): number {

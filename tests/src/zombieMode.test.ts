@@ -25,7 +25,12 @@ import {
 import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { MapDefs } from "../../shared/defs/mapDefs.ts";
 import { FireteamMapPool, ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
-import { SpecOpsDifficulties, type SpecOpsDifficulty, SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
+import {
+    SpecOpsBagSizes,
+    SpecOpsDifficulties,
+    type SpecOpsDifficulty,
+    SpecOpsShopCatalog,
+} from "../../shared/defs/maps/specOpsShop.ts";
 import {
     packAPunchArcBulletType,
     packAPunchBulletType,
@@ -42,12 +47,14 @@ import {
     ZombiePackAPunchTracer,
     ZombiePackAPunchType,
 } from "../../shared/defs/maps/zombiePackAPunch.ts";
+import { ZombieAmmoBagSizes } from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { zombiePerkMachine, ZombiePerkMachines, ZombiePerkMachineTypes } from "../../shared/defs/maps/zombiePerks.ts";
 import {
     isZombiePowerUpType,
     ZombieNukeCash,
     ZombiePowerUpDrops,
     zombiePowerUpFlashVisible,
+    zombiePowerUpKillChance,
     zombiePowerUpHudFlashPeriod,
     ZombiePowerUpLifetime,
     ZombiePowerUpTypes,
@@ -318,6 +325,47 @@ test("At most four power-ups drop per round; the cap resets next round", () => {
     ops.startNextWave();
     expect(ops.wave).toBe(2);
     expect(ops.zombieRoundDrops).toBe(0);
+});
+
+test("Power-up drops use Black Ops point targets and a per-kill chance that shrinks each round", () => {
+    expect(ZombiePowerUpDrops.pointStart).toBe(2000);
+    expect(ZombiePowerUpDrops.pointGrowth).toBe(1.14);
+    expect(zombiePowerUpKillChance(1)).toBeCloseTo(0.02);
+    expect(zombiePowerUpKillChance(11)).toBeCloseTo(0.015);
+    expect(zombiePowerUpKillChance(21)).toBeCloseTo(0.01);
+    expect(zombiePowerUpKillChance(40)).toBeCloseTo(ZombiePowerUpDrops.killChanceMin);
+
+    // A roll that drops on round 1 no longer drops on round 21.
+    const game = startZombieRound();
+    const ops = game.specOps!;
+    const zombie = ops.livingEnemies()[0];
+    const roll = 0.015 * ops.zombieDropTeamScale();
+    ops.wave = 21;
+    ops.onZombieKilledForDrops(zombie, 0, roll);
+    expect(powerUpDrops(game)).toHaveLength(0);
+    ops.wave = 1;
+    ops.onZombieKilledForDrops(zombie, 0, roll);
+    expect(powerUpDrops(game)).toHaveLength(1);
+});
+
+test("Zombies maps use smaller ammo bags that Max Ammo fills; Fireteam keeps Spec Ops bags", () => {
+    for (const map of ZombieMapPool) {
+        expect(MapDefs[map].gameConfig.bagSizes["9mm"]?.[1], map).toBe(ZombieAmmoBagSizes["9mm"][1]);
+        expect(MapDefs[map].gameConfig.bagSizes["762mm"]?.[1], map).toBe(ZombieAmmoBagSizes["762mm"][1]);
+        // Throwables keep their Spec Ops caps.
+        expect(MapDefs[map].gameConfig.bagSizes.frag?.[1], map).toBe(SpecOpsBagSizes.frag[1]);
+    }
+    for (const map of FireteamMapPool) {
+        expect(MapDefs[map].gameConfig.bagSizes["9mm"]?.[1], map).toBe(SpecOpsBagSizes["9mm"][1]);
+    }
+
+    const game = startZombieRound();
+    const operator = game.playerBarn.livingPlayers.find((p) => !p.specOpsAi)!;
+    operator.invManager.set("9mm", 10);
+    operator.invManager.set("762mm", 0);
+    game.specOps!.activateZombiePowerUp("zombie_powerup_max_ammo");
+    expect(operator.invManager.get("9mm")).toBe(ZombieAmmoBagSizes["9mm"][1]);
+    expect(operator.invManager.get("762mm")).toBe(ZombieAmmoBagSizes["762mm"][1]);
 });
 
 test("Bigger teams need more points and luckier kills per drop", () => {
