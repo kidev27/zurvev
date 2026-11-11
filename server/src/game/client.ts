@@ -22,6 +22,8 @@ import type { ClientSocket } from "./socket.ts";
 
 /** Cap per-client instant msgs queued while the socket is backpressured. */
 const MAX_QUEUED_CLIENT_MSGS = 32;
+/** Player infos for unseen Spec Ops enemies sent per update (see collectPlayerInfos). */
+const PlayerInfoTricklePerUpdate = 32;
 
 export class ClientBarn {
     clients: Client[] = [];
@@ -597,14 +599,15 @@ export class Client {
         teamId: number,
     ): Player[] {
         const out: Player[] = [];
-        const pushInfo = (p: Player) => {
+        const pushInfo = (p: Player): boolean => {
             if (
                 out.length >= 255
                 || this._pendingDeletedPlayerIds.has(p.__id)
                 || this._sentPlayerInfoIds.has(p.__id)
-            ) return;
+            ) return false;
             this._sentPlayerInfoIds.add(p.__id);
             out.push(p);
+            return true;
         };
 
         for (const p of playerBarn.players) {
@@ -614,6 +617,13 @@ export class Client {
         // Retry visible metadata on later updates if the 8-bit batch filled up.
         for (const obj of visibleObjects) {
             if (obj.__type === ObjectType.Player) pushInfo(obj);
+        }
+        // Then the rest (Spec Ops enemies never seen), a few per update, so kill-feed
+        // names resolve without one huge packet when joining a crowded wave.
+        let trickle = PlayerInfoTricklePerUpdate;
+        for (const p of playerBarn.players) {
+            if (trickle <= 0) break;
+            if (pushInfo(p)) trickle--;
         }
         return out;
     }
