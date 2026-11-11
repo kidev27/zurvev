@@ -6,7 +6,7 @@ developer: shared changes go through a pull request for review before merge.
 Statuses: Not Started, Investigating, Ready, In Progress, Needs Playtesting, Completed, Blocked.
 A task is Completed only after its pull request is merged and its acceptance criteria pass.
 
-Last updated: 2026-11-11 (base `6eab92c`).
+Last updated: 2026-11-11 (base `d6dc806`).
 
 ## Phase 1: Critical fixes
 
@@ -39,6 +39,16 @@ Last updated: 2026-11-11 (base `6eab92c`).
   stayed drawn on its old floor: invisible but still shooting. Object ID recycling was ruled out (0
   missing, ghost or wrong-type objects in long runs with IDs exhausted). Fixed in PR #46 (merged): resend
   missed changes on the next update; +0.21% bytes under 10% simulated backpressure, identical output without it.
+
+## Fireteam rollback review (PR #38 follow-up)
+
+Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code changed since then.
+
+| ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
+|---|---|---|---|---|---|---|---|---|
+| FT-001 | Kill feed shows blank names for enemies never seen | Shared (Fireteam, Zombies, Practice) | P1 | Needs Playtesting | None | `server/src/game/client.ts` | `specOpsSupportSync.test.ts`; mirror runs: 7/20 and 8/22 blank on `main`, 0 with the fix | Review of the rollback PR |
+| FT-002 | Hired support units reported as misbehaving | Fireteam | P1 | Blocked | None | `server/src/game/specOpsManager.ts` (unchanged since `37f180d`) | ~5,000 metadata/status/HUD/shop-cap checks clean on both versions | Not reproduced; needs a concrete symptom |
+| FT-003 | Tick-time WARNs around wave 30 | Shared | P1 | Investigating | None | `server/src/game/specOpsManager.ts` | Matched wave-30 benchmarks: no regression from #38, #43, #45 or #46; `planHouseAssault` scan skip -16% in Zombies After Hours | Check prod VM CPU credits; a Fireteam-wide speed-up (fewer wall-steering probes) changes AI movement and needs approval |
 
 ## Phase 2: Zombies balancing
 
