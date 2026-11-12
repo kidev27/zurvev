@@ -148,13 +148,13 @@ test("pressure blast and Tesla arcs cannot damage through solid cover", () => {
     expect(front.health).toBe(startHp);
 });
 
-test("Pressure Cannon fires its own charges: 8 in Zombies, none outside Zombies", () => {
+test("Pressure Cannon fires its own charges: 24 in Zombies, none outside Zombies", () => {
     for (const name of ["pressure_cannon", packAPunchType("pressure_cannon")]) {
         expect(GameObjectDefs.typeToDef(name, "gun").ammo).toBe("pressure_charge");
     }
     expect(ZombieWonderAmmo).toContain("pressure_charge");
     const { shooter } = arena();
-    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(8);
+    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(24);
 
     for (const map of ["test_specops", "practice_arena"] as const) {
         const game = createGame(TeamMode.Solo, map);
@@ -196,7 +196,7 @@ test("Max Ammo fills charges only for players who own a Pressure Cannon", () => 
     shooter.invManager.set("pressure_charge", 0);
     teammate.invManager.set("pressure_charge", 0);
     ops.activateZombiePowerUp("zombie_powerup_max_ammo");
-    expect(shooter.invManager.get("pressure_charge")).toBe(8);
+    expect(shooter.invManager.get("pressure_charge")).toBe(shooter.invManager.getMaxCapacity("pressure_charge"));
     expect(teammate.invManager.get("pressure_charge")).toBe(0);
 });
 
@@ -236,7 +236,7 @@ test("Pressure Cannon Mk II has a 3-shot magazine and returns with full charges"
     expect(shooter.weapons[primary].type).toBe(mk2);
     expect(shooter.weaponManager.getAmmoStats(GameObjectDefs.typeToDef(mk2, "gun")).maxClip).toBe(3);
     expect(shooter.weapons[primary].ammo).toBe(3);
-    expect(shooter.invManager.get("pressure_charge")).toBe(8);
+    expect(shooter.invManager.get("pressure_charge")).toBe(shooter.invManager.getMaxCapacity("pressure_charge"));
 });
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {

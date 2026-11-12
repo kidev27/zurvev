@@ -72,7 +72,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 - Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
   `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
   (0.75). Kill-heat rush adds up to +15% on top in Zombies (`ZombieRushSpeedBonus`); Fireteam keeps +38%.
-- The Pressure Cannon fires its own `pressure_charge` (cap 8 in Zombies, `ZombieAmmoBagSizes`). A box
+- The Pressure Cannon fires its own `pressure_charge` (cap 24 in Zombies, `ZombieAmmoBagSizes`). A box
   Cannon brings 4; Max Ammo and Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced.
   Kills drop a charge rarely while the killer owns a Cannon (`ZombieWonderAmmoDrops`: 2%, 1 charge,
   20 s). The HUD slot shows only while carrying charges (`hideWhenEmpty`). The Tesla Rifle and Gravegun
