@@ -568,6 +568,21 @@ const AmmoDefs: Record<string, AmmoDef> = {
             pickup: "ammo_pickup_01",
         },
     },
+    pressure_charge: {
+        name: "Pressure Charge",
+        type: "ammo",
+        special: true,
+        minStackSize: 1,
+        lootImg: {
+            sprite: "loot-ammo-box.img",
+            scale: 0.2,
+            tint: 0xc34831,
+            tintDark: 0x8f3424,
+        },
+        sound: {
+            pickup: "ammo_pickup_01",
+        },
+    },
     "308sub": {
         name: ".308 Subsonic",
         type: "ammo",

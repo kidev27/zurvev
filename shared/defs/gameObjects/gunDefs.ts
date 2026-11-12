@@ -3886,7 +3886,7 @@ for (
         pressure_cannon: {
             name: "Pressure Cannon",
             maxClip: 2,
-            ammoSpawnCount: 8,
+            ammoSpawnCount: 4,
             reloadTime: 3.5,
             fireDelay: 1.1,
             barrelLength: 3.8,
@@ -3925,7 +3925,7 @@ for (
         ...gun,
         pistol: false,
         pressureBlast: type === "pressure_cannon",
-        ammo: type === "gravegun" ? "12gauge" : "50AE",
+        ammo: type === "gravegun" ? "12gauge" : type === "pressure_cannon" ? "pressure_charge" : "50AE",
         maxReload: gun.maxClip,
         extendedClip: gun.maxClip,
         extendedReload: gun.maxClip,

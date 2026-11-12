@@ -93,7 +93,11 @@ import {
     ZombiePowerUpTypes,
     ZombieTimedPowerUpDuration,
 } from "../../../shared/defs/maps/zombiePowerUps.ts";
-import { ZombiePressureBlast, ZombieWonderWeapons } from "../../../shared/defs/maps/zombieWonderWeapons.ts";
+import {
+    ZombiePressureBlast,
+    ZombieWonderAmmo,
+    ZombieWonderWeapons,
+} from "../../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
 import type { ObstacleDef } from "../../../shared/defs/types/obstacle.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../../shared/gameConfig.ts";
@@ -5941,12 +5945,21 @@ export class SpecOpsManager implements PracticeHost {
         return this.isZombiePowerUpActive("doublePoints") ? amount * 2 : amount;
     }
 
+    private ownsGunFiring(player: Player, ammo: string): boolean {
+        return player.weapons.some((weapon) => {
+            const def = weapon.type ? GameObjectDefs.typeToDefSafe(weapon.type) : undefined;
+            return def?.type === "gun" && def.ammo === ammo;
+        });
+    }
+
     private refillZombieTeamAmmo(): void {
         for (const player of this.livingHumans()) {
             for (const item of Object.keys(player.invManager.items) as InventoryItem[]) {
                 const def = GameObjectDefs.typeToDef(item);
                 if (def.type === "throwable" && !ZombieMaxAmmoThrowables.includes(item)) continue;
                 if (def.type !== "ammo" && def.type !== "throwable") continue;
+                // Wonder-weapon ammo only for players who own a gun that fires it.
+                if (ZombieWonderAmmo.includes(item) && !this.ownsGunFiring(player, item)) continue;
                 player.invManager.set(item, player.invManager.getMaxCapacity(item));
             }
         }

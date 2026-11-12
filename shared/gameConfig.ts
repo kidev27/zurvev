@@ -151,7 +151,7 @@ export const GameConfig = {
     // the protocol we originated from was 78
     // remember to bump this every time a serialization function is changed
     // or a definition item added, removed or moved
-    protocolVersion: 1038,
+    protocolVersion: 1039,
     Action,
     Anim,
     DamageType,
@@ -441,6 +441,8 @@ export const GameConfig = {
         "308sub": [20, 40, 60, 80, 999],
         flare: [2, 4, 6, 8, 16],
         "45acp": [90, 180, 240, 300, 999],
+        // Zombies-only (Pressure Cannon): no capacity outside Zombies maps.
+        pressure_charge: [0, 0, 0, 0, 0],
         frag: [3, 6, 9, 12, 40],
         smoke: [3, 6, 9, 12, 40],
         strobe: [2, 3, 4, 5, 16],
