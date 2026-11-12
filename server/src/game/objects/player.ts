@@ -29,6 +29,7 @@ import {
 } from "../../../../shared/defs/maps/specOpsShop.ts";
 import { packAPunchBaseType } from "../../../../shared/defs/maps/zombiePackAPunch.ts";
 import { isZombiePowerUpType, type ZombiePowerUpTimers } from "../../../../shared/defs/maps/zombiePowerUps.ts";
+import { ZombieWonderAmmo } from "../../../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../../shared/defs/register.ts";
 import {
     type Action,
@@ -4328,10 +4329,13 @@ export class Player extends BaseGameObject {
 
                     // if "preloaded" gun add ammo to inventory
                     if (obj.isPreloadedGun) {
-                        this.invManager.giveAndDrop(
-                            def.ammo as InventoryItem,
-                            def.ammoSpawnCount,
-                        );
+                        const ammo = def.ammo as InventoryItem;
+                        // A Pack-a-Punched wonder weapon returns with a full stock of its own ammo.
+                        if (def.zombieUpgraded && ZombieWonderAmmo.includes(ammo)) {
+                            this.invManager.set(ammo, this.invManager.getMaxCapacity(ammo));
+                        } else {
+                            this.invManager.giveAndDrop(ammo, def.ammoSpawnCount);
+                        }
                     }
 
                     if (freeGunSlot.cause === net.PickupMsgType.AlreadyOwned) {

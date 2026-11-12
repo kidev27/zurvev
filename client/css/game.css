@@ -2464,6 +2464,14 @@ body.ui-specops-mode .ui-specops-bar-amount {
   width: 22px;
 }
 
+/* Pressure Charge icon: 10% larger, same center. */
+#ui-loot-pressure_charge > .ui-loot-image {
+  height: 24.2px;
+  margin-top: 3.9px;
+  right: 4.9px;
+  width: 24.2px;
+}
+
 .ui-ammo > .ui-loot-overlay {
   bottom: 0;
   height: 22px;
@@ -5332,6 +5340,13 @@ body.ui-specops-mode.ui-editor-active #ui-editor-top-right {
     width: 11px;
     right: 2px;
     margin-top: 2px;
+  }
+
+  #ui-loot-pressure_charge > .ui-loot-image {
+    height: 12.1px;
+    width: 12.1px;
+    right: 1.45px;
+    margin-top: 1.45px;
   }
 
   .ui-ammo > .ui-loot-overlay {

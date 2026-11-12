@@ -1411,6 +1411,9 @@ export class UiManager2 {
             if (Z && Y && J) {
                 if (Z.count || Z.maximum) {
                     Y.count.innerHTML = String(J.count);
+                    if ((GameObjectDefs.typeToDef(Y.lootType) as AmmoDef).hideWhenEmpty) {
+                        Y.div.style.display = J.count > 0 ? "inline-block" : "none";
+                    }
                     Y.div.style.opacity = String(
                         (GameObjectDefs.typeToDef(Y.lootType) as AmmoDef).special && J.count == 0
                             ? 0
@@ -1897,6 +1900,7 @@ export function loadStaticDomImages() {
         "ui-loot-308sub": "img/loot/loot-ammo-box.svg",
         "ui-loot-flare": "img/loot/loot-ammo-box.svg",
         "ui-loot-45acp": "img/loot/loot-ammo-box.svg",
+        "ui-loot-pressure_charge": "img/loot/loot-ammo-pressure-charge.svg",
     };
 
     for (const [id, img] of Object.entries(lootImages)) {

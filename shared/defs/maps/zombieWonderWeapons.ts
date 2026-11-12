@@ -6,6 +6,22 @@ export const ZombieWonderWeapons = [
     { type: "gravegun", chance: 0.03 },
 ] as const;
 
+/**
+ * Ammo only wonder weapons use (caps in ZombieAmmoBagSizes). Max Ammo refills it only for
+ * players who own a gun that fires it; a Pack-a-Punched one comes back with a full stock.
+ */
+export const ZombieWonderAmmo: readonly string[] = ["pressure_charge"];
+
+/**
+ * Rare wonder-ammo drop from zombie kills. Rolls only while the killer owns a gun that
+ * fires that ammo; anyone can pick it up. lifetime is in seconds.
+ */
+export const ZombieWonderAmmoDrops = {
+    killChance: 0.02,
+    count: 1,
+    lifetime: 20,
+};
+
 export const ZombiePressureBlast = {
     range: 20,
     nearRange: 8,

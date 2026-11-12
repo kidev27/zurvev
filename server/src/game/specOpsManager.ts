@@ -93,7 +93,12 @@ import {
     ZombiePowerUpTypes,
     ZombieTimedPowerUpDuration,
 } from "../../../shared/defs/maps/zombiePowerUps.ts";
-import { ZombiePressureBlast, ZombieWonderWeapons } from "../../../shared/defs/maps/zombieWonderWeapons.ts";
+import {
+    ZombiePressureBlast,
+    ZombieWonderAmmo,
+    ZombieWonderAmmoDrops,
+    ZombieWonderWeapons,
+} from "../../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
 import type { ObstacleDef } from "../../../shared/defs/types/obstacle.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../../shared/gameConfig.ts";
@@ -5941,12 +5946,21 @@ export class SpecOpsManager implements PracticeHost {
         return this.isZombiePowerUpActive("doublePoints") ? amount * 2 : amount;
     }
 
+    private ownsGunFiring(player: Player, ammo: string): boolean {
+        return player.weapons.some((weapon) => {
+            const def = weapon.type ? GameObjectDefs.typeToDefSafe(weapon.type) : undefined;
+            return def?.type === "gun" && def.ammo === ammo;
+        });
+    }
+
     private refillZombieTeamAmmo(): void {
         for (const player of this.livingHumans()) {
             for (const item of Object.keys(player.invManager.items) as InventoryItem[]) {
                 const def = GameObjectDefs.typeToDef(item);
                 if (def.type === "throwable" && !ZombieMaxAmmoThrowables.includes(item)) continue;
                 if (def.type !== "ammo" && def.type !== "throwable") continue;
+                // Wonder-weapon ammo only for players who own a gun that fires it.
+                if (ZombieWonderAmmo.includes(item) && !this.ownsGunFiring(player, item)) continue;
                 player.invManager.set(item, player.invManager.getMaxCapacity(item));
             }
         }
@@ -6082,6 +6096,20 @@ export class SpecOpsManager implements PracticeHost {
         for (let i = 0; i < owed; i++) {
             if (!this.spawnZombieDropFromHat(victim.pos, victim.layer)) break;
         }
+    }
+
+    /** Zombies: rare wonder-ammo drop, only for a killer who owns a gun that fires it. */
+    maybeDropWonderAmmo(killer: Player, victim: Player, rand = Math.random()): Loot | undefined {
+        if (!this.zombieMode || victim.specOpsKind !== "enemy" || killer.specOpsAi) return undefined;
+        if (rand >= ZombieWonderAmmoDrops.killChance) return undefined;
+        const ammo = ZombieWonderAmmo.find((type) => this.ownsGunFiring(killer, type));
+        if (!ammo) return undefined;
+        const loot = this.game.lootBarn.addLoot(ammo, victim.pos, victim.layer, ZombieWonderAmmoDrops.count, {
+            pushSpeed: 1.5,
+            source: "map",
+        });
+        if (loot) loot.lifetime = ZombieWonderAmmoDrops.lifetime;
+        return loot;
     }
 
     /** Zombies: a player's non-lethal hit on a zombie pays hit cash (capped per zombie). */
@@ -6988,6 +7016,7 @@ export class SpecOpsManager implements PracticeHost {
 
         this.contracts.onEnemyKilled(killer, victim);
         this.onZombieKilledForDrops(victim, cash);
+        this.maybeDropWonderAmmo(killer, victim);
 
         const brain = this.brains.get(victim);
         if (brain?.loadout.castIronWipe || brain?.enemyClass === "cast_iron") {

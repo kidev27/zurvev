@@ -63,7 +63,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
 | ZOM-006 | Mystery Box weapon replacement | Zombies | P2 | Needs Playtesting | None | `server/src/game/objects/player.ts`, `server/src/game/objects/loot.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: held gun replaced with no floor drop; with two guns, holding a grenade or melee blocks the take; ordinary pickups still drop | In-game feel. Old gun and its loaded rounds are gone; reserve ammo stays |
-| ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Blocked | Shared ammo design with ZOM-005 | `shared/defs/gameObjects/gunDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts` | Not started | Capacity, refill and drop rules need approval |
+| ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gearDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/ui2.ts` | `zombieWonderWeapons.test.ts` 33/36 (5 new pass; 3 failures pre-existing on `main`); PR #53 | Live check of HUD slot and drop art |
 | ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Blocked | Shared ammo design with ZOM-004 | Same as ZOM-004 | Not started | Same as ZOM-004 |
 | ZOM-007 | Additional zombie types | Zombies | P3 | Investigating | ZOM-001 (per-class speed) | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Benchmark before raising counts | Design proposal for two variants first (see issue #19) |
 
@@ -72,10 +72,12 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 - Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
   `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
   (0.75). Kill-heat rush adds up to +15% on top in Zombies (`ZombieRushSpeedBonus`); Fireteam keeps +38%.
-- The Pressure Cannon, Tesla Rifle and Gravegun inherit `ammo: "50AE"` from the Ray Gun, the same pool
-  as the Deagle.
-- Box guns follow standard pickup rules: they replace the held gun slot and drop the old gun,
-  Pack-a-Punched or not.
+- The Pressure Cannon fires its own `pressure_charge` (cap 24 in Zombies, `ZombieAmmoBagSizes`). A box
+  Cannon brings 4; Max Ammo and Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced.
+  Kills drop a charge rarely while the killer owns a Cannon (`ZombieWonderAmmoDrops`: 2%, 1 charge,
+  20 s). The HUD slot shows only while carrying charges (`hideWhenEmpty`). The Tesla Rifle and Gravegun
+  still share `50AE` / `12gauge`.
+- Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
 
 ## Phase 4: Practice improvements
 

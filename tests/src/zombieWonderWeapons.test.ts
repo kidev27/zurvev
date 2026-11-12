@@ -6,7 +6,12 @@ import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
 import { packAPunchType, packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
-import { ZombiePressureBlast, ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
+import {
+    ZombiePressureBlast,
+    ZombieWonderAmmo,
+    ZombieWonderAmmoDrops,
+    ZombieWonderWeapons,
+} from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { collider } from "../../shared/utils/collider.ts";
@@ -141,6 +146,97 @@ test("pressure blast and Tesla arcs cannot damage through solid cover", () => {
     game.bulletBarn.update(0);
     expect(covered.health).toBe(covered.maxHealth);
     expect(front.health).toBe(startHp);
+});
+
+test("Pressure Cannon fires its own charges: 24 in Zombies, none outside Zombies", () => {
+    for (const name of ["pressure_cannon", packAPunchType("pressure_cannon")]) {
+        expect(GameObjectDefs.typeToDef(name, "gun").ammo).toBe("pressure_charge");
+    }
+    expect(ZombieWonderAmmo).toContain("pressure_charge");
+    const { shooter } = arena();
+    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(24);
+
+    for (const map of ["test_specops", "practice_arena"] as const) {
+        const game = createGame(TeamMode.Solo, map);
+        const player = game.playerBarn.addTestPlayer({ name: "Operator" });
+        game.update(0.1);
+        expect(player.invManager.getMaxCapacity("pressure_charge"), map).toBe(0);
+    }
+});
+
+test("a box Pressure Cannon brings a full magazine and 4 charges, which stay if it is replaced", () => {
+    const { game, shooter } = arena();
+    const takeFromBox = (type: string) => {
+        const loot = game.lootBarn.addLoot(type, shooter.pos, shooter.layer, 1, {})!;
+        loot.isPreloadedGun = true;
+        loot.mysteryBoxId = 1;
+        loot.fromMysteryBox = true;
+        shooter.pickupLoot(loot);
+        shooter.pickupTicker = 0;
+    };
+    shooter.weaponManager.setWeapon(primary, "", 0);
+    shooter.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "m9", 15);
+    shooter.weaponManager.setCurWeapIndex(primary);
+    takeFromBox("pressure_cannon");
+    expect(shooter.weapons[primary].type).toBe("pressure_cannon");
+    expect(shooter.weapons[primary].ammo).toBe(2);
+    expect(shooter.invManager.get("pressure_charge")).toBe(4);
+
+    shooter.weaponManager.setCurWeapIndex(primary);
+    takeFromBox("mp5");
+    expect(shooter.weapons[primary].type).toBe("mp5");
+    expect(shooter.invManager.get("pressure_charge")).toBe(4);
+});
+
+test("Max Ammo fills charges only for players who own a Pressure Cannon", () => {
+    const { game, shooter, ops } = arena();
+    const teammate = game.playerBarn.addTestPlayer({ name: "Teammate" });
+    game.update(0.1);
+    shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
+    shooter.invManager.set("pressure_charge", 0);
+    teammate.invManager.set("pressure_charge", 0);
+    ops.activateZombiePowerUp("zombie_powerup_max_ammo");
+    expect(shooter.invManager.get("pressure_charge")).toBe(shooter.invManager.getMaxCapacity("pressure_charge"));
+    expect(teammate.invManager.get("pressure_charge")).toBe(0);
+});
+
+test("zombie kills rarely drop a charge, only for a Pressure Cannon owner, and it expires", () => {
+    const { game, shooter, ops, zombie } = arena();
+    const lucky = ZombieWonderAmmoDrops.killChance / 2;
+    const victim = zombie(4);
+    expect(ops.maybeDropWonderAmmo(shooter, victim, lucky)).toBeUndefined();
+
+    shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
+    expect(ops.maybeDropWonderAmmo(shooter, victim, ZombieWonderAmmoDrops.killChance)).toBeUndefined();
+    const loot = ops.maybeDropWonderAmmo(shooter, victim, lucky);
+    expect(loot?.type).toBe("pressure_charge");
+    expect(loot?.count).toBe(ZombieWonderAmmoDrops.count);
+
+    game.step(ZombieWonderAmmoDrops.lifetime - 1);
+    expect(loot!.destroyed).toBe(false);
+    game.step(2);
+    expect(loot!.destroyed).toBe(true);
+});
+
+test("Pressure Cannon Mk II has a 3-shot magazine and returns with full charges", () => {
+    const { game, shooter, ops } = arena();
+    const power = game.map.obstacles.find((o) => o.type === "zombie_power_switch")!;
+    place(shooter, power.pos, power.layer);
+    power.interact(shooter);
+    const machine = game.map.obstacles.find((o) => o.type === ZombiePackAPunchType)!;
+    place(shooter, machine.pos, machine.layer);
+    shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
+    shooter.weaponManager.setCurWeapIndex(primary);
+    shooter.invManager.set("pressure_charge", 1);
+    ops.setCashForDebug(shooter, 10000);
+    machine.interact(shooter);
+    game.step(packAPunchUpgradeTime(ops.difficulty) + 0.1);
+    machine.interact(shooter);
+    const mk2 = packAPunchType("pressure_cannon");
+    expect(shooter.weapons[primary].type).toBe(mk2);
+    expect(shooter.weaponManager.getAmmoStats(GameObjectDefs.typeToDef(mk2, "gun")).maxClip).toBe(3);
+    expect(shooter.weapons[primary].ammo).toBe(3);
+    expect(shooter.invManager.get("pressure_charge")).toBe(shooter.invManager.getMaxCapacity("pressure_charge"));
 });
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
