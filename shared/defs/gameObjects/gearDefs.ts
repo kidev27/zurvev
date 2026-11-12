@@ -578,7 +578,7 @@ const AmmoDefs: Record<string, AmmoDef> = {
         minStackSize: 1,
         lootImg: {
             sprite: "loot-ammo-pressure-charge.img",
-            scale: 0.2,
+            scale: 0.22,
             tint: 0xffffff,
             tintDark: 0xffffff,
         },
