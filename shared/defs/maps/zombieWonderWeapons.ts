@@ -12,6 +12,16 @@ export const ZombieWonderWeapons = [
  */
 export const ZombieWonderAmmo: readonly string[] = ["pressure_charge"];
 
+/**
+ * Rare wonder-ammo drop from zombie kills. Rolls only while the killer owns a gun that
+ * fires that ammo; anyone can pick it up. lifetime is in seconds.
+ */
+export const ZombieWonderAmmoDrops = {
+    killChance: 0.02,
+    count: 1,
+    lifetime: 20,
+};
+
 export const ZombiePressureBlast = {
     range: 20,
     nearRange: 8,

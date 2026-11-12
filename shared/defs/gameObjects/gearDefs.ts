@@ -494,6 +494,8 @@ export interface AmmoDef {
         pickup: string;
     };
     hideUi?: boolean;
+    /** The HUD slot only appears while carrying some (Zombies wonder-weapon ammo). */
+    hideWhenEmpty?: boolean;
 }
 
 const AmmoDefs: Record<string, AmmoDef> = {
@@ -572,12 +574,13 @@ const AmmoDefs: Record<string, AmmoDef> = {
         name: "Pressure Charge",
         type: "ammo",
         special: true,
+        hideWhenEmpty: true,
         minStackSize: 1,
         lootImg: {
-            sprite: "loot-ammo-box.img",
+            sprite: "loot-ammo-pressure-charge.img",
             scale: 0.2,
-            tint: 0xc34831,
-            tintDark: 0x8f3424,
+            tint: 0xffffff,
+            tintDark: 0xffffff,
         },
         sound: {
             pickup: "ammo_pickup_01",

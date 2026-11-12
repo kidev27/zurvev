@@ -96,6 +96,7 @@ import {
 import {
     ZombiePressureBlast,
     ZombieWonderAmmo,
+    ZombieWonderAmmoDrops,
     ZombieWonderWeapons,
 } from "../../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
@@ -6097,6 +6098,20 @@ export class SpecOpsManager implements PracticeHost {
         }
     }
 
+    /** Zombies: rare wonder-ammo drop, only for a killer who owns a gun that fires it. */
+    maybeDropWonderAmmo(killer: Player, victim: Player, rand = Math.random()): Loot | undefined {
+        if (!this.zombieMode || victim.specOpsKind !== "enemy" || killer.specOpsAi) return undefined;
+        if (rand >= ZombieWonderAmmoDrops.killChance) return undefined;
+        const ammo = ZombieWonderAmmo.find((type) => this.ownsGunFiring(killer, type));
+        if (!ammo) return undefined;
+        const loot = this.game.lootBarn.addLoot(ammo, victim.pos, victim.layer, ZombieWonderAmmoDrops.count, {
+            pushSpeed: 1.5,
+            source: "map",
+        });
+        if (loot) loot.lifetime = ZombieWonderAmmoDrops.lifetime;
+        return loot;
+    }
+
     /** Zombies: a player's non-lethal hit on a zombie pays hit cash (capped per zombie). */
     onZombieHit(victim: Player, attacker: Player): void {
         if (
@@ -7001,6 +7016,7 @@ export class SpecOpsManager implements PracticeHost {
 
         this.contracts.onEnemyKilled(killer, victim);
         this.onZombieKilledForDrops(victim, cash);
+        this.maybeDropWonderAmmo(killer, victim);
 
         const brain = this.brains.get(victim);
         if (brain?.loadout.castIronWipe || brain?.enemyClass === "cast_iron") {

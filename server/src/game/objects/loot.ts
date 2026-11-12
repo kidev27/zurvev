@@ -95,6 +95,7 @@ export class LootBarn {
     private shouldExpire(loot: Loot): boolean {
         if (loot.mapIndicator) return false;
         if (!this.game.map.specOpsMode) return false;
+        if (loot.lifetime > 0) return loot.age >= loot.lifetime;
         if (isZombiePowerUpType(loot.type)) return loot.age >= ZombiePowerUpLifetime;
         return loot.age >= SpecOpsLootLifetime;
     }
@@ -270,6 +271,8 @@ export class Loot extends BaseGameObject {
     mysteryBoxId = 0;
     /** A Mystery Box roll: with two guns it replaces the held gun instead of dropping it. */
     fromMysteryBox = false;
+    /** Spec Ops: seconds before this loot despawns; 0 uses the mode default. */
+    lifetime = 0;
     /** Player who paid for this Mystery Box roll; only they can claim it. */
     mysteryBoxOwnerId = 0;
     /** Wonder weapons: the player who dropped this one (blocks them re-rolling it). */

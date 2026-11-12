@@ -6,7 +6,12 @@ import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
 import { packAPunchType, packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
-import { ZombiePressureBlast, ZombieWonderAmmo, ZombieWonderWeapons } from "../../shared/defs/maps/zombieWonderWeapons.ts";
+import {
+    ZombiePressureBlast,
+    ZombieWonderAmmo,
+    ZombieWonderAmmoDrops,
+    ZombieWonderWeapons,
+} from "../../shared/defs/maps/zombieWonderWeapons.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { collider } from "../../shared/utils/collider.ts";
@@ -193,6 +198,24 @@ test("Max Ammo fills charges only for players who own a Pressure Cannon", () => 
     ops.activateZombiePowerUp("zombie_powerup_max_ammo");
     expect(shooter.invManager.get("pressure_charge")).toBe(8);
     expect(teammate.invManager.get("pressure_charge")).toBe(0);
+});
+
+test("zombie kills rarely drop a charge, only for a Pressure Cannon owner, and it expires", () => {
+    const { game, shooter, ops, zombie } = arena();
+    const lucky = ZombieWonderAmmoDrops.killChance / 2;
+    const victim = zombie(4);
+    expect(ops.maybeDropWonderAmmo(shooter, victim, lucky)).toBeUndefined();
+
+    shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
+    expect(ops.maybeDropWonderAmmo(shooter, victim, ZombieWonderAmmoDrops.killChance)).toBeUndefined();
+    const loot = ops.maybeDropWonderAmmo(shooter, victim, lucky);
+    expect(loot?.type).toBe("pressure_charge");
+    expect(loot?.count).toBe(ZombieWonderAmmoDrops.count);
+
+    game.step(ZombieWonderAmmoDrops.lifetime - 1);
+    expect(loot!.destroyed).toBe(false);
+    game.step(2);
+    expect(loot!.destroyed).toBe(true);
 });
 
 test("Pressure Cannon Mk II has a 3-shot magazine and returns with full charges", () => {
