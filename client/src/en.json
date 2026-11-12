@@ -519,6 +519,8 @@
   "game-50AE-tooltip": "Ammo for DEagle 50, S&W 500, Barrett M107 and ASh-12.",
   "game-pressure_charge": "Pressure Charges",
   "game-pressure_charge-tooltip": "Ammo for the Pressure Cannon.",
+  "game-tesla_cell": "Tesla Cells",
+  "game-tesla_cell-tooltip": "Ammo for the Tesla Rifle.",
   "game-308sub": ".308 Subsonic",
   "game-308sub-tooltip": "Ammo for AWM-S and Mk 20 SSR.",
   "game-flare": "Flare",

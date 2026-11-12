@@ -3881,6 +3881,13 @@ const SkinDefs: Record<string, GunDef> = {
     }),
 };
 
+/** Zombies wonder guns: Pressure Charges and Tesla Cells are Zombies-only (see ZombieWonderAmmo). */
+const WonderGunAmmo: Record<string, string> = {
+    pressure_cannon: "pressure_charge",
+    tesla_rifle: "tesla_cell",
+    gravegun: "12gauge",
+};
+
 for (
     const [type, gun] of Object.entries({
         pressure_cannon: {
@@ -3925,7 +3932,7 @@ for (
         ...gun,
         pistol: false,
         pressureBlast: type === "pressure_cannon",
-        ammo: type === "gravegun" ? "12gauge" : type === "pressure_cannon" ? "pressure_charge" : "50AE",
+        ammo: WonderGunAmmo[type],
         maxReload: gun.maxClip,
         extendedClip: gun.maxClip,
         extendedReload: gun.maxClip,

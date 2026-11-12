@@ -63,8 +63,8 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
 | ZOM-006 | Mystery Box weapon replacement | Zombies | P2 | Needs Playtesting | None | `server/src/game/objects/player.ts`, `server/src/game/objects/loot.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: held gun replaced with no floor drop; with two guns, holding a grenade or melee blocks the take; ordinary pickups still drop | In-game feel. Old gun and its loaded rounds are gone; reserve ammo stays |
-| ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gearDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/ui2.ts` | `zombieWonderWeapons.test.ts` 33/36 (5 new pass; 3 failures pre-existing on `main`); PR #53 | Live check of HUD slot and drop art |
-| ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Blocked | Shared ammo design with ZOM-004 | Same as ZOM-004 | Not started | Same as ZOM-004 |
+| ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gearDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/ui2.ts` | `zombieWonderWeapons.test.ts` (charges, box, Max Ammo, drop, Mk II); PR #53 | Live check of HUD slot and drop art |
+| ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Needs Playtesting | None | Same as ZOM-004, plus `shared/practice.ts` | `zombieWonderWeapons.test.ts` 39/42 (Tesla cases + per-ammo drop rates; 3 failures pre-existing on `main`); `practice.test.ts` 49/49 | Live check of HUD slot and drop art |
 | ZOM-007 | Additional zombie types | Zombies | P3 | Investigating | ZOM-001 (per-class speed) | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Benchmark before raising counts | Design proposal for two variants first (see issue #19) |
 
 ### Notes
@@ -75,8 +75,11 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 - The Pressure Cannon fires its own `pressure_charge` (cap 24 in Zombies, `ZombieAmmoBagSizes`). A box
   Cannon brings 4; Max Ammo and Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced.
   Kills drop a charge rarely while the killer owns a Cannon (`ZombieWonderAmmoDrops`: 2%, 1 charge,
-  20 s). The HUD slot shows only while carrying charges (`hideWhenEmpty`). The Tesla Rifle and Gravegun
-  still share `50AE` / `12gauge`.
+  20 s). The HUD slot shows only while carrying charges (`hideWhenEmpty`).
+- The Tesla Rifle fires its own `tesla_cell` (cap 36 in Zombies). Same rules as Pressure Charges: a box
+  Tesla brings 12, Max Ammo and Pack-a-Punch fill to the cap, cells stay if the Tesla is replaced. Kill
+  drop 1.5%, 1 cell, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
+  The Gravegun still shares `12gauge`.
 - Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
 
 ## Phase 4: Practice improvements
