@@ -732,7 +732,13 @@ test("random Practice loadouts cannot select a Zombies-only pressure blast", () 
     }
 });
 
-test.each(["ppsh41", "mp40", "fal", "rpd", "winchester1887", "pkp", "raygun", "tesla_rifle", "gravegun"])(
+test("guns that fire Zombies-only wonder ammo are not offered in Practice", () => {
+    expect(PracticeGuns).not.toContain("pressure_cannon");
+    expect(PracticeGuns).not.toContain("tesla_rifle");
+    expect(sanitizePracticeSettings({ primary: "tesla_rifle" } as never).primary).not.toBe("tesla_rifle");
+});
+
+test.each(["ppsh41", "mp40", "fal", "rpd", "winchester1887", "pkp", "raygun", "gravegun"])(
     "%s remains usable in Practice with native ammo, damage and reloads",
     type => {
         expect(PracticeGuns).toContain(type);

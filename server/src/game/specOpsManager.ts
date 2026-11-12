@@ -6098,18 +6098,22 @@ export class SpecOpsManager implements PracticeHost {
         }
     }
 
-    /** Zombies: rare wonder-ammo drop, only for a killer who owns a gun that fires it. */
-    maybeDropWonderAmmo(killer: Player, victim: Player, rand = Math.random()): Loot | undefined {
-        if (!this.zombieMode || victim.specOpsKind !== "enemy" || killer.specOpsAi) return undefined;
-        if (rand >= ZombieWonderAmmoDrops.killChance) return undefined;
-        const ammo = ZombieWonderAmmo.find((type) => this.ownsGunFiring(killer, type));
-        if (!ammo) return undefined;
-        const loot = this.game.lootBarn.addLoot(ammo, victim.pos, victim.layer, ZombieWonderAmmoDrops.count, {
-            pushSpeed: 1.5,
-            source: "map",
-        });
-        if (loot) loot.lifetime = ZombieWonderAmmoDrops.lifetime;
-        return loot;
+    /** Zombies: rare wonder-ammo drops, one roll per ammo the killer owns a gun for. */
+    maybeDropWonderAmmo(killer: Player, victim: Player, rand: () => number = Math.random): Loot[] {
+        const drops: Loot[] = [];
+        if (!this.zombieMode || victim.specOpsKind !== "enemy" || killer.specOpsAi) return drops;
+        for (const ammo of ZombieWonderAmmo) {
+            const drop = ZombieWonderAmmoDrops[ammo];
+            if (!drop || !this.ownsGunFiring(killer, ammo) || rand() >= drop.killChance) continue;
+            const loot = this.game.lootBarn.addLoot(ammo, victim.pos, victim.layer, drop.count, {
+                pushSpeed: 1.5,
+                source: "map",
+            });
+            if (!loot) continue;
+            loot.lifetime = drop.lifetime;
+            drops.push(loot);
+        }
+        return drops;
     }
 
     /** Zombies: a player's non-lethal hit on a zombie pays hit cash (capped per zombie). */

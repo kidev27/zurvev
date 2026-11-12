@@ -19,6 +19,7 @@ export const ZombieAmmoBagSizes: Record<string, number[]> = {
     "50AE": [84, 84, 84, 84, 84],
     "308sub": [36, 36, 36, 36, 36],
     pressure_charge: [24, 24, 24, 24, 24],
+    tesla_cell: [36, 36, 36, 36, 36],
 };
 
 /**
