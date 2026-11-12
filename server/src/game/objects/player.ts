@@ -704,6 +704,8 @@ export class Player extends BaseGameObject {
     );
 
     scale = 1;
+    /** Size before perks (Zombies Brutes are larger); recalculateScale starts from this. */
+    baseScale = 1;
 
     get rad(): number {
         return GameConfig.player.radius * this.scale;
@@ -782,7 +784,7 @@ export class Player extends BaseGameObject {
                     : 0);
         }
         if (this.game.map.specOpsMode && this.specOpsKind === "enemy") {
-            return SpecOpsEnemyMaxHealth;
+            return this.zombieMaxHealth || SpecOpsEnemyMaxHealth;
         }
         if (
             this.game.map.specOpsMode
@@ -1486,6 +1488,10 @@ export class Player extends BaseGameObject {
     specOpsBounty = 0;
     /** Zombies: hit cash already paid out for damaging this zombie. */
     zombieHitCashPaid = 0;
+    /** Zombies variants: health cap above the usual enemy cap (0 = default). */
+    zombieMaxHealth = 0;
+    /** Zombies variants: melee damage multiplier (Brutes hit harder). */
+    zombieMeleeDamageMult = 1;
     specOpsCash = 0;
     specOpsCashDirty = true;
     /** Packed Spec Ops contract HUD (see packSpecOpsContractHud). */
@@ -5383,7 +5389,7 @@ export class Player extends BaseGameObject {
     }
 
     recalculateScale() {
-        let scale = 1;
+        let scale = this.baseScale;
         for (let i = 0; i < this.perks.length; i++) {
             const perk = this.perks[i].type;
             const perkProps = PerkProperties[perk as keyof typeof PerkProperties];

@@ -1396,7 +1396,7 @@ export class WeaponManager {
                 if (obj.interactable) obj.interact(this.player);
             } else if (obj.__type === ObjectType.Player) {
                 obj.damage({
-                    amount: meleeDef.damage,
+                    amount: meleeDef.damage * this.player.zombieMeleeDamageMult,
                     gameSourceType: this.activeWeapon,
                     damageType: GameConfig.DamageType.Player,
                     source: this.player,

@@ -65,7 +65,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | ZOM-006 | Mystery Box weapon replacement | Zombies | P2 | Needs Playtesting | None | `server/src/game/objects/player.ts`, `server/src/game/objects/loot.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: held gun replaced with no floor drop; with two guns, holding a grenade or melee blocks the take; ordinary pickups still drop | In-game feel. Old gun and its loaded rounds are gone; reserve ammo stays |
 | ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gearDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/ui2.ts` | `zombieWonderWeapons.test.ts` (charges, box, Max Ammo, drop, Mk II); PR #53 | Live check of HUD slot and drop art |
 | ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Needs Playtesting | None | Same as ZOM-004, plus `shared/practice.ts` | `zombieWonderWeapons.test.ts` 39/42 (Tesla cases + per-ammo drop rates; 3 failures pre-existing on `main`); `practice.test.ts` 49/49 | Live check of HUD slot and drop art |
-| ZOM-007 | Additional zombie types | Zombies | P3 | Investigating | ZOM-001 (per-class speed) | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | Benchmark before raising counts | Design proposal for two variants first (see issue #19) |
+| ZOM-007 | Zombie variants: Runner and Brute | Zombies | P2 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts`, `server/src/game/objects/player.ts`, `shared/defs/gameObjects/outfitDefs.ts` | `zombieMode.test.ts` 81/81 (wave mix, stats, size, melee damage, power-ups); reach sim on High Water and Dead Air: Brute at 1.3x reaches as many spots as at 1.0x | In-game feel and readability; Charger (#19) not started |
 
 ### Notes
 
@@ -81,6 +81,11 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   drop 1.5%, 1 cell, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
   The Gravegun still shares `12gauge`.
 - Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
+- Zombie variants (`ZombieVariants` in `server/src/game/zombieMode.ts`). Runner from round 4: 1.3x walker
+  speed (capped at 0.75), 70% health, 5% of the wave growing 5% a round to 20%; dies to Insta-Kill and
+  Nuke. Brute from round 8 (two from round 12, never more than 2 a wave): 0.8x speed, 4x health (cap 1200),
+  2x melee damage, 1.3x size, 200 kill cash; Insta-Kill doubles damage, Nuke takes a fraction. Brutes
+  spawn last in a wave. Wave totals are unchanged.
 
 ## Phase 4: Practice improvements
 

@@ -141,6 +141,7 @@ import { SpecOpsContractRunner } from "./specOpsContracts.ts";
 import { doorFrameCenter, inferGroundLayer, MapNavGraph, navGroundLayer, stairAtPos } from "./specOpsNav.ts";
 import {
     composeZombieWave,
+    isOrdinaryZombieClass,
     isZombieClass,
     zombieBuyGateCost,
     type ZombieClass,
@@ -157,6 +158,7 @@ import {
     ZombieMysteryBoxRollDuration,
     ZombieMysteryBoxWeapons,
     ZombieRayGun,
+    ZombieVariants,
     zombieSpeedMult,
     ZombieUpgradeCost,
     zombieWaveCount,
@@ -5927,7 +5929,7 @@ export class SpecOpsManager implements PracticeHost {
     }
 
     private isOrdinaryZombie(player: Player): boolean {
-        return this.brains.get(player)?.enemyClass === "zombie_walker";
+        return isOrdinaryZombieClass(this.brains.get(player)?.enemyClass);
     }
 
     modifyZombieDamage(victim: Player, attacker: Player, amount: number): number {
@@ -10051,7 +10053,14 @@ export class SpecOpsManager implements PracticeHost {
     ): void {
         player.specOpsKind = kind;
         player.zombieHitCashPaid = 0;
-        player.specOpsBounty = isZombieClass(classId)
+        const brute = classId === "zombie_brute";
+        player.zombieMaxHealth = brute ? ZombieVariants.brute.healthCap : 0;
+        player.zombieMeleeDamageMult = brute ? ZombieVariants.brute.meleeDamageMult : 1;
+        player.baseScale = brute ? ZombieVariants.brute.scale : 1;
+        player.recalculateScale();
+        player.specOpsBounty = brute
+            ? ZombieVariants.brute.killCash
+            : isZombieClass(classId)
             ? ZombieKillBounty
             : classId
             ? (SpecOpsKillBounty[classId] ?? 100)
@@ -10177,7 +10186,7 @@ export class SpecOpsManager implements PracticeHost {
             }
             player.specOpsArmor = 0;
             player.health = isZombieClass(classId)
-                ? zombieEnemyHealth(this.wave || 1, this.difficulty)
+                ? zombieEnemyHealth(this.wave || 1, this.difficulty, classId)
                 : specOpsEnemyHealth(this.wave || 1, classId ?? "rifle", this.difficulty);
             // Cobalt / event bosses hit harder in the late-game fights.
             if (classId?.startsWith("cobalt_") || isEventBoss) {
