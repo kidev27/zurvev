@@ -4,9 +4,9 @@ import { ZombieWonderWeapons } from "../../../shared/defs/maps/zombieWonderWeapo
 
 /**
  * Zombie Survival content lives separately from the legacy Spec Ops roster.
- * This first slice intentionally has one readable melee archetype.
+ * Walkers are the horde; Runners and Brutes mix in from later rounds (see ZombieVariants).
  */
-export type ZombieClass = "zombie_walker";
+export type ZombieClass = "zombie_walker" | "zombie_runner" | "zombie_brute";
 
 export interface ZombieLoadout {
     name: string;
@@ -51,6 +51,76 @@ export const ZombieLoadouts: Record<ZombieClass, ZombieLoadout> = {
         reaction: 0.18,
         burst: 0.2,
         burstPause: 0.42,
+    },
+    zombie_runner: {
+        name: "Runner",
+        gun: "",
+        outfits: ["outfitZombieRunner"],
+        outfit: "outfitZombieRunner",
+        chest: "",
+        helmet: "",
+        backpack: "backpack00",
+        perks: [],
+        melee: "fists",
+        range: 3,
+        holdRange: 2.2,
+        speedMult: 0.55,
+        speedScale: 1.3,
+        turnRate: 180,
+        aimError: 0,
+        reaction: 0.14,
+        burst: 0.2,
+        burstPause: 0.42,
+    },
+    zombie_brute: {
+        name: "Brute",
+        gun: "",
+        outfits: ["outfitZombieBrute"],
+        outfit: "outfitZombieBrute",
+        chest: "",
+        helmet: "",
+        backpack: "backpack00",
+        perks: [],
+        melee: "fists",
+        range: 3.4,
+        holdRange: 2.6,
+        speedMult: 0.55,
+        speedScale: 0.8,
+        turnRate: 120,
+        aimError: 0,
+        reaction: 0.22,
+        burst: 0.2,
+        burstPause: 0.5,
+    },
+};
+
+/**
+ * Zombie variants. Everything else about them (chase AI, entries, routes) is the walker's.
+ * - runner: from `fromRound`, `shareStart` of each wave, growing by `sharePerRound` up to `shareMax`
+ *   (at least one once unlocked). Dies to Insta-Kill and Nuke like a walker.
+ * - brute: `count` per wave from `fromRound`, plus one more from `secondFromRound`; never more
+ *   than `maxPerWave` (a wave ends only when all its zombies die, so that also caps Brutes alive).
+ *   Resists Insta-Kill (double damage) and Nuke (loses a fraction of health).
+ * healthMult scales the walker health for the round; the Brute's cap is `healthCap`.
+ */
+export const ZombieVariants = {
+    runner: {
+        fromRound: 4,
+        shareStart: 0.05,
+        sharePerRound: 0.05,
+        shareMax: 0.2,
+        healthMult: 0.7,
+    },
+    brute: {
+        fromRound: 8,
+        count: 1,
+        secondFromRound: 12,
+        maxPerWave: 2,
+        healthMult: 4,
+        healthCap: 1200,
+        meleeDamageMult: 2,
+        scale: 1.3,
+        killCash: 200,
     },
 };
 
@@ -168,7 +238,12 @@ export const ZombieRayGun = {
 } as const;
 
 export function isZombieClass(kind: string | undefined): kind is ZombieClass {
-    return kind === "zombie_walker";
+    return kind === "zombie_walker" || kind === "zombie_runner" || kind === "zombie_brute";
+}
+
+/** Walkers and Runners: Insta-Kill and Nuke kill them outright. */
+export function isOrdinaryZombieClass(kind: string | undefined): boolean {
+    return kind === "zombie_walker" || kind === "zombie_runner";
 }
 
 /** Round one starts small, then grows steadily with team size and difficulty. */
@@ -185,25 +260,54 @@ export function zombieWaveCount(
     return Math.max(4, Math.min(48, Math.round(soloCount * teamScale * difficultyScale)));
 }
 
+export function zombieRunnerCount(wave: number, total: number): number {
+    const { fromRound, shareStart, sharePerRound, shareMax } = ZombieVariants.runner;
+    const round = Math.floor(wave);
+    if (round < fromRound) return 0;
+    const share = Math.min(shareMax, shareStart + (round - fromRound) * sharePerRound);
+    return Math.max(1, Math.floor(total * share));
+}
+
+export function zombieBruteCount(wave: number): number {
+    const { fromRound, count, secondFromRound, maxPerWave } = ZombieVariants.brute;
+    const round = Math.floor(wave);
+    if (round < fromRound) return 0;
+    return Math.min(maxPerWave, count + (round >= secondFromRound ? 1 : 0));
+}
+
+/**
+ * Walkers fill the wave; Runners are spread evenly through it; Brutes come last.
+ * The total is unchanged by variants.
+ */
 export function composeZombieWave(
     wave: number,
     humans: number,
     difficulty: SpecOpsDifficulty = "regular",
 ): ZombieClass[] {
-    return Array.from(
-        { length: zombieWaveCount(wave, humans, difficulty) },
-        () => "zombie_walker" as const,
-    );
+    const total = zombieWaveCount(wave, humans, difficulty);
+    const roster: ZombieClass[] = Array.from({ length: total }, () => "zombie_walker" as const);
+    const brutes = Math.min(zombieBruteCount(wave), total - 1);
+    for (let i = 0; i < brutes; i++) roster[total - 1 - i] = "zombie_brute";
+    const runners = Math.min(zombieRunnerCount(wave, total), total - brutes);
+    const spread = (total - brutes) / Math.max(1, runners);
+    for (let i = 0; i < runners; i++) roster[Math.floor((i + 0.5) * spread)] = "zombie_runner";
+    return roster;
 }
 
 export function zombieEnemyHealth(
     wave: number,
     difficulty: SpecOpsDifficulty = "regular",
+    kind: ZombieClass = "zombie_walker",
 ): number {
     const round = Math.max(1, Math.floor(wave));
     const base = 42 + Math.max(0, round - 1) * 5;
-    return Math.min(
+    const walker = Math.min(
         300,
         Math.max(24, Math.round(base * specOpsDifficultyMods(difficulty).enemyHp)),
     );
+    if (kind === "zombie_runner") return Math.max(1, Math.round(walker * ZombieVariants.runner.healthMult));
+    if (kind === "zombie_brute") {
+        return Math.min(ZombieVariants.brute.healthCap, Math.round(walker * ZombieVariants.brute.healthMult));
+    }
+    return walker;
 }

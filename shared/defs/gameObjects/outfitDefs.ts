@@ -825,6 +825,47 @@ const SkinDefs: Record<string, OutfitDef> = {
             tint: 0xc6bb8a,
         },
     }),
+    // Zombies variants (AI only).
+    outfitZombieRunner: defineOutfitSkin("outfitBase", {
+        name: "Runner",
+        aiOnly: true,
+        noDropOnDeath: true,
+        noDrop: true,
+        skinImg: {
+            baseTint: 0xffffff,
+            baseSprite: "player-base-zombie-runner.img",
+            handTint: 0x9be52d,
+            handSprite: "player-hands-01.img",
+            footTint: 0x3a3f45,
+            footSprite: "player-feet-01.img",
+            backpackTint: 0x3a3f45,
+            backpackSprite: "player-circle-base-01.img",
+        },
+        lootImg: {
+            sprite: "loot-shirt-01.img",
+            tint: 0x454b52,
+        },
+    }),
+    outfitZombieBrute: defineOutfitSkin("outfitBase", {
+        name: "Brute",
+        aiOnly: true,
+        noDropOnDeath: true,
+        noDrop: true,
+        skinImg: {
+            baseTint: 0xffffff,
+            baseSprite: "player-base-zombie-brute.img",
+            handTint: 0xb8b48a,
+            handSprite: "player-hands-01.img",
+            footTint: 0x4c5157,
+            footSprite: "player-feet-01.img",
+            backpackTint: 0x4c5157,
+            backpackSprite: "player-circle-base-01.img",
+        },
+        lootImg: {
+            sprite: "loot-shirt-01.img",
+            tint: 0x4c5157,
+        },
+    }),
     outfitRoyalFortune: defineOutfitSkin("outfitBase", {
         name: "Royal Fortune",
         rarity: Rarity.Rare,

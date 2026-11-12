@@ -6,6 +6,7 @@ import { ZombieWaveIntermissionTime } from "../../server/src/game/specOpsManager
 import { WeaponManager } from "../../server/src/game/weaponManager.ts";
 import {
     composeZombieWave,
+    zombieBruteCount,
     ZombieEconomy,
     zombieEnemyHealth,
     ZombieLoadouts,
@@ -21,6 +22,7 @@ import {
     ZombieSpeedByDifficulty,
     zombieSpeedMult,
     ZombieUpgradeCost,
+    ZombieVariants,
     zombieWaveCount,
 } from "../../server/src/game/zombieMode.ts";
 import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
@@ -1365,7 +1367,7 @@ test("Zombies only ever spawns zombies: no soldiers, bosses, or Ironclads", () =
     const enemies = ops.livingEnemies();
     expect(enemies.length).toBeGreaterThan(0);
     for (const enemy of enemies) {
-        expect(enemy.name).toBe("Zombie");
+        expect(["Zombie", "Runner", "Brute"]).toContain(enemy.name);
         expect(enemy.weapons[GameConfig.WeaponSlot.Primary].type).toBe("");
         expect(enemy.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("");
         expect(enemy.specOpsStrobeTank).toBe(false);
@@ -2116,4 +2118,99 @@ test("Fireteam: going down still keeps perks (zombies-only rule)", () => {
     knock();
     expect(a.downed).toBe(true);
     expect(a.perks.length).toBe(perks.length);
+});
+
+test("waves mix in Runners from round 4 and Brutes from round 8 without changing the total", () => {
+    const { runner, brute } = ZombieVariants;
+    for (let round = 1; round <= 40; round++) {
+        for (const humans of [1, 2, 4]) {
+            const roster = composeZombieWave(round, humans);
+            expect(roster.length).toBe(zombieWaveCount(round, humans));
+            const runners = roster.filter((k) => k === "zombie_runner").length;
+            const brutes = roster.filter((k) => k === "zombie_brute").length;
+            expect(runners > 0, `round ${round}`).toBe(round >= runner.fromRound);
+            expect(runners).toBeLessThanOrEqual(Math.max(1, Math.floor(roster.length * runner.shareMax)));
+            expect(brutes).toBe(zombieBruteCount(round));
+            expect(brutes).toBeLessThanOrEqual(brute.maxPerWave);
+            // Brutes arrive last.
+            expect(roster.slice(roster.length - brutes).every((k) => k === "zombie_brute")).toBe(true);
+        }
+    }
+    expect(zombieBruteCount(brute.fromRound - 1)).toBe(0);
+    expect(zombieBruteCount(brute.fromRound)).toBe(1);
+    expect(zombieBruteCount(brute.secondFromRound)).toBe(2);
+    expect(composeZombieWave(20, 1).filter((k) => k === "zombie_runner").length)
+        .toBe(Math.floor(zombieWaveCount(20, 1) * runner.shareMax));
+});
+
+test("Runners are faster and frailer; Brutes are bigger, tougher, hit twice as hard and pay more", () => {
+    const game = createGame(TeamMode.Solo, "zombie_dead_air");
+    const operator = game.playerBarn.addTestPlayer({ name: "A" });
+    game.update(0.1);
+    const ops = game.specOps!;
+    ops.wave = 10;
+    const walker = ops.spawnEnemyPublic("zombie_walker", true)!;
+    const runner = ops.spawnEnemyPublic("zombie_runner", true)!;
+    const brute = ops.spawnEnemyPublic("zombie_brute", true)!;
+
+    expect(runner.name).toBe("Runner");
+    expect(runner.outfit).toBe("outfitZombieRunner");
+    expect(runner.specOpsSpeedMult).toBeCloseTo(Math.min(ZombieMaxSpeedMult, walker.specOpsSpeedMult * 1.3), 5);
+    expect(runner.health).toBe(Math.round(walker.health * ZombieVariants.runner.healthMult));
+    expect(runner.scale).toBe(1);
+
+    expect(brute.name).toBe("Brute");
+    expect(brute.outfit).toBe("outfitZombieBrute");
+    expect(brute.specOpsSpeedMult).toBeCloseTo(walker.specOpsSpeedMult * 0.8, 5);
+    expect(brute.health).toBe(Math.min(ZombieVariants.brute.healthCap, walker.health * ZombieVariants.brute.healthMult));
+    expect(brute.health).toBeGreaterThan(280);
+    expect(brute.scale).toBe(ZombieVariants.brute.scale);
+    expect(brute.rad).toBeCloseTo(walker.rad * ZombieVariants.brute.scale, 5);
+    expect(brute.specOpsBounty).toBe(ZombieVariants.brute.killCash);
+    expect(walker.specOpsBounty).toBe(ZombieEconomy.killCash);
+    // Perk changes recalculate scale from the Brute's base size.
+    brute.recalculateScale();
+    expect(brute.scale).toBe(ZombieVariants.brute.scale);
+
+    // Measures the damage each punch deals before the operator's own protections.
+    const dealt: number[] = [];
+    const takeDamage = operator.damage.bind(operator);
+    operator.damage = (params) => {
+        dealt.push(params.amount!);
+        takeDamage(params);
+    };
+    const punch = (zombie: Player) => {
+        dealt.length = 0;
+        zombie.layer = operator.layer;
+        v2.set(zombie.pos, v2.add(operator.pos, v2.create(1.5 * zombie.scale, 0)));
+        game.grid.updateObject(zombie);
+        game.grid.updateObject(operator);
+        zombie.dir = v2.create(-1, 0);
+        zombie.weaponManager.meleeDamage();
+        return dealt[0] ?? 0;
+    };
+    const walkerHit = punch(walker);
+    expect(walkerHit).toBeGreaterThan(0);
+    expect(punch(brute)).toBeCloseTo(walkerHit * ZombieVariants.brute.meleeDamageMult, 5);
+    expect(punch(runner)).toBeCloseTo(walkerHit, 5);
+});
+
+test("Insta-Kill and Nuke kill Runners like walkers; Brutes resist", () => {
+    const game = createGame(TeamMode.Solo, "zombie_dead_air");
+    const operator = game.playerBarn.addTestPlayer({ name: "A" });
+    game.update(0.1);
+    const ops = game.specOps!;
+    ops.wave = 12;
+    ops.setNpcIgnoreOperators(true);
+    const runner = ops.spawnEnemyPublic("zombie_runner", true)!;
+    const brute = ops.spawnEnemyPublic("zombie_brute", true)!;
+    ops.activateZombiePowerUp("zombie_powerup_insta_kill");
+    expect(ops.modifyZombieDamage(runner, operator, 1)).toBeGreaterThan(runner.health);
+    expect(ops.modifyZombieDamage(brute, operator, 11)).toBe(22);
+
+    const bruteHealth = brute.health;
+    ops.activateZombiePowerUp("zombie_powerup_nuke");
+    expect(runner.dead).toBe(true);
+    expect(brute.dead).toBe(false);
+    expect(brute.health).toBeLessThan(bruteHealth);
 });
