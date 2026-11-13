@@ -3064,6 +3064,55 @@ body.steam-deck .specops-start .specops-lb-sidebar {
   }
 }
 
+/* Practice loadout picker (home, Practice mode only); kit colors come from the Survivor Kit block below. */
+.zv-practice-loadout-row {
+  display: flex;
+  gap: 8px;
+}
+
+.specops-start .zv-practice-loadout-row select.specops-select {
+  flex: 1;
+  height: 40px;
+  min-width: 0;
+  width: auto;
+}
+
+/* Beats the panel-wide "secondary buttons are full width" rule. */
+.specops-start .specops-panel .zv-practice-loadout-row .specops-secondary-btn.menu-option {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+  width: 88px !important;
+}
+
+.specops-start .zv-practice-loadout-empty.menu-option {
+  align-items: center;
+  background: var(--kit-field, #11110e);
+  border: 2px dashed var(--kit-line, #4a4a3c);
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--kit-text, #f2ead2);
+  display: flex;
+  font-size: 14px;
+  height: 40px;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.specops-start .zv-practice-loadout-empty.menu-option b {
+  color: var(--kit-mode, #e2ad35);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.specops-start .zv-practice-loadout-empty.menu-option:hover {
+  border-color: var(--kit-mode, #e2ad35);
+}
+
 .zv-team-row {
   display: grid;
   gap: 8px;
