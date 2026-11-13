@@ -216,6 +216,60 @@ export function defaultPracticeSettings(): PracticeSettings {
     };
 }
 
+/* ── Presets ─────────────────────────────────────────────────────────────── */
+
+export interface PracticePreset {
+    id: string;
+    name: string;
+    /** One line shown under the picker. */
+    description: string;
+    /** Builds a fresh copy so editing the menu never changes the preset. */
+    settings: () => PracticeSettings;
+}
+
+/** One-click setups in the Practice menu. Picking one fills the menu; Start/Apply sends it. */
+export const PracticePresets: PracticePreset[] = [
+    {
+        id: "default",
+        name: "Default",
+        description: "Reset everything to the starting setup.",
+        settings: defaultPracticeSettings,
+    },
+    {
+        id: "moving_targets",
+        name: "Moving targets",
+        description: "4 bots that strafe and dodge hard but never shoot back. They respawn 0.5 s after dying.",
+        settings: () => {
+            const target: PracticeBotSettings = {
+                ...defaultPracticeBot(),
+                shootsBack: false,
+                wiggle: 8,
+                strafe: 8,
+                turn: 8,
+                dodge: 8,
+            };
+            return {
+                ...defaultPracticeSettings(),
+                bots: Array.from({ length: PracticeMaxBots }, () => ({ ...target })),
+                respawnMode: "each",
+                respawnDelay: 5,
+            };
+        },
+    },
+    {
+        id: "spas_mosin",
+        name: "SPAS-12 + Mosin",
+        description: "SPAS-12 and Mosin with a 4x scope and level 2 armor. The bot has the same guns and armor.",
+        settings: () => ({
+            ...defaultPracticeSettings(),
+            primary: "spas12",
+            secondary: "mosin",
+            kit: { ...defaultPracticeKit(), helmet: 2, vest: 2, scope: "4xscope" },
+            bots: [{ ...defaultPracticeBot(), gun: "spas12", secondary: "mosin", armor: 2 }],
+        }),
+    },
+];
+
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
     const n = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
     return math.clamp(n, min, max);

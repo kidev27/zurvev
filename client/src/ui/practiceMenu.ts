@@ -17,6 +17,7 @@ import {
     PracticeMelees,
     PracticeMinBotHealth,
     PracticePlayerRespawnDelay,
+    PracticePresets,
     PracticeRandomGun,
     type PracticeRespawnMode,
     PracticeRespawnModeLabels,
@@ -207,6 +208,8 @@ export class PracticeMenu {
     private giveItem = "";
     private giveCount = 1;
     private activeTab: "player" | "bots" = "player";
+    /** Shown after picking a preset until the setup is sent. */
+    private presetNote = "";
     private resizeObserver?: ResizeObserver;
     private layoutSaveTimer = 0;
 
@@ -395,6 +398,7 @@ export class PracticeMenu {
     }
 
     private apply() {
+        this.presetNote = "";
         this.settings = sanitizePracticeSettings(this.settings);
         saveSettings(this.settings);
         this.send(this.settings);
@@ -444,6 +448,8 @@ export class PracticeMenu {
             root.append(el("p", { class: "pm-respawn" }));
             this.updateRespawnText();
         }
+
+        this.renderPresets(root);
 
         const tabs = el("div", { class: "pm-tabs", role: "tablist", "aria-label": "Practice settings" });
         for (const [id, label] of [["player", "Your setup"], ["bots", "Bots"]] as const) {
@@ -514,6 +520,28 @@ export class PracticeMenu {
         apply.addEventListener("click", () => this.apply());
         actions.append(apply);
         root.append(actions);
+    }
+
+    private renderPresets(root: HTMLElement) {
+        const row = el("div", { class: "pm-row" });
+        row.append(el("label", { for: "pm-preset" }, "Preset"));
+        const select = el("select", { id: "pm-preset" });
+        select.append(el("option", { value: "" }, "Choose a preset…"));
+        for (const preset of PracticePresets) {
+            select.append(el("option", { value: preset.id, title: preset.description }, preset.name));
+        }
+        select.addEventListener("change", () => {
+            const preset = PracticePresets.find((p) => p.id === select.value);
+            if (!preset) return;
+            this.settings = sanitizePracticeSettings(preset.settings());
+            this.presetNote = `${preset.name}: ${preset.description} Press ${
+                this.started ? (this.dead ? "Save setup" : "Apply") : "Start"
+            } to use it.`;
+            this.render();
+        });
+        row.append(select);
+        root.append(row);
+        if (this.presetNote) root.append(el("p", { class: "pm-note" }, this.presetNote));
     }
 
     private selectTab(tab: "player" | "bots") {

@@ -91,7 +91,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| PRA-001 | Practice presets | Practice | P2 | Ready | None | `shared/practice.ts`, `client/src/ui/practiceMenu.ts` | Not started | Default preset list needs approval |
+| PRA-001 | Practice presets | Practice | P2 | Needs Playtesting | None | `shared/practice.ts`, `client/src/ui/practiceMenu.ts` | `practice.test.ts` 53/53 (presets valid, fresh copies, server applies SPAS-12 + Mosin) | Menu not checked live in a browser |
 | PRA-002 | Saved loadouts | Practice | P2 | Ready | PRA-001 storage format | `shared/practice.ts`, `client/src/ui/practiceMenu.ts` | Not started | Persistence choice (recommended: browser storage, as settings already are) |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
 
@@ -99,6 +99,10 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 
 - Practice already saves one settings blob in browser storage (`practiceMenu.ts`). Presets and loadouts
   can extend that format.
+- Presets (`PracticePresets` in `shared/practice.ts`): Default, Moving targets (4 bots, never shoot back,
+  wiggle/strafe/turn/dodge 8, respawn 0.5 s) and SPAS-12 + Mosin (4x scope, level 2 armor; 1 bot with the
+  same guns and armor). Picking one fills the menu; Start/Apply sends it. Saved loadouts (PRA-002) can reuse
+  the `PracticePreset` shape.
 - The server already uses Survev switch rules: per-gun `switchDelay` plus a 1 s free-switch cooldown.
   Resurviv runs on the same Survev code. Timings for the other profiles are not yet sourced.
 

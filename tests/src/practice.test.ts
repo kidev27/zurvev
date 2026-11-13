@@ -19,6 +19,7 @@ import {
     PracticeMaxBotHealth,
     PracticeMaxBots,
     PracticePlayerRespawnDelay,
+    PracticePresets,
     PracticeRandomGun,
     type PracticeSettings,
     practiceWiggleToAdvanced,
@@ -775,3 +776,48 @@ test.each(["ppsh41", "mp40", "fal", "rpd", "winchester1887", "pkp", "raygun", "g
         expect(game.lootBarn.loots.some(loot => loot.type === type && !loot.destroyed)).toBe(true);
     },
 );
+
+test("every Practice preset is valid as-is and returns a fresh copy", () => {
+    expect(PracticePresets.map((p) => p.id)).toEqual(["default", "moving_targets", "spas_mosin"]);
+    for (const preset of PracticePresets) {
+        const settings = preset.settings();
+        expect(sanitizePracticeSettings(structuredClone(settings)), preset.id).toEqual(settings);
+        settings.bots[0].gun = "mp5";
+        settings.kit.helmet = 4;
+        expect(preset.settings(), preset.id).not.toEqual(settings);
+    }
+    expect(PracticePresets[0].settings()).toEqual(defaultPracticeSettings());
+});
+
+test("Moving targets: 4 bots that dodge hard and never shoot back", () => {
+    const settings = PracticePresets.find((p) => p.id === "moving_targets")!.settings();
+    expect(settings.bots).toHaveLength(PracticeMaxBots);
+    for (const bot of settings.bots) {
+        expect(bot.shootsBack).toBe(false);
+        expect([bot.wiggle, bot.strafe, bot.turn, bot.dodge]).toEqual([8, 8, 8, 8]);
+    }
+    expect(settings.respawnMode).toBe("each");
+    expect(settings.respawnDelay).toBe(5);
+});
+
+test("SPAS-12 + Mosin: 4x scope and level 2 armor for you and the bot", () => {
+    const settings = PracticePresets.find((p) => p.id === "spas_mosin")!.settings();
+    expect([settings.primary, settings.secondary]).toEqual(["spas12", "mosin"]);
+    expect([settings.kit.helmet, settings.kit.vest, settings.kit.scope]).toEqual([2, 2, "4xscope"]);
+    expect(settings.bots).toHaveLength(1);
+    expect([settings.bots[0].gun, settings.bots[0].secondary, settings.bots[0].armor]).toEqual(["spas12", "mosin", 2]);
+});
+
+test("starting from the SPAS-12 + Mosin preset gives you and the bot that loadout", () => {
+    const preset = PracticePresets.find((p) => p.id === "spas_mosin")!.settings();
+    const { game, player } = startPractice({ ...preset, bots: [{ ...preset.bots[0], shootsBack: false }] });
+    expect(player.weapons[GameConfig.WeaponSlot.Primary].type).toBe("spas12");
+    expect(player.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mosin");
+    expect([player.helmet, player.chest]).toEqual(["helmet02", "chest02"]);
+    expect(player.invManager.get("4xscope")).toBe(1);
+    const [bot, extra] = bots(game);
+    expect(extra).toBeUndefined();
+    expect(bot.weapons[GameConfig.WeaponSlot.Primary].type).toBe("spas12");
+    expect(bot.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mosin");
+    expect([bot.helmet, bot.chest]).toEqual(["helmet02", "chest02"]);
+});
