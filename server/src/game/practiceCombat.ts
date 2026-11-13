@@ -37,6 +37,29 @@ export function practiceInterceptPoint(
 }
 
 /**
+ * How a practice bot overclocks. After a shot the gun waits `fireDelay` before
+ * the next one and the bot walks at half speed for that long. Swapping weapons
+ * ends the slow walk at once, and a gun drawn again is ready after its
+ * `switchDelay`, which for bolt rifles is shorter than `fireDelay`.
+ *
+ * - Other gun loaded and quicker to draw than waiting: swap to it and shoot.
+ * - Otherwise: holster to melee for one tick and draw the same gun again.
+ *   Faster fire when `switchDelay < fireDelay` (Mosin 1.75 s to about 1.0 s).
+ *   When it is not faster (SPAS-12, M870), the bot still does it to keep
+ *   full speed, as long as it delays the next shot by `maxCancelCost` or less.
+ *
+ * Only runs when the bot's Quick switch setting is on.
+ */
+export const PracticeBotOverclock = {
+    /** Guns that fire faster than this never swap between shots. */
+    minFireDelay: 0.45,
+    /** Swap to end the slow walk even when it gains no fire rate. */
+    cancelSlowdown: true,
+    /** Most seconds a slow-walk swap may add to the wait for the next shot. */
+    maxCancelCost: 0.1,
+};
+
+/**
  * When a practice bot reloads. A reload only works on the gun in hand, and the
  * bot cannot shoot while it reloads, so each rule says when that trade is worth it.
  *
@@ -202,6 +225,13 @@ export class PracticeCombat {
         return undefined;
     }
 
+    /** Put the gun away for one tick and draw it again. Ends the slow walk after a shot. */
+    private holster(slot: number, dt: number): void {
+        this.player.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
+        this.returnSlot = slot;
+        this.returnWait = dt;
+    }
+
     private preferredGun(distance: number): number {
         const loaded = [0, 1].filter((slot) => this.loaded(slot));
         if (!loaded.length) return this.player.curWeapIdx < 2 ? this.player.curWeapIdx : 0;
@@ -255,30 +285,35 @@ export class PracticeCombat {
             return;
         }
 
+        const gun = GunDefs[p.weaponManager.activeWeapon];
+        const slowShot = fired && this.settings.quickSwitch
+            && gun?.fireDelay >= PracticeBotOverclock.minFireDelay && gun.fireMode !== "burst";
+
         this.reloadSlot = this.planReload(distance, target);
         if (this.reloadSlot !== undefined) {
             this.committedSlot = undefined;
-            if (active !== this.reloadSlot) p.weaponManager.setCurWeapIndex(this.reloadSlot);
+            if (active !== this.reloadSlot) {
+                p.weaponManager.setCurWeapIndex(this.reloadSlot);
+            } else if (slowShot && PracticeBotOverclock.cancelSlowdown) {
+                // Reloading the gun it just fired: shed the slow walk first.
+                this.holster(active, dt);
+            }
             return;
         }
 
-        const gun = GunDefs[p.weaponManager.activeWeapon];
-        if (
-            fired && canAttack && this.settings.quickSwitch && gun?.fireDelay >= 0.45
-            && gun.fireMode !== "burst" && p.actionType === GameConfig.Action.None
-        ) {
+        if (slowShot && canAttack && p.actionType === GameConfig.Action.None) {
             const other = active === 0 ? 1 : 0;
             if (this.loaded(other) && this.switchDelay(other) + dt < p.weapons[active].cooldown) {
                 p.weaponManager.setCurWeapIndex(other);
                 this.committedSlot = other;
                 return;
             }
-            // One slow gun: holster for a tick, then draw it again. A shotgun
-            // whose draw time costs as much as its recovery gains nothing here.
-            if (gun.switchDelay + dt * 2 < p.weapons[active].cooldown) {
-                p.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
-                this.returnSlot = active;
-                this.returnWait = dt;
+            // One slow gun: holster for a tick, then draw it again. The swap
+            // ends the half-speed walk after a shot, so it is worth it even
+            // when the draw is no quicker than waiting, up to maxCancelCost.
+            const cost = gun.switchDelay + dt * 2 - p.weapons[active].cooldown;
+            if (cost < 0 || (PracticeBotOverclock.cancelSlowdown && cost <= PracticeBotOverclock.maxCancelCost)) {
+                this.holster(active, dt);
                 return;
             }
         }

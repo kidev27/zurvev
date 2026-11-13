@@ -95,7 +95,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-002 | Saved loadouts | Practice | P2 | Needs Playtesting | None | `shared/practice.ts`, `client/src/ui/practiceLoadouts.ts`, `client/src/ui/practiceLoadoutMenu.ts`, `client/src/main.ts` | `practice.test.ts` (store sanitizing, Loadout N names, cap of 8); browser run of the loadout screen | Live check in the game |
 | PRA-004 | Practice menu redesign and respawn when ready | Practice | P2 | Needs Playtesting | PRA-001 | `client/src/ui/practiceEditor.ts`, `client/src/ui/practiceMenu.ts`, `server/src/game/practiceController.ts`, `shared/net/practiceMsg.ts` | `practice.test.ts` 59/59 (bots freeze while dead, hold and Respawn now, bots restart); scripted browser run, 25 checks | Live check in the game |
 | PRA-005 | Practice bots: reload and gun choice | Practice | P1 | Needs Playtesting | None | `server/src/game/practiceCombat.ts` | `practiceBotReload.test.ts` 9/9; `practice.test.ts` 59/59; full-game fights before/after (see notes) | In a nonstop close fight with no break the empty gun still waits (needs PRA-008) |
-| PRA-006 | Practice bots: overclocking and gun swaps by range | Practice | P1 | Ready | PRA-005 | `server/src/game/practiceCombat.ts` | Not started | Bot swaps to a shotgun at long range and walks in without shooting |
+| PRA-006 | Practice bots: overclocking and gun swaps by range | Practice | P1 | In Progress | PRA-005 | `server/src/game/practiceCombat.ts` | Overclocking: `practiceBotOverclock.test.ts` 11/11; full-game fights before/after (see notes). Gun swaps by range: not started | Bot swaps to a shotgun at long range and walks in without shooting. Swap rule for Model 94, BLR, Super 90 needs a decision |
 | PRA-007 | Practice bots: healing and boosts | Practice | P1 | Ready | None | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | Not started | Rules need approval |
 | PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Ready | None | `server/src/game/specOpsManager.ts` | Not started | Rules need approval; bot range follows the gun in hand today |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
@@ -121,6 +121,15 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   reloading or healing, or it is on its last round and the empty gun reloads at least 1 s quicker. A reload
   with 0.75 s or less left is finished. A loaded gun may fire mid-reload. Before this, the first gun to run
   dry was never reloaded (measured: Mosin empty for 55 of 60 s).
+- Bot overclocking (`PracticeBotOverclock` in `server/src/game/practiceCombat.ts`). After a shot the bot
+  walks at half speed for the gun's `fireDelay`; any weapon swap ends that. With Quick switch on, the bot
+  holsters to melee for one tick after each shot of a slow gun and draws it again. Bolt rifles also fire
+  faster this way (Mosin 1.75 s to about 1.0 s). For guns whose draw is no quicker than the wait (SPAS-12,
+  M870, Scout Elite) the swap only keeps full speed and delays the next shot by 0.02 s. Swaps that would
+  delay the next shot by more than 0.1 s are skipped (Model 94 0.32 s, BLR 0.22 s, Super 90 0.12 s), so
+  those guns still slow the bot. A gun that runs dry is holstered once before its reload. Measured in
+  120 s full-game fights: time at half speed 45-77% to 1%, average movement 6-7.4 to 9.6 units/s (SPAS-12,
+  M870); shots fired unchanged within run-to-run noise.
 - Respawn when ready: while you are dead, bots freeze and dead bots wait. Touching the loadout pauses the
   3 s auto-respawn; Respawn (Space) brings you back and the bots start over. Auto-respawn can be turned off.
   Protocol 1042 (`PracticeRespawnMsg`).
