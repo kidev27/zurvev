@@ -36,15 +36,68 @@ export function practiceInterceptPoint(
     return v2.add(target, v2.mul(velocity, math.clamp(time, 0, maxTime)));
 }
 
+/**
+ * When a practice bot reloads. A reload only works on the gun in hand, and the
+ * bot cannot shoot while it reloads, so each rule says when that trade is worth it.
+ *
+ * - Safe (it has not seen you for `safeDelay` s): fill both guns, empty ones first.
+ * - Nothing loaded: reload whichever gun gets a round in soonest, then shoot.
+ * - One gun empty, one loaded, and it sees you: keep fighting with the loaded gun,
+ *   unless one of the three `when…` reasons below holds.
+ */
+export const PracticeBotReload = {
+    /** Seconds without seeing you before the bot counts as safe. */
+    safeDelay: 0.4,
+    /** Reload the empty gun when the loaded gun cannot reach you (see `reachSlack`). */
+    whenOutOfReach: true,
+    /**
+     * A gun "reaches" you up to this multiple of its fire range: close enough to
+     * step in and shoot. Shotguns fire from 12.65 units, so they reach to 19.
+     */
+    reachSlack: 1.5,
+    /** Reload the empty gun while you are reloading or using a heal/boost. */
+    whenTargetBusy: true,
+    /**
+     * Reload the empty gun when the loaded gun is nearly empty, but only if the
+     * empty gun gets a round in at least `lowQuickerBy` s sooner than the loaded
+     * gun would once dry (otherwise: shoot the last round, then the "nothing
+     * loaded" rule reloads the quicker gun).
+     */
+    whenLow: true,
+    /** "Nearly empty": this many rounds or fewer, in magazines of `lowMinClip` or more. */
+    lowRounds: 1,
+    lowMinClip: 3,
+    lowQuickerBy: 1,
+    /** A reload with this many seconds or fewer left is finished even after its reason is gone. */
+    finishIfLeft: 0.75,
+};
+
+function isReloadAction(action: number): boolean {
+    return action === GameConfig.Action.Reload || action === GameConfig.Action.ReloadAlt;
+}
+
 /** Practice-only combat. All switches, fire, reloads and melee use the normal engine. */
 export class PracticeCombat {
     meleeEngaged = false;
+    /** The gun the bot is reloading on purpose this tick; it holds fire for it. */
+    reloadSlot?: number;
     private lastAmmo: number[];
     private returnSlot?: number;
     private returnWait = 0;
     private committedSlot?: number;
+    private unseenFor = 0;
+    /** Ammo in the gun when "finish this reload" began, so one finish covers one reload. */
+    private finishAmmo?: number;
 
-    constructor(readonly player: Player, readonly settings: PracticeBotSettings) {
+    /**
+     * @param fireRange how far the bot will shoot a given gun from (the brain's
+     *   range for it). Past this the gun "cannot reach".
+     */
+    constructor(
+        readonly player: Player,
+        readonly settings: PracticeBotSettings,
+        private readonly fireRange: (gun: string) => number = () => Infinity,
+    ) {
         this.lastAmmo = player.weapons.slice(0, 2).map((w) => w.ammo);
     }
 
@@ -67,6 +120,88 @@ export class PracticeCombat {
         return p.freeSwitchTimer < 0 ? GameConfig.player.baseSwitchDelay : next.switchDelay;
     }
 
+    /** Close enough to shoot this gun, or to step in and shoot it. */
+    private reaches(slot: number, distance: number): boolean {
+        return distance <= this.fireRange(this.player.weapons[slot].type) * PracticeBotReload.reachSlack;
+    }
+
+    private hasGun(slot: number): boolean {
+        return !!GunDefs[this.player.weapons[slot].type];
+    }
+
+    private clip(slot: number): number {
+        const type = this.player.weapons[slot].type;
+        return this.player.weaponManager.getAmmoStats(GunDefs[type], type).maxClip;
+    }
+
+    /** Seconds of reloading until this gun has a round more than now. */
+    private reloadTime(slot: number, asIfEmpty = false): number {
+        const p = this.player;
+        const weapon = p.weapons[slot];
+        const gun = GunDefs[weapon.type];
+        if (!asIfEmpty && slot === p.curWeapIdx && isReloadAction(p.actionType) && p.actionItem === weapon.type) {
+            return Math.max(0, p.action.duration - p.action.time);
+        }
+        // Bots carry endless ammo, so an empty gun always gets its full-clip reload.
+        return (asIfEmpty || weapon.ammo === 0) && gun.reloadTimeAlt ? gun.reloadTimeAlt : gun.reloadTime;
+    }
+
+    /** Seconds until this gun could have a fresh round in: draw it if needed, then reload. */
+    private timeToRound(slot: number): number {
+        return (slot === this.player.curWeapIdx ? 0 : this.switchDelay(slot)) + this.reloadTime(slot);
+    }
+
+    /** Which gun to reload right now, if any. See PracticeBotReload. */
+    private planReload(distance: number, target: Player): number | undefined {
+        const R = PracticeBotReload;
+        const p = this.player;
+        const active = p.curWeapIdx;
+        const ammo = (slot: number) => p.weapons[slot].ammo;
+        const guns = [0, 1].filter((slot) => this.hasGun(slot));
+        const empty = guns.filter((slot) => ammo(slot) === 0);
+        const quickest = (slots: number[]) =>
+            slots.reduce((best, slot) => {
+                const d = this.timeToRound(slot) - this.timeToRound(best);
+                return d < 0 || (d === 0 && slot === active) ? slot : best;
+            });
+
+        let want: number | undefined;
+        if (this.unseenFor >= R.safeDelay) {
+            // Safe: empty guns first, then top up (the gun in hand first, to save a switch).
+            const partial = guns.filter((slot) => ammo(slot) > 0 && ammo(slot) < this.clip(slot));
+            if (empty.length) want = quickest(empty);
+            else if (partial.length) want = partial.includes(active) ? active : partial[0];
+        } else if (empty.length && empty.length === guns.length) {
+            // Nothing loaded: get a round in as fast as possible.
+            want = quickest(empty);
+        } else if (empty.length === 1) {
+            const e = empty[0];
+            const l = guns.find((slot) => slot !== e)!;
+            const outOfReach = R.whenOutOfReach && !this.reaches(l, distance);
+            const targetBusy = R.whenTargetBusy
+                && (isReloadAction(target.actionType) || target.actionType === GameConfig.Action.UseItem);
+            const low = R.whenLow && this.clip(l) >= R.lowMinClip && ammo(l) <= R.lowRounds
+                && this.timeToRound(e) + R.lowQuickerBy <= this.reloadTime(l, true);
+            if (outOfReach || targetBusy || low) want = e;
+        }
+
+        if (want !== undefined) {
+            this.finishAmmo = undefined;
+            return want;
+        }
+        // The reason is gone. Still finish a reload that is nearly done.
+        if (
+            this.reloadSlot === active && active < 2 && isReloadAction(p.actionType)
+            && this.reloadTime(active) <= R.finishIfLeft
+            && (this.finishAmmo === undefined || this.finishAmmo === ammo(active))
+        ) {
+            this.finishAmmo = ammo(active);
+            return active;
+        }
+        this.finishAmmo = undefined;
+        return undefined;
+    }
+
     private preferredGun(distance: number): number {
         const loaded = [0, 1].filter((slot) => this.loaded(slot));
         if (!loaded.length) return this.player.curWeapIdx < 2 ? this.player.curWeapIdx : 0;
@@ -79,8 +214,13 @@ export class PracticeCombat {
         return loaded.reduce((best, slot) => score(slot) > score(best) ? slot : best);
     }
 
-    update(dt: number, target: Player, canAttack: boolean): void {
+    /**
+     * @param canAttack the bot sees the target and may shoot now (reaction time is over)
+     * @param canSee the bot has line of sight to the target
+     */
+    update(dt: number, target: Player, canAttack: boolean, canSee = canAttack): void {
         const p = this.player;
+        this.unseenFor = canSee ? 0 : this.unseenFor + dt;
         const active = p.curWeapIdx;
         const fired = active < 2 && p.weapons[active].ammo < this.lastAmmo[active];
         this.lastAmmo = p.weapons.slice(0, 2).map((w) => w.ammo);
@@ -101,6 +241,7 @@ export class PracticeCombat {
         if (this.meleeEngaged) {
             this.returnSlot = undefined;
             this.committedSlot = undefined;
+            this.reloadSlot = undefined;
             p.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
             return;
         }
@@ -113,6 +254,14 @@ export class PracticeCombat {
             this.returnSlot = undefined;
             return;
         }
+
+        this.reloadSlot = this.planReload(distance, target);
+        if (this.reloadSlot !== undefined) {
+            this.committedSlot = undefined;
+            if (active !== this.reloadSlot) p.weaponManager.setCurWeapIndex(this.reloadSlot);
+            return;
+        }
+
         const gun = GunDefs[p.weaponManager.activeWeapon];
         if (
             fired && canAttack && this.settings.quickSwitch && gun?.fireDelay >= 0.45
@@ -164,11 +313,14 @@ export class PracticeCombat {
     fire(ready: boolean): void {
         const p = this.player;
         p.shootHold = p.shootStart = false;
-        if (this.returnSlot !== undefined || p.actionType !== GameConfig.Action.None) return;
+        if (this.returnSlot !== undefined) return;
+        // A shot cancels a reload, so a loaded gun may fire mid-reload. Other actions are left alone.
+        const reloadingGun = isReloadAction(p.actionType) && p.curWeapIdx < 2;
+        if (p.actionType !== GameConfig.Action.None && !reloadingGun) return;
         if (p.curWeapIdx === GameConfig.WeaponSlot.Melee) {
             p.shootHold = p.shootStart = ready && this.meleeEngaged;
         } else if (p.curWeapIdx < 2) {
-            if (!this.loaded(p.curWeapIdx)) {
+            if (this.reloadSlot === p.curWeapIdx || !this.loaded(p.curWeapIdx)) {
                 p.weaponManager.tryReload();
                 return;
             }

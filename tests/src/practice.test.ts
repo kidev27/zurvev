@@ -668,7 +668,10 @@ test("Practice auto melee uses the selected weapon and returns to guns out of ra
 });
 
 test("Practice bots switch to the loaded gun instead of reloading an empty one", () => {
-    const { bot, player, combat } = combatScenario({ secondary: "mp5" });
+    const { game, bot, player, combat } = combatScenario({ secondary: "mp5" });
+    // Inside the MP5's fire range; past it the bot reloads instead (practiceBotReload.test.ts).
+    v2.set(player.pos, v2.add(bot.pos, v2.create(20, 0)));
+    game.grid.updateObject(player);
     bot.weapons[0].ammo = 0;
     combat.update(0.01, player, true);
     expect(bot.curWeapIdx).toBe(1);
