@@ -1,102 +1,87 @@
 import { GameObjectDefs } from "../../../shared/defs/register.ts";
 import {
-    defaultPracticeBot,
+    activePracticeLoadout,
+    addPracticeLoadout,
     emptyPracticeStats,
-    type PracticeBotSettings,
-    practiceGunName,
-    PracticeGuns,
-    PracticeKitItems,
-    PracticeKitMaxCount,
-    PracticeMaxArmor,
-    PracticeMaxBotHealth,
-    PracticeMaxBots,
-    PracticeMaxGearLevel,
-    PracticeMaxPackLevel,
-    PracticeMaxReaction,
-    PracticeMaxRespawnDelay,
-    PracticeMelees,
-    PracticeMinBotHealth,
     PracticePlayerRespawnDelay,
-    PracticeRandomGun,
-    type PracticeRespawnMode,
-    PracticeRespawnModeLabels,
-    PracticeRespawnModes,
-    PracticeScopes,
+    PracticePresets,
     type PracticeSettings,
-    PracticeSliderMax,
     type PracticeStats,
-    practiceWiggleToAdvanced,
     sanitizePracticeSettings,
 } from "../../../shared/practice.ts";
-
-const StorageKey = "practiceSettings";
-const LayoutKey = "practiceMenuLayout";
-
-interface PanelLayout {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-}
+import {
+    button,
+    type EditorHost,
+    type EditorState,
+    el,
+    ensureEditorCss,
+    GameTheme,
+    itemIcon,
+    itemName,
+    newEditorState,
+    renderBotEditor,
+    renderBotList,
+    renderGear,
+    renderGuns,
+    renderRespawnControls,
+    sectionTitle,
+} from "./practiceEditor.ts";
+import {
+    activePracticeSettings,
+    loadAutoRespawn,
+    loadPracticeLoadouts,
+    newPracticeLoadoutId,
+    saveAutoRespawn,
+    savePracticeLoadouts,
+} from "./practiceLoadouts.ts";
 
 const Css = `
-#practice-menu {
-  position: absolute; top: 24px; left: 24px;
-  width: min(560px, calc(100vw - 32px)); height: min(720px, calc(100vh - 48px));
-  min-width: 340px; min-height: 220px; max-width: calc(100vw - 8px); max-height: calc(100vh - 8px);
-  overflow: auto; resize: both; box-sizing: border-box;
-  background: rgba(16, 20, 24, 0.94); border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
-  color: #e8ecef; font-family: "Barlow Condensed", "Roboto Condensed", sans-serif; font-size: 16px;
-  padding: 14px 16px 16px; z-index: 1000; pointer-events: auto; display: none;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.55);
-}
-#practice-menu.is-open { display: block; }
-#practice-menu h2 { margin: 0 0 2px; font-size: 24px; letter-spacing: 0.5px; }
-#practice-menu .pm-drag {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin: -14px -16px 6px; padding: 10px 16px 6px; cursor: move; user-select: none;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  position: sticky; top: -14px; z-index: 1; background: rgba(16, 20, 24, 0.98);
-}
-#practice-menu .pm-drag-hint { color: #6f7b82; font-size: 13px; }
-#practice-menu .pm-sub { margin: 0 0 12px; color: #9aa6ad; font-size: 14px; }
-#practice-menu .pm-tabs { display: flex; gap: 6px; border-bottom: 1px solid #3a444c; padding-bottom: 8px; }
-#practice-menu .pm-tab {
-  flex: 1; padding: 8px 12px; border: 1px solid #3f4a52; border-radius: 6px;
-  background: #232a30; color: #c9d1d6; font: inherit; cursor: pointer;
-}
-#practice-menu .pm-tab[aria-selected=true] { background: #3f7d44; color: #fff; border-color: #6fbf73; }
-#practice-menu [role=tabpanel][hidden] { display: none; }
-#practice-menu .pm-tab:focus-visible { outline: 2px solid #a5dcaa; outline-offset: 2px; }
-#practice-menu .pm-respawn { color: #ffcf5a; font-size: 18px; margin: 0 0 10px; }
-#practice-menu h3 { margin: 14px 0 8px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; color: #9aa6ad; }
-#practice-menu .pm-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
-#practice-menu .pm-row label { flex: 0 0 132px; color: #c9d1d6; }
-#practice-menu .pm-row input[type=range] { flex: 1; accent-color: #6fbf73; }
-#practice-menu .pm-row .pm-val { flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums; }
-#practice-menu select { flex: 1; min-width: 0; max-width: 100%; background: #232a30; color: #e8ecef; border: 1px solid #3a444c; border-radius: 6px; padding: 4px 6px; font: inherit; }
-#practice-menu .pm-count { display: flex; gap: 6px; }
-#practice-menu .pm-count button, #practice-menu .pm-actions button {
-  background: #2b343b; color: #e8ecef; border: 1px solid #3f4a52; border-radius: 6px;
-  padding: 6px 14px; font: inherit; cursor: pointer;
-}
-#practice-menu .pm-count button.is-active { background: #3f7d44; border-color: #6fbf73; }
-#practice-menu .pm-bot { border: 1px solid #333d44; border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: rgba(255,255,255,0.03); }
-#practice-menu .pm-bot-title { font-size: 17px; margin-bottom: 4px; }
-#practice-menu details { margin: 4px 0 2px; }
-#practice-menu summary { cursor: pointer; color: #9aa6ad; }
-#practice-menu .pm-actions {
-  display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: -16px; z-index: 2;
-  margin: 14px -16px -16px; padding: 10px 16px; background: #101418; border-top: 1px solid #3a444c;
-}
-#practice-menu .pm-actions .pm-apply { background: #3f7d44; border-color: #6fbf73; }
-#practice-menu .pm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; margin: 6px 0; }
-#practice-menu .pm-grid label { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #c9d1d6; }
-#practice-menu input[type=number] { width: 64px; background: #232a30; color: #e8ecef; border: 1px solid #3a444c; border-radius: 6px; padding: 3px 6px; font: inherit; }
-#practice-menu .pm-give { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#practice-menu { ${GameTheme} position: absolute; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); box-sizing: border-box;
+  display: none; flex-direction: column; background: rgba(16, 20, 24, 0.97); border-left: 1px solid #2f3940; z-index: 1000; pointer-events: auto;
+  box-shadow: -12px 0 40px rgba(0,0,0,0.45); }
+#practice-menu.is-open { display: flex; }
+#practice-menu .pm-head { flex: none; padding: 12px 12px 10px 20px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #2a3238; }
+#practice-menu .pm-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#practice-menu h2 { margin: 0; font-size: 26px; }
+#practice-menu .pm-close { width: 44px; height: 44px; border: 0; background: none; color: #c9d1d6; cursor: pointer; font-size: 22px; }
+#practice-menu .pm-head select { flex: 1; }
+#practice-menu .pm-tabs { flex: none; display: flex; padding: 0 12px; border-bottom: 1px solid #2a3238; }
+#practice-menu .pm-tabs button { flex: 1; min-height: 46px; background: none; border: 0; color: #a9b4bc; cursor: pointer; font-size: 18px; }
+#practice-menu .pm-tabs button[aria-selected=true] { color: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 #6fbf73; }
+#practice-menu .pm-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 20px; }
+#practice-menu .pm-foot { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid #2a3238; background: #0c1013; }
+#practice-menu .pm-changes { flex: 1; color: #f0cf7a; }
+#practice-menu .pm-changes.is-none { color: #a9b4bc; }
+#practice-menu .pm-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; box-sizing: border-box; padding: 6px 12px; margin-bottom: 8px;
+  border-radius: 8px; background: #1a2127; border: 1px solid #33404a; cursor: pointer; text-align: left; }
+#practice-menu .pm-row.is-changed { border-color: #8a7330; }
+#practice-menu .pm-row > .pe-label { width: 84px; flex: none; }
+#practice-menu .pm-row-icon { width: 52px; height: 30px; flex: none; background: center / contain no-repeat; }
+#practice-menu .pm-row-end { margin-left: auto; display: flex; align-items: center; gap: 8px; color: #a9b4bc; }
+#practice-menu .pm-changed { font-size: 13px; padding: 1px 8px; border-radius: 999px; background: #3d3420; color: #f0cf7a; border: 1px solid #8a7330; }
+#practice-menu .pm-back { margin-bottom: 10px; }
+#practice-menu .pm-give { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 #practice-menu .pm-give select { flex: 1 1 200px; }
-#practice-menu .pm-give button { background: #2b343b; color: #e8ecef; border: 1px solid #3f4a52; border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
-#practice-menu .pm-note { color: #9aa6ad; font-size: 13px; margin: 2px 0 0; }
+#practice-menu .pm-give input { width: 80px; height: 40px; box-sizing: border-box; padding: 0 8px; border-radius: 6px; background: #232a30; border: 1px solid #3a444c; }
+#practice-respawn { ${GameTheme} position: absolute; inset: 0; z-index: 900; display: none; align-items: center; justify-content: center; background: rgba(8, 10, 12, 0.55); pointer-events: auto; }
+#practice-respawn.is-open { display: flex; }
+#practice-respawn .pr-card { width: min(500px, calc(100vw - 32px)); box-sizing: border-box; padding: 22px; border-radius: 12px;
+  background: rgba(16, 20, 24, 0.97); border: 1px solid #2f3940; display: flex; flex-direction: column; gap: 12px; }
+#practice-menu.is-open ~ #practice-respawn .pr-card { margin-right: 440px; }
+#practice-respawn .pr-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+#practice-respawn h2 { margin: 0; font-size: 32px; }
+#practice-respawn .pr-chip { font-size: 15px; padding: 3px 10px; border-radius: 999px; background: #1f2e3a; color: #a9d4f5; border: 1px solid #3f6a8a; }
+#practice-respawn .pr-bar { display: flex; align-items: center; gap: 12px; }
+#practice-respawn .pr-track { flex: 1; height: 6px; border-radius: 3px; background: #2b343b; overflow: hidden; }
+#practice-respawn .pr-fill { height: 100%; background: #6fbf73; }
+#practice-respawn .pr-fill.is-held { background: #6c7780; }
+#practice-respawn .pr-status { color: #f0cf7a; }
+#practice-respawn .pr-guns { display: flex; gap: 10px; }
+#practice-respawn .pr-gun { flex: 1; min-height: 72px; border-radius: 8px; background: #1a2127; border: 1px solid #33404a; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+#practice-respawn .pr-gun span:first-child { width: 64px; height: 36px; background: center / contain no-repeat; }
+#practice-respawn .pr-actions { display: flex; gap: 12px; }
+#practice-respawn .pr-actions > * { flex: 1; }
 #practice-stats {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   background: rgba(0,0,0,0.45); border-radius: 6px; padding: 4px 12px; color: #fff;
@@ -105,6 +90,7 @@ const Css = `
   text-shadow: 0 1px 2px #000;
 }
 #practice-stats.is-visible { display: block; }
+#practice-menu.is-open ~ #practice-stats { left: calc(50% - 220px); }
 #practice-stats .pm-hint { color: #9aa6ad; margin-left: 10px; }
 body.ui-practice-mode #ui-specops-hud,
 body.ui-practice-mode #ui-specops-phase,
@@ -118,7 +104,7 @@ body.ui-practice-mode #ui-specops-wait {
 }
 `;
 
-/** Item categories offered by "Give item", in menu order. */
+/** Item categories offered by "Spawn items and perks", in menu order. */
 const GiveCategories: Array<[string, string]> = [
     ["gun", "Guns"],
     ["melee", "Melee"],
@@ -150,69 +136,67 @@ function giveItemGroups(): Array<{ label: string; items: string[] }> {
     })).filter((g) => g.items.length > 0);
 }
 
-const KitItemLabels: Record<string, string> = {
-    bandage: "Bandages",
-    healthkit: "Med kits",
-    soda: "Sodas",
-    painkiller: "Pills",
-    frag: "Frags",
-    smoke: "Smokes",
-    mirv: "MIRVs",
-};
+type Tab = "loadout" | "bots" | "tools";
+/** What the Loadout / Bots tab shows: its overview rows, or one editor section. */
+type Section = "" | "guns" | "gear" | "bot";
 
-function loadSettings(): PracticeSettings {
-    try {
-        const raw = localStorage.getItem(StorageKey);
-        if (raw) return sanitizePracticeSettings(JSON.parse(raw));
-    } catch {
-        // Private mode or corrupt data: fall back to defaults.
-    }
-    return sanitizePracticeSettings(undefined);
-}
-
-function saveSettings(settings: PracticeSettings) {
-    try {
-        localStorage.setItem(StorageKey, JSON.stringify(settings));
-    } catch {
-        // Storage unavailable; settings just won't be remembered.
-    }
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(
-    tag: K,
-    attrs: Record<string, string> = {},
-    text?: string,
-): HTMLElementTagNameMap[K] {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-    if (text !== undefined) node.textContent = text;
-    return node;
+/** The parts of a setup the Apply bar counts as separate changes. */
+function changeGroups(s: PracticeSettings): string[] {
+    const { melee, helmet, vest, backpack, scope, fillAmmo, counts } = s.kit;
+    return [
+        s.primary,
+        s.secondary,
+        melee,
+        JSON.stringify([helmet, vest, backpack, scope]),
+        JSON.stringify([fillAmmo, counts]),
+        ...s.bots.map((b) => JSON.stringify(b)),
+        `bots:${s.bots.length}`,
+        JSON.stringify([s.respawnMode, s.respawnDelay]),
+    ];
 }
 
 /**
- * Practice mode panel (Tab key). Opens on its own when the match starts and when
- * you die, so you can change your loadout before respawning.
+ * Practice panel in a match (Tab): a drawer on the right with Loadout, Bots and
+ * Tools. Matches start right away with the loadout picked on the home screen;
+ * Apply sends changes and saves them to that loadout. When you die, a respawn
+ * card lets you change guns; touching anything pauses the auto-respawn.
  */
-export class PracticeMenu {
+export class PracticeMenu implements EditorHost {
     open = false;
-    settings: PracticeSettings = loadSettings();
+    /** What the drawer is editing (sent with Apply). */
+    settings: PracticeSettings = activePracticeSettings();
+    state: EditorState = newEditorState();
+    private applied: PracticeSettings = structuredClone(this.settings);
     private stats: PracticeStats = emptyPracticeStats();
     private root!: HTMLDivElement;
+    private respawnRoot!: HTMLDivElement;
     private statsElem!: HTMLDivElement;
     private started = false;
     private dead = false;
-    private respawnAt = 0;
+    private diedAt = 0;
+    /** Countdown left when the auto-respawn was paused (the bar stops there). */
+    private heldLeft: number = PracticePlayerRespawnDelay;
+    private held = false;
+    private killedBy = "";
     private respawnTimer = 0;
-
+    private respawnFill?: HTMLElement;
+    private respawnStatus?: HTMLElement;
+    private tab: Tab = "loadout";
+    private section: Section = "";
     private giveItem = "";
     private giveCount = 1;
-    private activeTab: "player" | "bots" = "player";
-    private resizeObserver?: ResizeObserver;
-    private layoutSaveTimer = 0;
+    private note = "";
+
+    private readonly onKey = (e: KeyboardEvent) => {
+        if (!this.dead || e.code !== "Space" || PracticeMenu.focusInField()) return;
+        e.preventDefault();
+        this.respawnNow();
+    };
 
     constructor(
         private readonly send: (settings: PracticeSettings) => void,
         private readonly sendGive: (item: string, count: number, clear: boolean, respawnBots?: boolean) => void,
+        private readonly sendRespawn: (hold: boolean, now: boolean) => void,
     ) {}
 
     init() {
@@ -221,58 +205,50 @@ export class PracticeMenu {
             style.textContent = Css;
             document.head.appendChild(style);
         }
-        document.getElementById("practice-menu")?.remove();
-        document.getElementById("practice-stats")?.remove();
+        ensureEditorCss();
+        for (const id of ["practice-menu", "practice-respawn", "practice-stats"]) document.getElementById(id)?.remove();
 
-        this.root = el("div", { id: "practice-menu" });
-        // Keep clicks and scrolling in the panel from reaching the game's input.
-        this.root.addEventListener("mousedown", (e) => e.stopPropagation());
-        this.root.addEventListener("wheel", (e) => e.stopPropagation());
-        // Typing a number or picking from a list must not move or switch weapons.
-        const stopKeys = (e: KeyboardEvent) => {
-            // Tab always reaches the game so it can close the panel.
-            if (e.keyCode === 9) return;
-            const target = e.target as HTMLElement;
-            if (target.matches("input, select, textarea, button")) {
-                e.stopPropagation();
-            }
-        };
-        this.root.addEventListener("keydown", stopKeys);
-        this.root.addEventListener("keyup", stopKeys);
-        // Buttons shouldn't keep focus, or game keys would go to them.
-        this.root.addEventListener("click", (e) => {
-            const target = e.target as HTMLElement;
-            if (target.tagName === "BUTTON" && e.detail > 0) target.blur();
-        });
-        document.body.appendChild(this.root);
-        this.restoreLayout();
-        // Remember the size after the player resizes the panel (corner handle).
-        if (typeof ResizeObserver !== "undefined") {
-            this.resizeObserver = new ResizeObserver(() => {
-                if (this.open) this.saveLayoutSoon();
+        this.root = el("div", { id: "practice-menu", class: "pe", role: "dialog", "aria-label": "Practice" });
+        this.respawnRoot = el("div", { id: "practice-respawn", class: "pe" });
+        for (const node of [this.root, this.respawnRoot]) {
+            // Keep clicks, scrolling and typing in the panel away from the game's input.
+            node.addEventListener("mousedown", (e) => e.stopPropagation());
+            node.addEventListener("wheel", (e) => e.stopPropagation());
+            const stopKeys = (e: KeyboardEvent) => {
+                if (e.keyCode === 9) return; // Tab still reaches the game to close the panel
+                if ((e.target as HTMLElement).matches("input, select, textarea, button")) e.stopPropagation();
+            };
+            node.addEventListener("keydown", stopKeys);
+            node.addEventListener("keyup", stopKeys);
+            // Buttons shouldn't keep focus, or game keys would go to them.
+            node.addEventListener("click", (e) => {
+                const target = e.target as HTMLElement;
+                if (target.tagName === "BUTTON" && e.detail > 0) target.blur();
             });
-            this.resizeObserver.observe(this.root);
         }
-        window.addEventListener("resize", this.onWindowResize);
-
+        document.body.append(this.root, this.respawnRoot);
         this.statsElem = el("div", { id: "practice-stats" });
         document.body.appendChild(this.statsElem);
         document.body.classList.add("ui-practice-mode");
+        window.addEventListener("keydown", this.onKey);
 
-        this.started = false;
+        // Start with the home-screen loadout right away; Tab opens the panel.
+        this.settings = activePracticeSettings();
+        this.applied = structuredClone(this.settings);
+        this.send(this.settings);
+        this.started = true;
         this.dead = false;
         this.stats = emptyPracticeStats();
         this.renderStats();
         this.statsElem.classList.add("is-visible");
-        this.show();
     }
 
     destroy() {
-        this.resizeObserver?.disconnect();
-        window.removeEventListener("resize", this.onWindowResize);
-        this.root?.remove();
-        this.statsElem?.remove();
+        window.removeEventListener("keydown", this.onKey);
         window.clearInterval(this.respawnTimer);
+        this.root?.remove();
+        this.respawnRoot?.remove();
+        this.statsElem?.remove();
         document.body.classList.remove("ui-practice-mode");
         this.open = false;
     }
@@ -282,90 +258,34 @@ export class PracticeMenu {
         else this.show();
     }
 
-    /* ── Drag / resize ─────────────────────────────────────────────────── */
-
-    private startDrag(e: MouseEvent) {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const rect = this.root.getBoundingClientRect();
-        const offsetX = e.clientX - rect.left;
-        const offsetY = e.clientY - rect.top;
-        const move = (ev: MouseEvent) => {
-            this.placeAt(ev.clientX - offsetX, ev.clientY - offsetY);
-        };
-        const up = () => {
-            window.removeEventListener("mousemove", move);
-            window.removeEventListener("mouseup", up);
-            this.saveLayoutSoon();
-        };
-        window.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", up);
-    }
-
-    /** Move the panel, keeping at least its header on screen. */
-    private placeAt(left: number, top: number) {
-        const w = this.root.offsetWidth || 400;
-        const maxLeft = Math.max(0, window.innerWidth - Math.min(w, 120));
-        const maxTop = Math.max(0, window.innerHeight - 48);
-        this.root.style.left = `${Math.round(Math.min(Math.max(left, Math.min(0, 120 - w)), maxLeft))}px`;
-        this.root.style.top = `${Math.round(Math.min(Math.max(top, 0), maxTop))}px`;
-    }
-
-    private readonly onWindowResize = () => {
-        if (!this.open) return;
-        const rect = this.root.getBoundingClientRect();
-        this.placeAt(rect.left, rect.top);
-    };
-
-    private restoreLayout() {
-        let layout: PanelLayout | undefined;
-        try {
-            const raw = localStorage.getItem(LayoutKey);
-            if (raw) layout = JSON.parse(raw) as PanelLayout;
-        } catch {
-            // No saved layout.
-        }
-        if (layout && [layout.left, layout.top, layout.width, layout.height].every(Number.isFinite)) {
-            this.root.style.width = `${Math.max(340, Math.min(layout.width, window.innerWidth - 8))}px`;
-            this.root.style.height = `${Math.max(220, Math.min(layout.height, window.innerHeight - 8))}px`;
-            this.placeAt(layout.left, layout.top);
-        } else {
-            // First time: centre it.
-            const w = Math.min(560, window.innerWidth - 32);
-            const h = Math.min(720, window.innerHeight - 48);
-            this.placeAt((window.innerWidth - w) / 2, (window.innerHeight - h) / 2);
-        }
-    }
-
-    private saveLayoutSoon() {
-        window.clearTimeout(this.layoutSaveTimer);
-        this.layoutSaveTimer = window.setTimeout(() => {
-            const rect = this.root.getBoundingClientRect();
-            if (rect.width <= 0) return;
-            const layout: PanelLayout = {
-                left: Math.round(rect.left),
-                top: Math.round(rect.top),
-                width: Math.round(rect.width),
-                height: Math.round(rect.height),
-            };
-            try {
-                localStorage.setItem(LayoutKey, JSON.stringify(layout));
-            } catch {
-                // Not remembered; harmless.
-            }
-        }, 250);
-    }
-
     show() {
         this.open = true;
-        this.render();
         this.root.classList.add("is-open");
+        this.render();
+        if (this.dead) this.hold();
     }
 
     hide() {
-        if (!this.started) return; // first setup must be applied
         this.open = false;
         this.root.classList.remove("is-open");
+    }
+
+    setStats(stats: PracticeStats) {
+        this.stats = stats;
+        this.renderStats();
+    }
+
+    /** Who killed you, for the respawn card. */
+    setKilledBy(text: string) {
+        this.killedBy = text;
+        if (this.dead) this.renderRespawn();
+    }
+
+    /** True if a key press should not drive the game (typing in a field). */
+    static focusInField(): boolean {
+        const active = document.activeElement;
+        return !!active && ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
+            && !(active instanceof HTMLInputElement && active.type === "range");
     }
 
     /** Called every frame with whether the local player is dead. */
@@ -374,43 +294,86 @@ export class PracticeMenu {
         this.dead = dead;
         window.clearInterval(this.respawnTimer);
         if (dead) {
-            this.respawnAt = performance.now() + PracticePlayerRespawnDelay * 1000;
-            this.respawnTimer = window.setInterval(() => this.updateRespawnText(), 200);
-            this.show();
-        } else if (this.open && this.started) {
-            this.hide();
+            this.diedAt = performance.now();
+            this.heldLeft = PracticePlayerRespawnDelay;
+            this.held = false;
+            if (!loadAutoRespawn()) this.hold();
+            this.respawnTimer = window.setInterval(() => this.updateRespawnBar(), 200);
+            this.respawnRoot.classList.add("is-open");
+            this.renderRespawn();
+        } else {
+            this.held = false;
+            this.killedBy = "";
+            this.respawnRoot.classList.remove("is-open");
+            if (this.open) this.hide();
         }
     }
 
-    setStats(stats: PracticeStats) {
-        this.stats = stats;
-        this.renderStats();
+    /* ── EditorHost ───────────────────────────────────────────────────── */
+
+    changed(): void {
+        this.render();
+        if (this.dead) {
+            this.hold();
+            this.renderRespawn();
+        }
     }
 
-    /** True if a key press should toggle the panel (not while typing in a field). */
-    static focusInField(): boolean {
-        const active = document.activeElement;
-        return !!active && ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
-            && !(active instanceof HTMLInputElement && active.type === "range");
+    showSection(section: "guns" | "bots"): void {
+        if (section === "guns") {
+            this.section = "guns";
+        } else {
+            this.tab = "bots";
+            this.section = "bot";
+        }
+        this.render();
     }
 
+    respawnBotsNow(): void {
+        this.sendGive("", 1, false, true);
+    }
+
+    /* ── Apply / respawn ──────────────────────────────────────────────── */
+
+    private get changeCount(): number {
+        const now = changeGroups(this.settings);
+        const before = changeGroups(this.applied);
+        const n = Math.max(now.length, before.length);
+        let count = 0;
+        for (let i = 0; i < n; i++) if (now[i] !== before[i]) count++;
+        return count;
+    }
+
+    /** Send the setup and save it to the loadout picked on the home screen. */
     private apply() {
         this.settings = sanitizePracticeSettings(this.settings);
-        saveSettings(this.settings);
         this.send(this.settings);
-        this.started = true;
-        if (!this.dead) this.hide();
-        else this.render();
+        this.applied = structuredClone(this.settings);
+        const store = loadPracticeLoadouts();
+        const active = activePracticeLoadout(store);
+        if (active) active.settings = structuredClone(this.settings);
+        else addPracticeLoadout(store, this.settings, newPracticeLoadoutId());
+        savePracticeLoadouts(store);
+        this.note = "";
+        if (this.dead) this.render();
+        else this.hide();
     }
 
-    private updateRespawnText() {
-        const node = this.root.querySelector(".pm-respawn");
-        if (!node) return;
-        const left = Math.max(0, Math.ceil((this.respawnAt - performance.now()) / 1000));
-        node.textContent = left > 0
-            ? `Respawning in ${left}… change your kit below.`
-            : "Respawning…";
+    /** Pause the auto-respawn: you are changing your loadout. */
+    private hold() {
+        if (!this.dead || this.held) return;
+        this.held = true;
+        this.sendRespawn(true, false);
+        this.renderRespawn();
     }
+
+    private respawnNow() {
+        if (!this.dead) return;
+        if (this.changeCount > 0) this.apply();
+        this.sendRespawn(false, true);
+    }
+
+    /* ── Rendering ────────────────────────────────────────────────────── */
 
     private renderStats() {
         if (!this.statsElem) return;
@@ -426,228 +389,166 @@ export class PracticeMenu {
         );
     }
 
-    private render() {
-        const root = this.root;
-        root.innerHTML = "";
-        const header = el("div", { class: "pm-drag", title: "Drag to move · resize from the bottom-right corner" });
-        header.append(el("h2", {}, "Practice"), el("span", { class: "pm-drag-hint" }, "drag to move"));
-        header.addEventListener("mousedown", (e) => this.startDrag(e));
-        root.append(header);
-        root.append(el(
-            "p",
-            { class: "pm-sub" },
-            this.started
-                ? "Change bots or your kit. Bots restart only when their settings change."
-                : "Set up your bots and loadout, then start.",
-        ));
-        if (this.dead) {
-            root.append(el("p", { class: "pm-respawn" }));
-            this.updateRespawnText();
-        }
+    private openEditor(tab: Tab, section: Section) {
+        this.tab = tab;
+        this.section = section;
+        if (!this.open) this.show();
+        else this.render();
+        if (this.dead) this.hold();
+    }
 
-        const tabs = el("div", { class: "pm-tabs", role: "tablist", "aria-label": "Practice settings" });
-        for (const [id, label] of [["player", "Your setup"], ["bots", "Bots"]] as const) {
-            const button = el("button", {
-                type: "button",
-                role: "tab",
-                class: "pm-tab",
-                id: `pm-tab-${id}`,
-                "aria-controls": `pm-panel-${id}`,
-            }, label);
-            button.addEventListener("click", () => this.selectTab(id));
-            button.addEventListener("keydown", (e) => {
-                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const next = e.key === "Home" ? "player" : e.key === "End"
-                    ? "bots"
-                    : this.activeTab === "player"
-                    ? "bots"
-                    : "player";
-                this.selectTab(next);
-                this.root.querySelector<HTMLElement>(`#pm-tab-${next}`)?.focus();
+    private render() {
+        if (!this.open) return;
+        const root = this.root;
+        const scroll = root.querySelector(".pm-body")?.scrollTop ?? 0;
+        root.innerHTML = "";
+
+        const head = el("header", { class: "pm-head" });
+        const top = el("div", { class: "pm-head-row" });
+        top.append(el("h2", {}, "Practice"));
+        const close = el("button", { type: "button", class: "pm-close", "aria-label": "Close" }, "✕");
+        close.addEventListener("click", () => this.hide());
+        top.append(close);
+        head.append(top, this.renderLoadoutPicker());
+        root.append(head);
+
+        const tabs = el("nav", { class: "pm-tabs", role: "tablist", "aria-label": "Practice sections" });
+        for (const [id, label] of [["loadout", "Loadout"], ["bots", "Bots"], ["tools", "Tools"]] as const) {
+            const b = el("button", { type: "button", role: "tab", "aria-selected": String(this.tab === id) }, label);
+            b.addEventListener("click", () => {
+                this.tab = id;
+                this.section = "";
+                this.render();
             });
-            tabs.append(button);
+            tabs.append(b);
         }
         root.append(tabs);
-        const playerPanel = el("div", { role: "tabpanel", id: "pm-panel-player", "aria-labelledby": "pm-tab-player" });
-        const botPanel = el("div", { role: "tabpanel", id: "pm-panel-bots", "aria-labelledby": "pm-tab-bots" });
-        root.append(playerPanel, botPanel);
-        playerPanel.append(el("h3", {}, "Your spawn loadout"));
-        playerPanel.append(this.gunRow("Primary", this.settings.primary, false, false, (v) => {
-            this.settings.primary = v;
-        }));
-        playerPanel.append(this.gunRow("Secondary", this.settings.secondary, false, true, (v) => {
-            this.settings.secondary = v;
-        }));
-        this.renderKit(playerPanel);
-        this.renderGive(playerPanel);
 
-        botPanel.append(el("h3", {}, "Bots"));
-        const countRow = el("div", { class: "pm-row" });
-        countRow.append(el("label", {}, "How many"));
-        const count = el("div", { class: "pm-count" });
-        for (let n = 1; n <= PracticeMaxBots; n++) {
-            const btn = el("button", { type: "button" }, String(n));
-            if (n === this.settings.bots.length) btn.classList.add("is-active");
-            btn.addEventListener("click", () => this.setBotCount(n));
-            count.append(btn);
-        }
-        countRow.append(count);
-        botPanel.append(countRow);
-        this.renderRespawn(botPanel);
-
-        this.settings.bots.forEach((bot, i) => botPanel.append(this.botCard(bot, i)));
-        this.selectTab(this.activeTab);
-
-        const actions = el("div", { class: "pm-actions" });
-        if (this.started && !this.dead) {
-            const close = el("button", { type: "button" }, "Close");
-            close.addEventListener("click", () => this.hide());
-            actions.append(close);
-        }
-        const apply = el(
-            "button",
-            { type: "button", class: "pm-apply" },
-            this.started ? (this.dead ? "Save setup" : "Apply") : "Start",
-        );
-        apply.addEventListener("click", () => this.apply());
-        actions.append(apply);
-        root.append(actions);
-    }
-
-    private selectTab(tab: "player" | "bots") {
-        this.activeTab = tab;
-        for (const id of ["player", "bots"]) {
-            const active = id === tab;
-            const button = this.root.querySelector<HTMLElement>(`#pm-tab-${id}`);
-            button?.setAttribute("aria-selected", String(active));
-            if (button) button.tabIndex = active ? 0 : -1;
-            const panel = this.root.querySelector<HTMLElement>(`#pm-panel-${id}`);
-            if (panel) panel.hidden = !active;
-        }
-    }
-
-    private renderKit(root: HTMLElement) {
-        const kit = this.settings.kit;
-
-        const meleeRow = el("div", { class: "pm-row" });
-        meleeRow.append(el("label", {}, "Melee"));
-        const melee = el("select");
-        for (const type of PracticeMelees) melee.append(el("option", { value: type }, itemLabel(type)));
-        melee.value = kit.melee;
-        melee.addEventListener("change", () => {
-            kit.melee = melee.value;
-        });
-        meleeRow.append(melee);
-        root.append(meleeRow);
-
-        const level = (v: number) => (v === 0 ? "None" : `Lv ${v}`);
-        root.append(this.slider("Helmet", kit.helmet, 0, PracticeMaxGearLevel, level, (v) => {
-            kit.helmet = v;
-        }));
-        root.append(this.slider("Vest", kit.vest, 0, PracticeMaxGearLevel, level, (v) => {
-            kit.vest = v;
-        }));
-        root.append(this.slider("Backpack", kit.backpack, 0, PracticeMaxPackLevel, (v) => `Lv ${v}`, (v) => {
-            kit.backpack = v;
-        }));
-
-        const scopeRow = el("div", { class: "pm-row" });
-        scopeRow.append(el("label", {}, "Scope"));
-        const scope = el("select");
-        for (const type of PracticeScopes) scope.append(el("option", { value: type }, type.replace("scope", "")));
-        scope.value = kit.scope;
-        scope.addEventListener("change", () => {
-            kit.scope = scope.value;
-        });
-        scopeRow.append(scope);
-        root.append(scopeRow);
-
-        const grid = el("div", { class: "pm-grid" });
-        for (const item of PracticeKitItems) {
-            const label = el("label", {}, KitItemLabels[item] ?? item);
-            const input = el("input", {
-                type: "number",
-                min: "0",
-                max: String(PracticeKitMaxCount),
-                step: "1",
+        const body = el("div", { class: "pm-body", role: "tabpanel" });
+        if (this.section) {
+            const back = button("← Back", () => {
+                this.section = "";
+                this.state.gunTarget = { who: "you", slot: "primary" };
+                this.render();
             });
-            input.value = String(kit.counts[item]);
-            input.addEventListener("change", () => {
-                const n = Math.max(0, Math.min(PracticeKitMaxCount, Math.round(Number(input.value) || 0)));
-                kit.counts[item] = n;
-                input.value = String(n);
-            });
-            label.append(input);
-            grid.append(label);
+            back.classList.add("pm-back");
+            body.append(back);
         }
-        root.append(grid);
+        if (this.section === "guns") renderGuns(body, this);
+        else if (this.section === "gear") renderGear(body, this);
+        else if (this.section === "bot") renderBotEditor(body, this);
+        else if (this.tab === "loadout") this.renderLoadoutRows(body);
+        else if (this.tab === "bots") {
+            renderBotList(body, this, (i) => {
+                this.state.bot = i;
+                this.section = "bot";
+                this.render();
+            });
+            renderRespawnControls(body, this);
+            body.append(el("p", { class: "pe-muted" }, "Bots restart only when their own settings change."));
+        } else this.renderTools(body);
+        root.append(body);
 
-        const ammoRow = el("div", { class: "pm-row" });
-        ammoRow.append(el("label", {}, "Full ammo"));
-        const ammo = el("input", { type: "checkbox" });
-        ammo.checked = kit.fillAmmo;
-        ammo.addEventListener("change", () => {
-            kit.fillAmmo = ammo.checked;
-        });
-        ammoRow.append(ammo);
-        root.append(ammoRow);
+        const foot = el("footer", { class: "pm-foot" });
+        const n = this.changeCount;
+        foot.append(el("span", { class: `pm-changes${n ? "" : " is-none"}` }, this.note || (n ? `${n} change${n > 1 ? "s" : ""}` : "No changes")));
+        foot.append(button("Close", () => this.hide()));
+        const apply = button("Apply", () => this.apply(), "primary");
+        apply.disabled = n === 0;
+        foot.append(apply);
+        root.append(foot);
+        const newBody = root.querySelector(".pm-body");
+        if (newBody) newBody.scrollTop = scroll;
     }
 
-    private renderRespawn(root: HTMLElement) {
-        const modeRow = el("div", { class: "pm-row" });
-        modeRow.append(el("label", {}, "Bots respawn"));
-        const mode = el("select");
-        for (const m of PracticeRespawnModes) {
-            mode.append(el("option", { value: m }, PracticeRespawnModeLabels[m]));
+    /** Header picker: switch to another saved loadout, or copy a preset in. */
+    private renderLoadoutPicker(): HTMLElement {
+        const store = loadPracticeLoadouts();
+        const row = el("div", { class: "pm-head-row" });
+        row.append(el("span", { class: "pe-label" }, "LOADOUT"));
+        const select = el("select", { "aria-label": "Loadout" });
+        if (store.loadouts.length) {
+            const mine = el("optgroup", { label: "My loadouts" });
+            for (const l of store.loadouts) mine.append(el("option", { value: `l:${l.id}` }, l.name));
+            select.append(mine);
+        } else {
+            select.append(el("option", { value: "" }, "Default setup"));
         }
-        mode.value = this.settings.respawnMode;
-        modeRow.append(mode);
-        root.append(modeRow);
+        const presets = el("optgroup", { label: "Copy a preset in" });
+        for (const p of PracticePresets) presets.append(el("option", { value: `p:${p.id}` }, p.name));
+        select.append(presets);
+        select.value = store.activeId ? `l:${store.activeId}` : "";
+        select.addEventListener("change", () => {
+            const [kind, id] = [select.value.slice(0, 2), select.value.slice(2)];
+            if (kind === "l:") {
+                store.activeId = id;
+                savePracticeLoadouts(store);
+                this.settings = structuredClone(activePracticeLoadout(store)!.settings);
+                this.note = "Switched loadout. Apply to use it.";
+            } else if (kind === "p:") {
+                const preset = PracticePresets.find((p) => p.id === id);
+                if (preset) {
+                    this.settings = preset.settings();
+                    this.note = `${preset.name} copied in. Apply to use and save it.`;
+                }
+            }
+            this.changed();
+        });
+        row.append(select);
+        return row;
+    }
 
-        const delay = this.slider(
-            "Respawn delay",
-            this.settings.respawnDelay,
-            0,
-            PracticeMaxRespawnDelay,
-            (v) => `${(v / 10).toFixed(1)}s`,
-            (v) => {
-                this.settings.respawnDelay = v;
-            },
-        );
-        root.append(delay);
-
-        const syncDelay = () => {
-            // No delay to set when bots only come back on the button.
-            delay.style.opacity = this.settings.respawnMode === "off" ? "0.4" : "1";
+    private renderLoadoutRows(body: HTMLElement) {
+        const s = this.settings;
+        const a = this.applied;
+        body.append(sectionTitle("YOUR LOADOUT"));
+        const row = (label: string, icons: string[], text: string, changed: boolean, onOpen: () => void) => {
+            const r = el("button", { type: "button", class: `pm-row${changed ? " is-changed" : ""}` });
+            r.append(el("span", { class: "pe-label" }, label));
+            for (const icon of icons) {
+                const i = el("span", { class: "pm-row-icon" });
+                i.style.backgroundImage = `url(${icon})`;
+                r.append(i);
+            }
+            r.append(el("span", {}, text));
+            const end = el("span", { class: "pm-row-end" });
+            if (changed) end.append(el("span", { class: "pm-changed" }, "Changed"));
+            end.append("›");
+            r.append(end);
+            r.addEventListener("click", onOpen);
+            body.append(r);
         };
-        mode.addEventListener("change", () => {
-            this.settings.respawnMode = mode.value as PracticeRespawnMode;
-            syncDelay();
-        });
-        syncDelay();
-
-        const nowRow = el("div", { class: "pm-row" });
-        nowRow.append(el("label", {}, ""));
-        const now = el("button", { type: "button" }, "Respawn bots now");
-        now.style.cssText = "background:#2b343b;color:#e8ecef;border:1px solid #3f4a52;border-radius:6px;"
-            + "padding:6px 12px;font:inherit;cursor:pointer;";
-        now.addEventListener("click", () => this.sendGive("", 1, false, true));
-        nowRow.append(now);
-        root.append(nowRow);
-        root.append(el("p", { class: "pm-note" }, "Respawn mode and delay apply with Apply; bots already alive stay."));
+        const gun = (slot: "primary" | "secondary") => () => {
+            this.state.gunTarget = { who: "you", slot };
+            this.openEditor("loadout", "guns");
+        };
+        row("PRIMARY", s.primary ? [itemIcon(s.primary)] : [], itemName(s.primary), s.primary !== a.primary, gun("primary"));
+        row("SECONDARY", s.secondary ? [itemIcon(s.secondary)] : [], itemName(s.secondary), s.secondary !== a.secondary, gun("secondary"));
+        const gear = () => this.openEditor("loadout", "gear");
+        row("MELEE", [], itemName(s.kit.melee), s.kit.melee !== a.kit.melee, gear);
+        const k = s.kit;
+        const lv = (n: number) => (n ? `Lv ${n}` : "none");
+        row(
+            "GEAR",
+            [],
+            `Helmet ${lv(k.helmet)} · vest ${lv(k.vest)} · pack ${k.backpack} · ${k.scope.replace("scope", "")}`,
+            JSON.stringify([k.helmet, k.vest, k.backpack, k.scope]) !== JSON.stringify([a.kit.helmet, a.kit.vest, a.kit.backpack, a.kit.scope]),
+            gear,
+        );
+        const kit = Object.entries(k.counts).filter(([, n]) => n > 0).map(([t, n]) => `${n} ${itemName(t)}`);
+        row(
+            "KIT",
+            [],
+            `${kit.length ? kit.join(", ") : "Nothing extra"}${k.fillAmmo ? " · full ammo" : ""}`,
+            JSON.stringify([k.fillAmmo, k.counts]) !== JSON.stringify([a.kit.fillAmmo, a.kit.counts]),
+            gear,
+        );
+        body.append(el("p", { class: "pe-muted" }, "Your new loadout is given when you press Apply, and saved to the loadout picked above."));
     }
 
-    private renderGive(root: HTMLElement) {
-        root.append(el("h3", {}, "Spawn items and perks"));
-        root.append(
-            el(
-                "p",
-                { class: "pm-note" },
-                "Spawns a pickup near you. Walk over and pick it up to equip it. Perks work the same way.",
-            ),
-        );
+    private renderTools(body: HTMLElement) {
+        body.append(sectionTitle("SPAWN ITEMS AND PERKS"));
+        body.append(el("p", { class: "pe-muted" }, "Drops a pickup next to you. Walk over it to take it. Perks work the same way."));
         const row = el("div", { class: "pm-give" });
         const select = el("select", { "aria-label": "Item to spawn" });
         for (const group of giveItemGroups()) {
@@ -657,195 +558,96 @@ export class PracticeMenu {
         }
         if (this.giveItem) select.value = this.giveItem;
         this.giveItem = select.value;
-        select.addEventListener("change", () => {
-            this.giveItem = select.value;
-            syncCount();
-        });
-
-        const count = el("input", { type: "number", min: "1", max: "999", step: "1", title: "How many" });
-        count.value = String(this.giveCount);
+        const count = el("input", { type: "number", min: "1", max: "999", step: "1", "aria-label": "How many" });
         const syncCount = () => {
             const type = GameObjectDefs.typeToDefSafe(this.giveItem)?.type;
             count.disabled = !type || !["ammo", "heal", "boost", "throwable"].includes(type);
             if (count.disabled) this.giveCount = 1;
             count.value = String(this.giveCount);
         };
+        select.addEventListener("change", () => {
+            this.giveItem = select.value;
+            syncCount();
+        });
         syncCount();
         count.addEventListener("change", () => {
             this.giveCount = Math.max(1, Math.min(999, Math.round(Number(count.value) || 1)));
             count.value = String(this.giveCount);
         });
-
-        const give = el("button", { type: "button" }, "Spawn on ground");
-        give.addEventListener("click", () => this.sendGive(this.giveItem, this.giveCount, false));
-        const clear = el("button", { type: "button" }, "Clear inventory");
-        clear.addEventListener("click", () => this.sendGive("", 1, true));
-
-        row.append(select, count, give, clear);
-        root.append(row);
+        row.append(select, count, button("Spawn on ground", () => this.sendGive(this.giveItem, this.giveCount, false), "primary"));
+        body.append(row);
+        body.append(sectionTitle("INVENTORY"));
+        body.append(button("Clear inventory", () => this.sendGive("", 1, true)));
+        body.append(el("p", { class: "pe-muted" }, "Empties every slot, gear and your bag. Leaves fists and a 1x scope."));
+        body.append(sectionTitle("BOTS"));
+        body.append(button("Respawn bots now", () => this.respawnBotsNow()));
+        body.append(el("p", { class: "pe-muted" }, "These act right away. They don't need Apply."));
     }
 
-    private setBotCount(n: number) {
-        const bots = this.settings.bots.slice(0, n);
-        while (bots.length < n) {
-            const last = bots[bots.length - 1];
-            bots.push(last ? { ...last } : defaultPracticeBot());
-        }
-        this.settings.bots = bots;
-        this.render();
-    }
+    private renderRespawn() {
+        if (!this.dead) return;
+        const root = this.respawnRoot;
+        root.innerHTML = "";
+        const card = el("section", { class: "pr-card", "aria-label": "Respawn" });
+        const top = el("div", { class: "pr-top" });
+        top.append(el("h2", {}, "You died"), el("span", { class: "pr-chip" }, "Bots paused"));
+        card.append(top);
 
-    private gunRow(
-        label: string,
-        value: string,
-        allowRandom: boolean,
-        allowNone: boolean,
-        onChange: (v: string) => void,
-    ): HTMLDivElement {
-        const row = el("div", { class: "pm-row" });
-        row.append(el("label", {}, label));
-        const select = el("select", { "aria-label": label });
-        if (allowNone) select.append(el("option", { value: "" }, "None"));
-        if (allowRandom) select.append(el("option", { value: PracticeRandomGun }, "Random"));
-        for (const gun of PracticeGuns) {
-            select.append(el("option", { value: gun }, practiceGunName(gun)));
-        }
-        select.value = value;
-        select.addEventListener("change", () => onChange(select.value));
-        row.append(select);
-        return row;
-    }
+        const auto = loadAutoRespawn();
+        const bar = el("div", { class: "pr-bar" });
+        const track = el("div", { class: "pr-track" });
+        this.respawnFill = el("div", { class: "pr-fill" });
+        this.respawnStatus = el("span", { class: "pr-status" });
+        track.append(this.respawnFill);
+        bar.append(track, this.respawnStatus);
+        card.append(bar);
+        if (this.killedBy) card.append(el("div", { class: "pe-muted" }, this.killedBy));
 
-    private slider(
-        label: string,
-        value: number,
-        min: number,
-        max: number,
-        format: (v: number) => string,
-        onChange: (v: number) => void,
-    ): HTMLDivElement {
-        const row = el("div", { class: "pm-row" });
-        row.append(el("label", {}, label));
-        const input = el("input", {
-            type: "range",
-            "aria-label": label,
-            min: String(min),
-            max: String(max),
-            step: "1",
-        });
-        input.value = String(value);
-        const val = el("span", { class: "pm-val" }, format(value));
-        input.addEventListener("input", () => {
-            const v = Number(input.value);
-            val.textContent = format(v);
-            onChange(v);
-        });
-        row.append(input, val);
-        return row;
-    }
-
-    private botCard(bot: PracticeBotSettings, index: number): HTMLDivElement {
-        const card = el("div", { class: "pm-bot" });
-        card.append(el("div", { class: "pm-bot-title" }, `Bot ${index + 1}`));
-        card.append(this.gunRow("Primary gun", bot.gun, true, false, (v) => {
-            bot.gun = v;
-        }));
-        card.append(this.gunRow("Secondary gun", bot.secondary, true, true, (v) => {
-            bot.secondary = v;
-        }));
-        const meleeRow = el("div", { class: "pm-row" });
-        meleeRow.append(el("label", {}, "Melee"));
-        const melee = el("select", { "aria-label": `Bot ${index + 1} melee` });
-        for (const type of PracticeMelees) melee.append(el("option", { value: type }, itemLabel(type)));
-        melee.value = bot.melee;
-        melee.addEventListener("change", () => {
-            bot.melee = melee.value;
-        });
-        meleeRow.append(melee);
-        card.append(meleeRow);
-        for (const [key, label] of [["quickSwitch", "Quick switch"], ["autoMelee", "Auto melee"]] as const) {
-            const row = el("div", { class: "pm-row" });
-            row.append(el("label", {}, label));
-            const toggle = el("input", { type: "checkbox", "aria-label": `Bot ${index + 1} ${label}` });
-            toggle.checked = bot[key];
-            toggle.addEventListener("change", () => {
-                bot[key] = toggle.checked;
+        card.append(sectionTitle("RESPAWN WITH"));
+        const guns = el("div", { class: "pr-guns" });
+        for (const slot of ["primary", "secondary"] as const) {
+            const gun = slot === "primary" ? this.settings.primary : this.settings.secondary;
+            const b = el("button", { type: "button", class: "pr-gun" });
+            const icon = el("span");
+            if (gun) icon.style.backgroundImage = `url(${itemIcon(gun)})`;
+            b.append(icon, el("span", {}, `${itemName(gun)} · change`));
+            b.addEventListener("click", () => {
+                this.state.gunTarget = { who: "you", slot };
+                this.openEditor("loadout", "guns");
             });
-            row.append(toggle);
-            card.append(row);
+            guns.append(b);
         }
-        card.append(
-            el(
-                "p",
-                { class: "pm-note" },
-                "Quick switch uses normal equip delays. Auto melee engages at close range. Accuracy controls aim error, not gun spread.",
-            ),
+        card.append(guns);
+        const actions = el("div", { class: "pr-actions" });
+        actions.append(
+            button("Edit full loadout", () => this.openEditor("loadout", "")),
+            button("Respawn (Space)", () => this.respawnNow(), "primary"),
         );
-
-        const plain = (v: number) => String(v);
-        const advanced = el("details");
-        const strafe = this.slider("Strafe speed", bot.strafe, 0, PracticeSliderMax, plain, (v) => {
-            bot.strafe = v;
+        card.append(actions);
+        const autoRow = el("label", { class: "pe-toggle" });
+        const box = el("input", { type: "checkbox" });
+        box.checked = auto;
+        box.addEventListener("change", () => {
+            saveAutoRespawn(box.checked);
+            if (!box.checked) this.hold();
+            this.renderRespawn();
         });
-        const turn = this.slider("Direction change", bot.turn, 0, PracticeSliderMax, plain, (v) => {
-            bot.turn = v;
-        });
-        const dodge = this.slider("Aim dodging", bot.dodge, 0, PracticeSliderMax, plain, (v) => {
-            bot.dodge = v;
-        });
+        autoRow.append(box, `Auto-respawn after ${PracticePlayerRespawnDelay} s if I don't touch anything`);
+        card.append(autoRow);
+        card.append(el("p", { class: "pe-muted" }, "While you're down, bots freeze and dead bots wait. When you respawn, they start over with you."));
+        root.append(card);
+        this.updateRespawnBar();
+    }
 
-        card.append(this.slider("Wiggle", bot.wiggle, 0, PracticeSliderMax, plain, (v) => {
-            bot.wiggle = v;
-            Object.assign(bot, practiceWiggleToAdvanced(v));
-            // Move the advanced sliders to match.
-            const sync = (row: HTMLDivElement, value: number) => {
-                const input = row.querySelector("input")!;
-                input.value = String(value);
-                row.querySelector(".pm-val")!.textContent = String(value);
-            };
-            sync(strafe, bot.strafe);
-            sync(turn, bot.turn);
-            sync(dodge, bot.dodge);
-        }));
-
-        advanced.append(el("summary", {}, "Advanced movement"), strafe, turn, dodge);
-        card.append(advanced);
-
-        card.append(this.slider("Accuracy", bot.accuracy, 0, 100, (v) => `${v}%`, (v) => {
-            bot.accuracy = v;
-        }));
-        card.append(
-            this.slider(
-                "Reaction time",
-                bot.reaction,
-                0,
-                PracticeMaxReaction,
-                (v) => `${(v / 10).toFixed(1)}s`,
-                (v) => {
-                    bot.reaction = v;
-                },
-            ),
-        );
-        card.append(
-            this.slider("Health", bot.health, PracticeMinBotHealth, PracticeMaxBotHealth, plain, (v) => {
-                bot.health = v;
-            }),
-        );
-        card.append(
-            this.slider("Armor level", bot.armor, 0, PracticeMaxArmor, (v) => (v === 0 ? "None" : `Lv ${v}`), (v) => {
-                bot.armor = v;
-            }),
-        );
-
-        const fireRow = el("div", { class: "pm-row" });
-        fireRow.append(el("label", {}, "Shoots back"));
-        const fire = el("input", { type: "checkbox", "aria-label": `Bot ${index + 1} Shoots back` });
-        fire.checked = bot.shootsBack;
-        fire.addEventListener("change", () => {
-            bot.shootsBack = fire.checked;
-        });
-        fireRow.append(fire);
-        card.append(fireRow);
-        return card;
+    /** Countdown bar and text only, so the card's buttons are never replaced mid-click. */
+    private updateRespawnBar() {
+        if (!this.dead || !this.respawnFill || !this.respawnStatus) return;
+        if (!this.held) this.heldLeft = Math.max(0, PracticePlayerRespawnDelay - (performance.now() - this.diedAt) / 1000);
+        const left = this.heldLeft;
+        this.respawnFill.classList.toggle("is-held", this.held);
+        this.respawnFill.style.width = `${Math.round((1 - left / PracticePlayerRespawnDelay) * 100)}%`;
+        this.respawnStatus.textContent = this.held
+            ? (loadAutoRespawn() ? "Auto-respawn paused: you're editing" : "Waiting for you")
+            : `Respawning in ${Math.ceil(left)}`;
     }
 }

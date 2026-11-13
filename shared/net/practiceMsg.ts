@@ -137,6 +137,25 @@ export class PracticeGiveMsg implements AbstractMsg {
     }
 }
 
+/**
+ * Client → server, while dead: hold the 3 s auto-respawn (you are changing your
+ * loadout), release it, or respawn right now.
+ */
+export class PracticeRespawnMsg implements AbstractMsg {
+    hold = false;
+    now = false;
+
+    serialize(s: BitStream) {
+        s.writeBoolean(this.hold);
+        s.writeBoolean(this.now);
+    }
+
+    deserialize(s: BitStream) {
+        this.hold = s.readBoolean();
+        this.now = s.readBoolean();
+    }
+}
+
 /** Server → client: running practice stats for the HUD. */
 export class PracticeStatsMsg implements AbstractMsg {
     stats: PracticeStats = emptyPracticeStats();

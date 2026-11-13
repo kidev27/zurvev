@@ -91,14 +91,28 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 
 | ID | Title | Mode | Priority | Status | Depends on | Relevant files | Testing | Blockers |
 |---|---|---|---|---|---|---|---|---|
-| PRA-001 | Practice presets | Practice | P2 | Ready | None | `shared/practice.ts`, `client/src/ui/practiceMenu.ts` | Not started | Default preset list needs approval |
-| PRA-002 | Saved loadouts | Practice | P2 | Ready | PRA-001 storage format | `shared/practice.ts`, `client/src/ui/practiceMenu.ts` | Not started | Persistence choice (recommended: browser storage, as settings already are) |
+| PRA-001 | Practice presets | Practice | P2 | Needs Playtesting | None | `shared/practice.ts`, `client/src/ui/practiceLoadoutMenu.ts` | `practice.test.ts` (presets valid, fresh copies, server applies SPAS-12 + Mosin) | Live check in the game |
+| PRA-002 | Saved loadouts | Practice | P2 | Needs Playtesting | None | `shared/practice.ts`, `client/src/ui/practiceLoadouts.ts`, `client/src/ui/practiceLoadoutMenu.ts`, `client/src/main.ts` | `practice.test.ts` (store sanitizing, Loadout N names, cap of 8); browser run of the loadout screen | Live check in the game |
+| PRA-004 | Practice menu redesign and respawn when ready | Practice | P2 | Needs Playtesting | PRA-001 | `client/src/ui/practiceEditor.ts`, `client/src/ui/practiceMenu.ts`, `server/src/game/practiceController.ts`, `shared/net/practiceMsg.ts` | `practice.test.ts` 59/59 (bots freeze while dead, hold and Respawn now, bots restart); scripted browser run, 25 checks | Live check in the game |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
 
 ### Notes
 
 - Practice already saves one settings blob in browser storage (`practiceMenu.ts`). Presets and loadouts
   can extend that format.
+- Presets (`PracticePresets` in `shared/practice.ts`): Default, Moving targets (4 bots, never shoot back,
+  wiggle/strafe/turn/dodge 8, respawn 0.5 s) and SPAS-12 + Mosin (4x scope, level 2 armor; 1 bot with the
+  same guns and armor). They are templates: the loadout screen copies one into the open loadout.
+- Saved loadouts: up to 8 on this device, named Loadout 1, 2… (rename any time). The home page shows a
+  "Practice loadout" dropdown with Edit, or "No loadouts saved · click to create one". A match starts with
+  the picked loadout right away; Apply in the match saves changes back to it. The old single settings blob
+  becomes Loadout 1 on first run.
+- Loadout screen (home): Presets / Guns / Gear & kit / Bots tabs in the Survivor Kit theme. Bot skill buttons:
+  Easy 30% / 1.0 s / wiggle 3, Normal 50% / 0.5 s / 5, Hard 80% / 0.2 s / 8 (`PracticeBotSkills`).
+- In the match, Tab opens a drawer on the right (Loadout / Bots / Tools) with Changed badges and an Apply bar.
+- Respawn when ready: while you are dead, bots freeze and dead bots wait. Touching the loadout pauses the
+  3 s auto-respawn; Respawn (Space) brings you back and the bots start over. Auto-respawn can be turned off.
+  Protocol 1042 (`PracticeRespawnMsg`).
 - The server already uses Survev switch rules: per-gun `switchDelay` plus a 1 s free-switch cooldown.
   Resurviv runs on the same Survev code. Timings for the other profiles are not yet sourced.
 

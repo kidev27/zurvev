@@ -1557,6 +1557,12 @@ export class Game {
                             giveMsg.respawnBots = !!respawnBots;
                             this.m_sendMessage(net.MsgType.PracticeGive, giveMsg, 64);
                         },
+                        (hold, now) => {
+                            const respawnMsg = new net.PracticeRespawnMsg();
+                            respawnMsg.hold = hold;
+                            respawnMsg.now = now;
+                            this.m_sendMessage(net.MsgType.PracticeRespawn, respawnMsg, 8);
+                        },
                     );
                     this.m_practiceMenu.init();
                 }
@@ -1625,6 +1631,14 @@ export class Game {
                     this.m_activeId,
                     true,
                 );
+                if (this.m_practiceMenu && msg.killed && msg.targetId == this.m_localId) {
+                    // Plain text (set with textContent), so use the raw name.
+                    const weapon = GameObjectDefs.typeToDefSafe(sourceType) as { name?: string } | undefined;
+                    const by = msg.killCreditId && msg.killCreditId != msg.targetId ? killerName : "";
+                    this.m_practiceMenu.setKilledBy(
+                        by ? `Killed by ${by}${weapon?.name ? ` · ${weapon.name}` : ""}` : "",
+                    );
+                }
                 targetName = helpers.htmlEscape(targetName);
                 killerName = helpers.htmlEscape(killerName);
                 killfeedKillerName = helpers.htmlEscape(killfeedKillerName);

@@ -7,22 +7,38 @@ import { MapDefs } from "../../shared/defs/mapDefs.ts";
 import { isPracticeMapName, PracticeMapPool } from "../../shared/defs/maps/practiceDefs.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { BitStream } from "../../shared/net/net.ts";
-import { PracticeGiveMsg, PracticeSettingsMsg, PracticeStatsMsg } from "../../shared/net/practiceMsg.ts";
 import {
+    PracticeGiveMsg,
+    PracticeRespawnMsg,
+    PracticeSettingsMsg,
+    PracticeStatsMsg,
+} from "../../shared/net/practiceMsg.ts";
+import {
+    activePracticeLoadout,
+    addPracticeLoadout,
     defaultPracticeBot,
     defaultPracticeKit,
     defaultPracticeSettings,
     practiceAimErrorDeg,
     PracticeBotRespawnDelay,
     practiceFlipInterval,
+    PracticeBotSkills,
+    practiceBotSkillOf,
+    practiceGunGroup,
+    PracticeGunGroups,
     PracticeGuns,
+    PracticeMaxLoadouts,
     PracticeMaxBotHealth,
     PracticeMaxBots,
     PracticePlayerRespawnDelay,
+    PracticePresets,
     PracticeRandomGun,
     type PracticeSettings,
     practiceWiggleToAdvanced,
+    removePracticeLoadout,
+    sanitizePracticeLoadoutStore,
     sanitizePracticeSettings,
+    withPracticeBotSkill,
 } from "../../shared/practice.ts";
 import { v2 } from "../../shared/utils/v2.ts";
 import { createGame } from "./gameTestHelpers.ts";
@@ -775,3 +791,155 @@ test.each(["ppsh41", "mp40", "fal", "rpd", "winchester1887", "pkp", "raygun", "g
         expect(game.lootBarn.loots.some(loot => loot.type === type && !loot.destroyed)).toBe(true);
     },
 );
+
+test("every Practice preset is valid as-is and returns a fresh copy", () => {
+    expect(PracticePresets.map((p) => p.id)).toEqual(["default", "moving_targets", "spas_mosin"]);
+    for (const preset of PracticePresets) {
+        const settings = preset.settings();
+        expect(sanitizePracticeSettings(structuredClone(settings)), preset.id).toEqual(settings);
+        settings.bots[0].gun = "mp5";
+        settings.kit.helmet = 4;
+        expect(preset.settings(), preset.id).not.toEqual(settings);
+    }
+    expect(PracticePresets[0].settings()).toEqual(defaultPracticeSettings());
+});
+
+test("Moving targets: 4 bots that dodge hard and never shoot back", () => {
+    const settings = PracticePresets.find((p) => p.id === "moving_targets")!.settings();
+    expect(settings.bots).toHaveLength(PracticeMaxBots);
+    for (const bot of settings.bots) {
+        expect(bot.shootsBack).toBe(false);
+        expect([bot.wiggle, bot.strafe, bot.turn, bot.dodge]).toEqual([8, 8, 8, 8]);
+    }
+    expect(settings.respawnMode).toBe("each");
+    expect(settings.respawnDelay).toBe(5);
+});
+
+test("SPAS-12 + Mosin: 4x scope and level 2 armor for you and the bot", () => {
+    const settings = PracticePresets.find((p) => p.id === "spas_mosin")!.settings();
+    expect([settings.primary, settings.secondary]).toEqual(["spas12", "mosin"]);
+    expect([settings.kit.helmet, settings.kit.vest, settings.kit.scope]).toEqual([2, 2, "4xscope"]);
+    expect(settings.bots).toHaveLength(1);
+    expect([settings.bots[0].gun, settings.bots[0].secondary, settings.bots[0].armor]).toEqual(["spas12", "mosin", 2]);
+});
+
+test("starting from the SPAS-12 + Mosin preset gives you and the bot that loadout", () => {
+    const preset = PracticePresets.find((p) => p.id === "spas_mosin")!.settings();
+    const { game, player } = startPractice({ ...preset, bots: [{ ...preset.bots[0], shootsBack: false }] });
+    expect(player.weapons[GameConfig.WeaponSlot.Primary].type).toBe("spas12");
+    expect(player.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mosin");
+    expect([player.helmet, player.chest]).toEqual(["helmet02", "chest02"]);
+    expect(player.invManager.get("4xscope")).toBe(1);
+    const [bot, extra] = bots(game);
+    expect(extra).toBeUndefined();
+    expect(bot.weapons[GameConfig.WeaponSlot.Primary].type).toBe("spas12");
+    expect(bot.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mosin");
+    expect([bot.helmet, bot.chest]).toEqual(["helmet02", "chest02"]);
+});
+
+test("bot skill buttons: Normal is today's default bot; any slider change reads Custom", () => {
+    expect(practiceBotSkillOf(defaultPracticeBot())).toBe("normal");
+    expect(PracticeBotSkills).toEqual({
+        easy: { accuracy: 30, reaction: 10, wiggle: 3 },
+        normal: { accuracy: 50, reaction: 5, wiggle: 5 },
+        hard: { accuracy: 80, reaction: 2, wiggle: 8 },
+    });
+    for (const skill of ["easy", "normal", "hard"] as const) {
+        const bot = withPracticeBotSkill({ ...defaultPracticeBot(), gun: "mosin", health: 200 }, skill);
+        expect(practiceBotSkillOf(bot)).toBe(skill);
+        expect([bot.gun, bot.health]).toEqual(["mosin", 200]);
+        expect(practiceBotSkillOf({ ...bot, accuracy: bot.accuracy + 1 })).toBe("custom");
+        expect(practiceBotSkillOf({ ...bot, dodge: bot.dodge + 1 })).toBe("custom");
+    }
+});
+
+test("every Practice gun falls into one Guns-tab group", () => {
+    for (const gun of PracticeGuns) expect(PracticeGunGroups).toContain(practiceGunGroup(gun));
+    expect(["spas12", "mosin", "hk416", "mp5", "m249", "deagle", "mk12", "ppsh41"].map(practiceGunGroup))
+        .toEqual(["shotgun", "sniper", "assault", "smg", "lmg", "pistol", "dmr", "smg"]);
+});
+
+test("saved loadouts: named Loadout N, capped at 8, sanitized, active one tracked", () => {
+    const store = sanitizePracticeLoadoutStore(undefined);
+    expect(store).toEqual({ activeId: "", loadouts: [] });
+    for (let i = 0; i < PracticeMaxLoadouts; i++) {
+        expect(addPracticeLoadout(store, defaultPracticeSettings(), `id${i}`)?.name).toBe(`Loadout ${i + 1}`);
+    }
+    expect(addPracticeLoadout(store, defaultPracticeSettings(), "extra")).toBeUndefined();
+    expect(activePracticeLoadout(store)?.id).toBe(`id${PracticeMaxLoadouts - 1}`);
+
+    removePracticeLoadout(store, "id1");
+    expect(addPracticeLoadout(store, defaultPracticeSettings(), "again")?.name).toBe("Loadout 2");
+    removePracticeLoadout(store, "again");
+    expect(store.activeId).toBe("id0");
+
+    const messy = sanitizePracticeLoadoutStore({
+        activeId: "gone",
+        loadouts: [
+            { id: "a", name: "   My   SPAS  ", settings: { primary: "spas12", bots: [{ gun: "nope" }] } },
+            { id: "a", name: "dupe", settings: {} },
+            { name: "no id", settings: {} },
+            { id: "b", name: "x".repeat(40), settings: null },
+        ],
+    });
+    expect(messy.loadouts.map((l) => l.name)).toEqual(["My SPAS", "x".repeat(24)]);
+    expect(messy.activeId).toBe("a");
+    expect(messy.loadouts[0].settings.primary).toBe("spas12");
+    expect(messy.loadouts[0].settings.bots[0].gun).toBe(defaultPracticeBot().gun);
+});
+
+test("while you are dead the bots freeze; when you respawn they start over with you", () => {
+    const { game, player, practice } = startPractice({
+        bots: [{ ...defaultPracticeBot(), shootsBack: false, wiggle: 10, strafe: 10, turn: 10 }],
+    });
+    const bot = bots(game)[0];
+    for (let i = 0; i < 10; i++) game.update(0.1);
+
+    killPlayer(player, bot);
+    game.update(0.05);
+    expect(practice.botsPaused).toBe(true);
+    const frozenAt = v2.copy(bot.pos);
+    for (let t = 0; t < PracticePlayerRespawnDelay - 0.5; t += 0.1) game.update(0.1);
+    expect(v2.distance(bot.pos, frozenAt)).toBeLessThan(0.01);
+
+    for (let t = 0; t < 1.5; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(false);
+    expect(practice.botsPaused).toBe(false);
+    for (let t = 0; t < 1; t += 0.1) game.update(0.1);
+    const fresh = bots(game);
+    expect(fresh.length).toBe(1);
+    expect(fresh[0]).not.toBe(bot);
+});
+
+test("holding the respawn keeps you down past 3 s; Respawn now brings you back", () => {
+    const { game, player, practice } = startPractice();
+    killPlayer(player, bots(game)[0]);
+    game.update(0.05);
+    practice.setRespawnHold(player, true);
+    for (let t = 0; t < PracticePlayerRespawnDelay + 2; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(true);
+
+    // Releasing the hold resumes the countdown where it stopped.
+    practice.setRespawnHold(player, false);
+    for (let t = 0; t < PracticePlayerRespawnDelay + 0.5; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(false);
+
+    killPlayer(player, bots(game)[0] ?? undefined);
+    game.update(0.05);
+    practice.setRespawnHold(player, true);
+    practice.respawnNow(player);
+    game.update(0.05);
+    expect(player.dead).toBe(false);
+    expect(practice.respawnHold.has(player)).toBe(false);
+});
+
+test("PracticeRespawnMsg round-trips", () => {
+    const msg = new PracticeRespawnMsg();
+    msg.hold = true;
+    const stream = new BitStream(new ArrayBuffer(16));
+    msg.serialize(stream);
+    stream.byteIndex = 0;
+    const back = new PracticeRespawnMsg();
+    back.deserialize(stream);
+    expect([back.hold, back.now]).toEqual([true, false]);
+});

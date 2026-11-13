@@ -55,6 +55,8 @@ export class PracticeController {
     slots: BotSlot[] = [];
     /** Seconds until each dead player respawns. */
     readonly humanRespawn = new Map<Player, number>();
+    /** Dead players changing their loadout: their auto-respawn waits until released. */
+    readonly respawnHold = new Set<Player>();
     private readonly stats = new Map<Player, PlayerPracticeStats>();
     private statsTicker = 0;
     /** Seconds of match time, advanced in update(); drives TTK and the spam guard. */
@@ -158,10 +160,34 @@ export class PracticeController {
         st.dirty = true;
     }
 
+    /**
+     * While you are dead the bots freeze (the Spec Ops brain loop skips them) and
+     * dead bots wait, so you never come back into a fight you did not see.
+     */
+    get botsPaused(): boolean {
+        for (const player of this.humanRespawn.keys()) {
+            if (player.dead && !player.disconnected) return true;
+        }
+        return false;
+    }
+
+    /** Respawn panel: hold or release the auto-respawn while the player is dead. */
+    setRespawnHold(player: Player, hold: boolean): void {
+        if (hold && player.dead && !player.specOpsAi) this.respawnHold.add(player);
+        else this.respawnHold.delete(player);
+    }
+
+    /** Respawn button / Space: come back on the next tick. */
+    respawnNow(player: Player): void {
+        if (!player.dead || player.specOpsAi) return;
+        this.respawnHold.delete(player);
+        this.humanRespawn.set(player, 0);
+    }
+
     update(dt: number): void {
         this.clock += dt;
         this.updateHumans(dt);
-        if (this.started) this.updateBots(dt);
+        if (this.started && !this.botsPaused) this.updateBots(dt);
 
         this.statsTicker -= dt;
         if (this.statsTicker <= 0) {
@@ -184,18 +210,36 @@ export class PracticeController {
                     st.dirty = true;
                     continue;
                 }
+                if (this.respawnHold.has(player) && left > 0) continue;
                 const next = left - dt;
                 if (next > 0) {
                     this.humanRespawn.set(player, next);
                     continue;
                 }
                 this.humanRespawn.delete(player);
+                this.respawnHold.delete(player);
                 this.host.respawnPracticeHuman(player);
                 this.host.equipPracticeHuman(player, this.settings);
+                this.restartBots();
             } else {
                 this.humanRespawn.delete(player);
+                this.respawnHold.delete(player);
             }
         }
+    }
+
+    /** After you respawn, the bots start over from their spawn points with you. */
+    private restartBots(): void {
+        if (!this.started) return;
+        // Count kills from the moment you died before replacing anyone.
+        this.updateBots(0);
+        this.waveRespawnIn = -1;
+        this.slots.forEach((slot, i) => {
+            if (slot.bot && !slot.bot.dead) this.host.removePracticeBot(slot.bot);
+            slot.bot = undefined;
+            slot.firstHitAt = 0;
+            slot.respawnIn = 0.3 + i * 0.15;
+        });
     }
 
     /** "Respawn bots" button: bring every dead bot back now, whatever the mode. */

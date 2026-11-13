@@ -1,4 +1,4 @@
-import { BaseDefs } from "./defs/gameObjects/gunDefs.ts";
+import { BaseDefs, type GunDef } from "./defs/gameObjects/gunDefs.ts";
 import { MeleeDefs } from "./defs/gameObjects/meleeDefs.ts";
 import { ZombieWonderAmmo } from "./defs/maps/zombieWonderWeapons.ts";
 import { math } from "./utils/math.ts";
@@ -216,6 +216,60 @@ export function defaultPracticeSettings(): PracticeSettings {
     };
 }
 
+/* ── Presets ─────────────────────────────────────────────────────────────── */
+
+export interface PracticePreset {
+    id: string;
+    name: string;
+    /** One line shown under the picker. */
+    description: string;
+    /** Builds a fresh copy so editing the menu never changes the preset. */
+    settings: () => PracticeSettings;
+}
+
+/** One-click setups in the Practice menu. Picking one fills the menu; Start/Apply sends it. */
+export const PracticePresets: PracticePreset[] = [
+    {
+        id: "default",
+        name: "Default",
+        description: "Reset everything to the starting setup.",
+        settings: defaultPracticeSettings,
+    },
+    {
+        id: "moving_targets",
+        name: "Moving targets",
+        description: "4 bots that strafe and dodge hard but never shoot back. They respawn 0.5 s after dying.",
+        settings: () => {
+            const target: PracticeBotSettings = {
+                ...defaultPracticeBot(),
+                shootsBack: false,
+                wiggle: 8,
+                strafe: 8,
+                turn: 8,
+                dodge: 8,
+            };
+            return {
+                ...defaultPracticeSettings(),
+                bots: Array.from({ length: PracticeMaxBots }, () => ({ ...target })),
+                respawnMode: "each",
+                respawnDelay: 5,
+            };
+        },
+    },
+    {
+        id: "spas_mosin",
+        name: "SPAS-12 + Mosin",
+        description: "SPAS-12 and Mosin with a 4x scope and level 2 armor. The bot has the same guns and armor.",
+        settings: () => ({
+            ...defaultPracticeSettings(),
+            primary: "spas12",
+            secondary: "mosin",
+            kit: { ...defaultPracticeKit(), helmet: 2, vest: 2, scope: "4xscope" },
+            bots: [{ ...defaultPracticeBot(), gun: "spas12", secondary: "mosin", armor: 2 }],
+        }),
+    },
+];
+
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
     const n = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
     return math.clamp(n, min, max);
@@ -288,6 +342,140 @@ export function sanitizePracticeSettings(raw: Partial<PracticeSettings> | undefi
         respawnMode,
         respawnDelay: clampInt(raw?.respawnDelay, 0, PracticeMaxRespawnDelay, def.respawnDelay),
     };
+}
+
+/* ── Bot skill buttons ───────────────────────────────────────────────────── */
+
+/** Easy / Normal / Hard set accuracy (%), reaction (tenths of a second) and wiggle (0–10). */
+export const PracticeBotSkills = {
+    easy: { accuracy: 30, reaction: 10, wiggle: 3 },
+    normal: { accuracy: 50, reaction: 5, wiggle: 5 },
+    hard: { accuracy: 80, reaction: 2, wiggle: 8 },
+} as const;
+export type PracticeBotSkill = keyof typeof PracticeBotSkills;
+export const PracticeBotSkillLabels: Record<PracticeBotSkill | "custom", string> = {
+    easy: "Easy",
+    normal: "Normal",
+    hard: "Hard",
+    custom: "Custom",
+};
+
+/** The bot with a skill's accuracy, reaction and wiggle (advanced movement follows wiggle). */
+export function withPracticeBotSkill(bot: PracticeBotSettings, skill: PracticeBotSkill): PracticeBotSettings {
+    const s = PracticeBotSkills[skill];
+    return { ...bot, accuracy: s.accuracy, reaction: s.reaction, wiggle: s.wiggle, ...practiceWiggleToAdvanced(s.wiggle) };
+}
+
+/** Which skill button matches the bot, or "custom" once any of those values was changed. */
+export function practiceBotSkillOf(bot: PracticeBotSettings): PracticeBotSkill | "custom" {
+    for (const skill of Object.keys(PracticeBotSkills) as PracticeBotSkill[]) {
+        const want = withPracticeBotSkill(bot, skill);
+        if (
+            want.accuracy === bot.accuracy && want.reaction === bot.reaction && want.wiggle === bot.wiggle
+            && want.strafe === bot.strafe && want.turn === bot.turn && want.dodge === bot.dodge
+        ) {
+            return skill;
+        }
+    }
+    return "custom";
+}
+
+/* ── Gun groups (Guns tab filters) ───────────────────────────────────────── */
+
+export const PracticeGunGroups = ["assault", "smg", "shotgun", "sniper", "dmr", "lmg", "pistol"] as const;
+export type PracticeGunGroup = (typeof PracticeGunGroups)[number];
+export const PracticeGunGroupLabels: Record<PracticeGunGroup, string> = {
+    assault: "Assault",
+    smg: "SMG",
+    shotgun: "Shotgun",
+    sniper: "Sniper",
+    dmr: "DMR",
+    lmg: "LMG",
+    pistol: "Pistol",
+};
+
+/** Gun defs have no category, so group by pistol flag, ammo, fire mode, magazine and fire delay. */
+export function practiceGunGroup(type: string): PracticeGunGroup {
+    const def = BaseDefs[type] as GunDef;
+    if (def.pistol) return "pistol";
+    if (def.ammo === "12gauge") return "shotgun";
+    if (type === "ppsh41" || (def.fireMode !== "single" && (def.ammo === "9mm" || def.ammo === "45acp"))) return "smg";
+    if (def.fireMode === "auto" && def.maxClip >= 45) return "lmg";
+    if (def.fireMode === "single" && def.fireDelay >= 0.9) return "sniper";
+    if (def.fireMode === "single") return "dmr";
+    return "assault";
+}
+
+/* ── Saved loadouts (Practice loadout on the home screen) ────────────────── */
+
+/** Most saved loadouts kept on one device. */
+export const PracticeMaxLoadouts = 8;
+export const PracticeLoadoutNameMax = 24;
+
+export interface PracticeLoadout {
+    id: string;
+    name: string;
+    settings: PracticeSettings;
+}
+
+export interface PracticeLoadoutStore {
+    /** The loadout a match starts with; "" when none are saved. */
+    activeId: string;
+    loadouts: PracticeLoadout[];
+}
+
+export function cleanPracticeLoadoutName(name: unknown, fallback: string): string {
+    const clean = typeof name === "string" ? name.replace(/\s+/g, " ").trim().slice(0, PracticeLoadoutNameMax) : "";
+    return clean || fallback;
+}
+
+/** Lowest free "Loadout N". */
+export function nextPracticeLoadoutName(store: PracticeLoadoutStore): string {
+    const taken = new Set(store.loadouts.map((l) => l.name));
+    let n = 1;
+    while (taken.has(`Loadout ${n}`)) n++;
+    return `Loadout ${n}`;
+}
+
+export function sanitizePracticeLoadoutStore(raw: unknown): PracticeLoadoutStore {
+    const r = (raw ?? {}) as Partial<PracticeLoadoutStore>;
+    const loadouts: PracticeLoadout[] = [];
+    const ids = new Set<string>();
+    for (const item of Array.isArray(r.loadouts) ? r.loadouts : []) {
+        if (loadouts.length >= PracticeMaxLoadouts) break;
+        const id = typeof item?.id === "string" && item.id && !ids.has(item.id) ? item.id : "";
+        if (!id) continue;
+        ids.add(id);
+        loadouts.push({
+            id,
+            name: cleanPracticeLoadoutName(item.name, `Loadout ${loadouts.length + 1}`),
+            settings: sanitizePracticeSettings(item.settings),
+        });
+    }
+    const activeId = loadouts.some((l) => l.id === r.activeId) ? r.activeId! : loadouts[0]?.id ?? "";
+    return { activeId, loadouts };
+}
+
+export function activePracticeLoadout(store: PracticeLoadoutStore): PracticeLoadout | undefined {
+    return store.loadouts.find((l) => l.id === store.activeId);
+}
+
+/** Adds a loadout, makes it active and returns it; undefined when the store is full. */
+export function addPracticeLoadout(
+    store: PracticeLoadoutStore,
+    settings: PracticeSettings,
+    id: string,
+): PracticeLoadout | undefined {
+    if (store.loadouts.length >= PracticeMaxLoadouts || store.loadouts.some((l) => l.id === id)) return undefined;
+    const loadout = { id, name: nextPracticeLoadoutName(store), settings: sanitizePracticeSettings(structuredClone(settings)) };
+    store.loadouts.push(loadout);
+    store.activeId = id;
+    return loadout;
+}
+
+export function removePracticeLoadout(store: PracticeLoadoutStore, id: string): void {
+    store.loadouts = store.loadouts.filter((l) => l.id !== id);
+    if (store.activeId === id) store.activeId = store.loadouts[0]?.id ?? "";
 }
 
 /* ── Bot tuning: slider values → AI numbers (server) ─────────────────────── */

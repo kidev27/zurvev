@@ -72,6 +72,8 @@ import { MenuLeaderboard } from "./ui/menuLeaderboard.ts";
 import { MenuModal } from "./ui/menuModal.ts";
 import { LoadoutDisplay } from "./ui/opponentDisplay.ts";
 import { Pass } from "./ui/pass.ts";
+import { PracticeLoadoutMenu } from "./ui/practiceLoadoutMenu.ts";
+import { loadPracticeLoadouts, savePracticeLoadouts } from "./ui/practiceLoadouts.ts";
 import { ProfileUi } from "./ui/profileUi.ts";
 import { ServerBrowser } from "./ui/serverBrowser.ts";
 import { teamHashJoin, TeamMenu } from "./ui/teamMenu.ts";
@@ -108,6 +110,7 @@ export class Application {
     ipBanModal = new MenuModal($("#modal-ip-banned"));
     communityAnnounceModal = new MenuModal($("#modal-community-announce"));
     config = new ConfigManager();
+    practiceLoadoutMenu = new PracticeLoadoutMenu(() => this.refreshPracticeLoadoutField());
     localization = new Localization();
 
     account!: Account;
@@ -273,6 +276,22 @@ export class Application {
                 }
             });
             this.updateHomeModeFields();
+
+            // Practice loadout: pick a saved loadout, or edit / create one.
+            const practiceLoadoutSelect = $("#practice-loadout-select");
+            practiceLoadoutSelect.on("change", () => {
+                const store = loadPracticeLoadouts();
+                store.activeId = String(practiceLoadoutSelect.val() || store.activeId);
+                savePracticeLoadouts(store);
+            });
+            $("#btn-practice-loadout-edit").on("click", () => {
+                this.practiceLoadoutMenu.open("guns");
+                return false;
+            });
+            $("#btn-practice-loadout-create").on("click", () => {
+                this.practiceLoadoutMenu.open("presets");
+                return false;
+            });
 
             this.playModeBtns.on("click", (e) => {
                 const modeIdx = Number($(e.currentTarget).data("mode-idx")) || 0;
@@ -864,7 +883,20 @@ export class Application {
         // Practice is always a private solo match.
         const practice = mode === "practice";
         $("#start-menu .zv-team-row").toggle(!practice);
+        $("#zv-practice-loadout").toggle(practice);
+        if (practice) this.refreshPracticeLoadoutField();
         this.updateHomePlayButtons();
+    }
+
+    /** Practice loadout field: the saved loadout names, or "No loadouts saved". */
+    refreshPracticeLoadoutField() {
+        const store = loadPracticeLoadouts();
+        const select = $("#practice-loadout-select");
+        select.empty();
+        for (const l of store.loadouts) select.append($("<option>").val(l.id).text(l.name));
+        select.val(store.activeId);
+        $("#zv-practice-loadout-saved").toggle(store.loadouts.length > 0);
+        $("#btn-practice-loadout-create").toggle(store.loadouts.length === 0);
     }
 
     /** Show Play buttons for enabled server modes and a spinner on the one that is matchmaking. */

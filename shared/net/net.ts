@@ -314,6 +314,8 @@ export enum MsgType {
     PracticeStats,
     /** Practice: client gives itself an item / clears its inventory. */
     PracticeGive,
+    /** Practice: client holds its respawn while editing, or respawns now. */
+    PracticeRespawn,
 }
 
 export enum PickupMsgType {
@@ -345,7 +347,7 @@ export { KillMsg } from "./killMsg.ts";
 export { MapMsg } from "./mapMsg.ts";
 export { PerkModeRoleSelectMsg } from "./perkModeRoleSelectMsg.ts";
 export { PickupMsg } from "./pickupMsg.ts";
-export { PracticeGiveMsg, PracticeSettingsMsg, PracticeStatsMsg } from "./practiceMsg.ts";
+export { PracticeGiveMsg, PracticeRespawnMsg, PracticeSettingsMsg, PracticeStatsMsg } from "./practiceMsg.ts";
 export { PlayerStatsMsg } from "./playerStatsMsg.ts";
 export { RoleAnnouncementMsg } from "./roleAnnouncementMsg.ts";
 export { SpectateMsg } from "./spectateMsg.ts";

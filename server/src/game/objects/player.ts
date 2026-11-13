@@ -5185,6 +5185,17 @@ export class Player extends BaseGameObject {
         return true;
     }
 
+    /** Spec Ops AI: stand still and stop attacking (Practice pauses bots while you are dead). */
+    haltSpecOpsInput(): void {
+        this.moveLeft = false;
+        this.moveRight = false;
+        this.moveUp = false;
+        this.moveDown = false;
+        this.touchMoveActive = false;
+        this.shootHold = false;
+        this.shootStart = false;
+    }
+
     /** Practice: empty every slot and the bag; keeps fists and the 1x scope. */
     clearInventoryForPractice(): void {
         this.cancelAction();
