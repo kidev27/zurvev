@@ -6395,7 +6395,7 @@ export class SpecOpsManager implements PracticeHost {
         const targets = this.game.grid.intersectCollider(collider.createCircle(shooter.pos, blast.range))
             .filter((obj): obj is Player =>
                 obj.__type === ObjectType.Player
-                && !(obj as Player).dead && this.isOrdinaryZombie(obj as Player)
+                && !(obj as Player).dead && isZombieClass(this.brains.get(obj as Player)?.enemyClass)
                 && util.toGroundLayer(obj.layer) === layer
             )
             .sort((a, b) => v2.distance(a.pos, shooter.pos) - v2.distance(b.pos, shooter.pos));

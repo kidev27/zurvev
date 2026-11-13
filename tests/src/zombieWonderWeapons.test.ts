@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { lastCallNavPoints, lastCallWalkable } from "../../server/src/game/lastCallNav.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
 import { stairAtPos } from "../../server/src/game/specOpsNav.ts";
+import type { ZombieClass } from "../../server/src/game/zombieMode.ts";
 import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
@@ -20,6 +21,7 @@ import { createGame } from "./gameTestHelpers.ts";
 
 const added = ZombieWonderWeapons.slice(1);
 const primary = GameConfig.WeaponSlot.Primary;
+const zombieClasses: ZombieClass[] = ["zombie_walker", "zombie_runner", "zombie_brute"];
 const damageCases = [
     { label: "base", upgraded: false, doubleTap: false, multiplier: 1 },
     { label: "Mk II", upgraded: true, doubleTap: false, multiplier: 1.35 },
@@ -33,7 +35,7 @@ function place(player: Player, pos: Vec2, layer = 0) {
     player.game.grid.updateObject(player);
 }
 
-function arena(map: (typeof ZombieMapPool)[number] = "zombie_high_water") {
+function arena(map: (typeof ZombieMapPool)[number] = "zombie_high_water", kind: ZombieClass = "zombie_walker") {
     const game = createGame(TeamMode.Solo, map);
     const shooter = game.playerBarn.addTestPlayer({ name: "Operator" });
     game.update(0.1);
@@ -46,7 +48,7 @@ function arena(map: (typeof ZombieMapPool)[number] = "zombie_high_water") {
     const ops = game.specOps!;
     ops.setNpcIgnoreOperators(true);
     const zombie = (x: number, y = 0, layer = 0) => {
-        const enemy = ops.spawnEnemyPublic("zombie_walker");
+        const enemy = ops.spawnEnemyPublic(kind);
         place(enemy, v2.add(shooter.pos, v2.create(x, y)), layer);
         enemy.health = enemy.maxHealth;
         return enemy;
@@ -132,8 +134,8 @@ for (const map of ZombieMapPool) {
     });
 }
 
-test("pressure blast and Tesla arcs cannot damage through solid cover", () => {
-    const { game, shooter, ops, zombie } = arena();
+test.each(zombieClasses)("pressure blast and Tesla arcs cannot damage %s through solid cover", (kind) => {
+    const { game, shooter, ops, zombie } = arena("zombie_high_water", kind);
     const front = zombie(5);
     const covered = zombie(11);
     game.map.genObstacle("stone_01", v2.add(shooter.pos, v2.create(8, 0)), 0, 0, 1);
@@ -351,12 +353,13 @@ for (const { type } of added) {
 }
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
-    test(`Pressure Cannon ${label}: damage falls from 220 to 90 and stops at its advertised range`, () => {
-        const { game, shooter, zombie } = arena();
+    test.each(zombieClasses)(`Pressure Cannon ${label}: %s obeys damage falloff, range and floors`, (kind) => {
+        const { game, shooter, zombie } = arena("zombie_high_water", kind);
         const near = zombie(6);
         const far = zombie(18);
         const edge = zombie(20);
         const outside = zombie(21);
+        const otherFloor = zombie(6, 0, 1);
         const outsidePos = v2.copy(outside.pos);
         if (doubleTap) shooter.addPerk("zombie_double_tap", false);
         shoot(shooter, upgraded ? packAPunchType("pressure_cannon") : "pressure_cannon");
@@ -366,8 +369,11 @@ for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
             expect(hits[0].amount).toBeCloseTo(baseDamage * multiplier);
         }
         game.bulletBarn.update(0);
+        for (const [target, baseDamage] of [[near, 220], [far, 220 - 130 * 10 / 12], [edge, 90]] as const) {
+            expect(target.health).toBeCloseTo(Math.max(0, target.maxHealth - baseDamage * multiplier));
+        }
         expect(far.health).toBeGreaterThan(0);
-        expect(far.health).toBeLessThan(far.maxHealth);
+        expect(otherFloor.health).toBe(otherFloor.maxHealth);
         expect(outside.health).toBe(outside.maxHealth);
         expect(outside.pos).toEqual(outsidePos);
     });
