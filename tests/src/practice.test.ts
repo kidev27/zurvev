@@ -9,13 +9,20 @@ import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfi
 import { BitStream } from "../../shared/net/net.ts";
 import { PracticeGiveMsg, PracticeSettingsMsg, PracticeStatsMsg } from "../../shared/net/practiceMsg.ts";
 import {
+    activePracticeLoadout,
+    addPracticeLoadout,
     defaultPracticeBot,
     defaultPracticeKit,
     defaultPracticeSettings,
     practiceAimErrorDeg,
     PracticeBotRespawnDelay,
     practiceFlipInterval,
+    PracticeBotSkills,
+    practiceBotSkillOf,
+    practiceGunGroup,
+    PracticeGunGroups,
     PracticeGuns,
+    PracticeMaxLoadouts,
     PracticeMaxBotHealth,
     PracticeMaxBots,
     PracticePlayerRespawnDelay,
@@ -23,7 +30,10 @@ import {
     PracticeRandomGun,
     type PracticeSettings,
     practiceWiggleToAdvanced,
+    removePracticeLoadout,
+    sanitizePracticeLoadoutStore,
     sanitizePracticeSettings,
+    withPracticeBotSkill,
 } from "../../shared/practice.ts";
 import { v2 } from "../../shared/utils/v2.ts";
 import { createGame } from "./gameTestHelpers.ts";
@@ -820,4 +830,55 @@ test("starting from the SPAS-12 + Mosin preset gives you and the bot that loadou
     expect(bot.weapons[GameConfig.WeaponSlot.Primary].type).toBe("spas12");
     expect(bot.weapons[GameConfig.WeaponSlot.Secondary].type).toBe("mosin");
     expect([bot.helmet, bot.chest]).toEqual(["helmet02", "chest02"]);
+});
+
+test("bot skill buttons: Normal is today's default bot; any slider change reads Custom", () => {
+    expect(practiceBotSkillOf(defaultPracticeBot())).toBe("normal");
+    expect(PracticeBotSkills).toEqual({
+        easy: { accuracy: 30, reaction: 10, wiggle: 3 },
+        normal: { accuracy: 50, reaction: 5, wiggle: 5 },
+        hard: { accuracy: 80, reaction: 2, wiggle: 8 },
+    });
+    for (const skill of ["easy", "normal", "hard"] as const) {
+        const bot = withPracticeBotSkill({ ...defaultPracticeBot(), gun: "mosin", health: 200 }, skill);
+        expect(practiceBotSkillOf(bot)).toBe(skill);
+        expect([bot.gun, bot.health]).toEqual(["mosin", 200]);
+        expect(practiceBotSkillOf({ ...bot, accuracy: bot.accuracy + 1 })).toBe("custom");
+        expect(practiceBotSkillOf({ ...bot, dodge: bot.dodge + 1 })).toBe("custom");
+    }
+});
+
+test("every Practice gun falls into one Guns-tab group", () => {
+    for (const gun of PracticeGuns) expect(PracticeGunGroups).toContain(practiceGunGroup(gun));
+    expect(["spas12", "mosin", "hk416", "mp5", "m249", "deagle", "mk12", "ppsh41"].map(practiceGunGroup))
+        .toEqual(["shotgun", "sniper", "assault", "smg", "lmg", "pistol", "dmr", "smg"]);
+});
+
+test("saved loadouts: named Loadout N, capped at 8, sanitized, active one tracked", () => {
+    const store = sanitizePracticeLoadoutStore(undefined);
+    expect(store).toEqual({ activeId: "", loadouts: [] });
+    for (let i = 0; i < PracticeMaxLoadouts; i++) {
+        expect(addPracticeLoadout(store, defaultPracticeSettings(), `id${i}`)?.name).toBe(`Loadout ${i + 1}`);
+    }
+    expect(addPracticeLoadout(store, defaultPracticeSettings(), "extra")).toBeUndefined();
+    expect(activePracticeLoadout(store)?.id).toBe(`id${PracticeMaxLoadouts - 1}`);
+
+    removePracticeLoadout(store, "id1");
+    expect(addPracticeLoadout(store, defaultPracticeSettings(), "again")?.name).toBe("Loadout 2");
+    removePracticeLoadout(store, "again");
+    expect(store.activeId).toBe("id0");
+
+    const messy = sanitizePracticeLoadoutStore({
+        activeId: "gone",
+        loadouts: [
+            { id: "a", name: "   My   SPAS  ", settings: { primary: "spas12", bots: [{ gun: "nope" }] } },
+            { id: "a", name: "dupe", settings: {} },
+            { name: "no id", settings: {} },
+            { id: "b", name: "x".repeat(40), settings: null },
+        ],
+    });
+    expect(messy.loadouts.map((l) => l.name)).toEqual(["My SPAS", "x".repeat(24)]);
+    expect(messy.activeId).toBe("a");
+    expect(messy.loadouts[0].settings.primary).toBe("spas12");
+    expect(messy.loadouts[0].settings.bots[0].gun).toBe(defaultPracticeBot().gun);
 });
