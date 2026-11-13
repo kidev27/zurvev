@@ -64,25 +64,28 @@ test("a bolt rifle is holstered after each shot and fires at its draw time", () 
     expect(slowed).toBeLessThan(0.05);
 });
 
-test.for(["spas12", "m870", "scout_elite"])(
+test.for(["spas12", "m870", "scout_elite", "model94", "blr", "winchester1887"])(
     "%s gains no fire rate from a swap, but the bot swaps to keep full speed",
     (gun: string) => {
         const def = GunDefs[gun];
         expect(def.switchDelay).toBeGreaterThanOrEqual(def.fireDelay);
-        const { gap, slowed, holstered } = shoot(gun, "", gun === "scout_elite" ? 30 : 10, 12);
+        const { gap, slowed, holstered } = shoot(gun, "", def.bulletCount > 1 ? 10 : 20, 12);
         expect(slowed).toBeLessThan(0.05);
         expect(holstered).toBeGreaterThan(0);
-        // The swap may delay the next shot by maxCancelCost at most.
-        expect(gap).toBeLessThanOrEqual(def.fireDelay + PracticeBotOverclock.maxCancelCost);
+        // The gun is ready again once it is drawn.
+        expect(gap).toBeLessThanOrEqual(def.switchDelay + 0.05);
     },
 );
 
-test("a swap that would cost more fire rate than maxCancelCost is skipped", () => {
+test("maxCancelCost caps what a full-speed swap may cost in fire rate", () => {
+    PracticeBotOverclock.maxCancelCost = 0.1;
     const def = GunDefs.model94;
     expect(def.switchDelay - def.fireDelay).toBeGreaterThan(PracticeBotOverclock.maxCancelCost);
     const { gap, holstered } = shoot("model94", "", 20, 8);
     expect(holstered).toBe(0);
     expect(gap).toBeCloseTo(def.fireDelay, 1);
+    // A swap that costs 0.02 s still happens.
+    expect(shoot("spas12", "", 10, 6).holstered).toBeGreaterThan(0);
 });
 
 test("cancelSlowdown off keeps the fire-rate swaps and drops the rest", () => {
@@ -110,7 +113,7 @@ test("with the other gun empty the bot overclocks the loaded one and does not re
 
 test("the same holds for a shotgun with an empty rifle behind it", () => {
     const { bot, gap, slowed, reloaded } = shoot("spas12", "mosin", 10, 8, { secondaryAmmo: 0 });
-    expect(gap).toBeLessThanOrEqual(GunDefs.spas12.fireDelay + PracticeBotOverclock.maxCancelCost);
+    expect(gap).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + 0.05);
     expect(slowed).toBeLessThan(0.05);
     expect(reloaded).toBe(false);
     expect(bot.weapons[1].ammo).toBe(0);
@@ -137,5 +140,5 @@ test("a gun that runs dry is holstered once, then reloaded at full speed", () =>
     expect(bot.actionType === Action.Reload || bot.actionType === Action.ReloadAlt).toBe(true);
     // The next shell goes out as soon as the gun allows it.
     const waited = run(2, true, () => bot.weapons[0].ammo === 0 && bot.shotSlowdownTimer > 0);
-    expect(waited).toBeLessThanOrEqual(GunDefs.spas12.fireDelay + PracticeBotOverclock.maxCancelCost);
+    expect(waited).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + 0.05);
 });
