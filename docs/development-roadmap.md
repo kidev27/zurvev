@@ -114,6 +114,9 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 - Loadout screen (home): Presets / Guns / Gear & kit / Bots tabs in the Survivor Kit theme. Bot skill buttons:
   Easy 30% / 1.0 s / wiggle 3, Normal 50% / 0.5 s / 5, Hard 80% / 0.2 s / 8 (`PracticeBotSkills`).
 - In the match, Tab opens a drawer on the right (Loadout / Bots / Tools) with Changed badges and an Apply bar.
+- Rule for Practice bot AI: bot code must not change game mechanics. A bot plays like a top player with
+  the inputs a player has (move, aim, weapon slot, trigger, reload, use item) and the same guns, timers
+  and ranges. New bot behaviour is a decision about when to use a mechanic, never a new number on one.
 - Bot reload rules (`PracticeBotReload` in `server/src/game/practiceCombat.ts`). A reload only works on the
   gun in hand and the bot cannot shoot meanwhile. Safe (has not seen you for 0.4 s): fill both guns, empty
   first. Nothing loaded: reload the gun that gets a round in soonest, then shoot. One gun empty and it sees

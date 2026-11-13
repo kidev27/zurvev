@@ -115,7 +115,11 @@ function isReloadAction(action: number): boolean {
     return action === GameConfig.Action.Reload || action === GameConfig.Action.ReloadAlt;
 }
 
-/** Practice-only combat. All switches, fire, reloads and melee use the normal engine. */
+/**
+ * Practice-only combat. All switches, fire, reloads and melee use the normal engine.
+ * This class only decides when to press what a player can press; it must not
+ * change a gun's timers, ranges or damage.
+ */
 export class PracticeCombat {
     meleeEngaged = false;
     /** The gun the bot is reloading on purpose this tick; it holds fire for it. */
