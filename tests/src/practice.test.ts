@@ -7,7 +7,12 @@ import { MapDefs } from "../../shared/defs/mapDefs.ts";
 import { isPracticeMapName, PracticeMapPool } from "../../shared/defs/maps/practiceDefs.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
 import { BitStream } from "../../shared/net/net.ts";
-import { PracticeGiveMsg, PracticeSettingsMsg, PracticeStatsMsg } from "../../shared/net/practiceMsg.ts";
+import {
+    PracticeGiveMsg,
+    PracticeRespawnMsg,
+    PracticeSettingsMsg,
+    PracticeStatsMsg,
+} from "../../shared/net/practiceMsg.ts";
 import {
     activePracticeLoadout,
     addPracticeLoadout,
@@ -881,4 +886,60 @@ test("saved loadouts: named Loadout N, capped at 8, sanitized, active one tracke
     expect(messy.activeId).toBe("a");
     expect(messy.loadouts[0].settings.primary).toBe("spas12");
     expect(messy.loadouts[0].settings.bots[0].gun).toBe(defaultPracticeBot().gun);
+});
+
+test("while you are dead the bots freeze; when you respawn they start over with you", () => {
+    const { game, player, practice } = startPractice({
+        bots: [{ ...defaultPracticeBot(), shootsBack: false, wiggle: 10, strafe: 10, turn: 10 }],
+    });
+    const bot = bots(game)[0];
+    for (let i = 0; i < 10; i++) game.update(0.1);
+
+    killPlayer(player, bot);
+    game.update(0.05);
+    expect(practice.botsPaused).toBe(true);
+    const frozenAt = v2.copy(bot.pos);
+    for (let t = 0; t < PracticePlayerRespawnDelay - 0.5; t += 0.1) game.update(0.1);
+    expect(v2.distance(bot.pos, frozenAt)).toBeLessThan(0.01);
+
+    for (let t = 0; t < 1.5; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(false);
+    expect(practice.botsPaused).toBe(false);
+    for (let t = 0; t < 1; t += 0.1) game.update(0.1);
+    const fresh = bots(game);
+    expect(fresh.length).toBe(1);
+    expect(fresh[0]).not.toBe(bot);
+});
+
+test("holding the respawn keeps you down past 3 s; Respawn now brings you back", () => {
+    const { game, player, practice } = startPractice();
+    killPlayer(player, bots(game)[0]);
+    game.update(0.05);
+    practice.setRespawnHold(player, true);
+    for (let t = 0; t < PracticePlayerRespawnDelay + 2; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(true);
+
+    // Releasing the hold resumes the countdown where it stopped.
+    practice.setRespawnHold(player, false);
+    for (let t = 0; t < PracticePlayerRespawnDelay + 0.5; t += 0.1) game.update(0.1);
+    expect(player.dead).toBe(false);
+
+    killPlayer(player, bots(game)[0] ?? undefined);
+    game.update(0.05);
+    practice.setRespawnHold(player, true);
+    practice.respawnNow(player);
+    game.update(0.05);
+    expect(player.dead).toBe(false);
+    expect(practice.respawnHold.has(player)).toBe(false);
+});
+
+test("PracticeRespawnMsg round-trips", () => {
+    const msg = new PracticeRespawnMsg();
+    msg.hold = true;
+    const stream = new BitStream(new ArrayBuffer(16));
+    msg.serialize(stream);
+    stream.byteIndex = 0;
+    const back = new PracticeRespawnMsg();
+    back.deserialize(stream);
+    expect([back.hold, back.now]).toEqual([true, false]);
 });

@@ -7684,7 +7684,12 @@ export class SpecOpsManager implements PracticeHost {
         for (const brain of this.brains.values()) {
             if (!brain.player.dead) this.nav.occupy(brain.player.pos);
         }
+        const practicePaused = !!this.practice?.botsPaused;
         for (const brain of this.brains.values()) {
+            if (practicePaused && brain.practice) {
+                brain.player.haltSpecOpsInput();
+                continue;
+            }
             brain.update(dt, this);
         }
         if (this.phase === "combat" && this.spawnedThisWave) {

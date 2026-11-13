@@ -222,6 +222,7 @@ export class ClientBarn {
             | net.EditMsg
             | net.PracticeSettingsMsg
             | net.PracticeGiveMsg
+            | net.PracticeRespawnMsg
             | undefined = undefined;
 
         switch (type) {
@@ -279,6 +280,10 @@ export class ClientBarn {
                 break;
             case net.MsgType.PracticeGive:
                 msg = new net.PracticeGiveMsg();
+                msg.deserialize(stream);
+                break;
+            case net.MsgType.PracticeRespawn:
+                msg = new net.PracticeRespawnMsg();
                 msg.deserialize(stream);
                 break;
         }
@@ -1058,6 +1063,14 @@ export class Client {
                 const give = msg as net.PracticeGiveMsg;
                 if (give.respawnBots) this.game.specOps.practice.respawnBotsNow();
                 this.game.specOps.givePracticeItem(player, give.item, give.count, give.clearInventory);
+                break;
+            }
+            case net.MsgType.PracticeRespawn: {
+                const practice = this.game.specOps?.practice;
+                if (!player || !practice) break;
+                const respawn = msg as net.PracticeRespawnMsg;
+                if (respawn.now) practice.respawnNow(player);
+                else practice.setRespawnHold(player, respawn.hold);
                 break;
             }
             case net.MsgType.PracticeSettings: {
