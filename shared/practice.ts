@@ -485,11 +485,6 @@ export function practiceStrafeWeight(strafe: number): number {
     return math.clamp(strafe, 0, PracticeSliderMax) / 5;
 }
 
-/** Overall move speed multiplier; faster strafers also move faster. */
-export function practiceSpeedMult(strafe: number): number {
-    return 0.55 + math.clamp(strafe, 0, PracticeSliderMax) * 0.05;
-}
-
 /** Seconds between strafe direction flips, as [min, max]. 0 = never flips. */
 export function practiceFlipInterval(turn: number): [number, number] {
     const t = math.clamp(turn, 0, PracticeSliderMax);

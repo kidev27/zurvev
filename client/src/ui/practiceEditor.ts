@@ -502,7 +502,7 @@ export function renderBotEditor(root: HTMLElement, host: EditorHost): void {
     const advanced = el("details", { class: "pe-details" });
     advanced.append(
         el("summary", {}, `Advanced movement: strafe ${bot.strafe} · turns ${bot.turn} · dodge ${bot.dodge}`),
-        slider("Strafe speed", bot.strafe, 0, PracticeSliderMax, String, (v) => edit((b) => (b.strafe = v))),
+        slider("Strafe amount", bot.strafe, 0, PracticeSliderMax, String, (v) => edit((b) => (b.strafe = v))),
         slider("Direction change", bot.turn, 0, PracticeSliderMax, String, (v) => edit((b) => (b.turn = v))),
         slider("Aim dodging", bot.dodge, 0, PracticeSliderMax, String, (v) => edit((b) => (b.dodge = v))),
     );

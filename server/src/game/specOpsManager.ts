@@ -116,7 +116,6 @@ import {
     PracticeRandomGun,
     practiceReactionSeconds,
     type PracticeSettings,
-    practiceSpeedMult,
     practiceStrafeWeight,
 } from "../../../shared/practice.ts";
 import { type AABB, coldet } from "../../../shared/utils/coldet.ts";
@@ -2042,7 +2041,8 @@ function practiceBotLoadout(gun: string, settings: PracticeBotSettings, index: n
         perks: ["endless_ammo"],
         range,
         holdRange: range * 0.65,
-        speedMult: practiceSpeedMult(settings.strafe),
+        // Practice bots move at player speed. The Strafe setting only steers.
+        speedMult: 1,
         turnRate: 240,
         aimError: practiceAimErrorDeg(settings.accuracy),
         reaction: practiceReactionSeconds(settings.reaction),

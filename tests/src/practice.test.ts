@@ -607,7 +607,8 @@ test("Practice single-sniper holster cycle shortens recovery without erasing swi
     expect(bot.curWeapIdx).toBe(GameConfig.WeaponSlot.Melee);
     combat.fire(true);
     expect(bot.shootStart).toBe(false);
-    combat.update(0.01, player, true);
+    // The gun stays holstered for a few ticks, like two key presses.
+    for (let tick = 0; tick < 10 && bot.curWeapIdx !== 0; tick++) combat.update(0.01, player, true);
     expect(bot.curWeapIdx).toBe(0);
     expect(bot.weapons[0].cooldown).toBe(GunDefs.mosin.switchDelay);
     expect(bot.weapons[0].cooldown).toBeLessThan(GunDefs.mosin.fireDelay);
@@ -950,4 +951,11 @@ test("PracticeRespawnMsg round-trips", () => {
     const back = new PracticeRespawnMsg();
     back.deserialize(stream);
     expect([back.hold, back.now]).toEqual([true, false]);
+});
+
+test("Practice bots move at player speed whatever the Strafe setting", () => {
+    for (const strafe of [0, 5, 10]) {
+        const { game } = startPractice({ bots: [{ ...defaultPracticeBot(), strafe }] });
+        expect(bots(game)[0].specOpsSpeedMult).toBe(1);
+    }
 });

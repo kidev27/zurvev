@@ -98,6 +98,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-006 | Practice bots: overclocking and gun swaps by range | Practice | P1 | Needs Playtesting | PRA-005 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotOverclock.test.ts` 14/14; `practiceBotRange.test.ts` 7/7; `practice.test.ts` 59/59; full-game fights before/after (see notes) | In-game feel. Fast semi-autos (DMRs, pistols, M1014, M1100) still slow the bot while it shoots: needs a decision. The rifle is often empty by the time the bot is close (needs PRA-008) |
 | PRA-007 | Practice bots: healing and boosts | Practice | P1 | Ready | None | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | Not started | Rules need approval |
 | PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Ready | None | `server/src/game/specOpsManager.ts` | Not started | Rules need approval; bot range follows the gun in hand today |
+| PRA-009 | Practice bots: player move speed and human swap timing | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practiceBotOverclock.test.ts` 15/15; `practice.test.ts` 60/60 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
 
 ### Notes
@@ -134,6 +135,12 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   is holstered once before its reload. Measured in 60 to 120 s full-game fights: time at half speed
   24-77% to 1%, movement 6-8.5 to 9.6 units/s; Model 94 shots per minute 55 to 43, BLR 81 50 to 37.
   Guns faster than 0.45 s (DMRs, pistols, M1014, M1100, autos) are not swapped and still slow the bot.
+- Bots match a player (PRA-009). Move speed is 100% of player speed at every setting; it used to follow
+  the Strafe setting (55% at 0, 80% at 5, 105% at 10). The slider is now called "Strafe amount" and only
+  changes how much the bot moves sideways. A holstered gun is drawn again after 0.06 s
+  (`PracticeBotOverclock.holsterTime`), like two key presses; it used to be one server tick (0.01 s).
+  Seconds between shots with that: Mosin, SV-98, Scout Elite, Model 94, BLR 81 1.06; M870, Winchester 1887
+  0.96; SPAS-12 0.81. Bots still have endless reserve ammo.
 - Where a two-gun bot fights (`PracticeBotRange` in `server/src/game/practiceCombat.ts`). A bot whose guns
   differ in reach moves by the shorter gun: it walks in until you are inside 0.8x that gun's fire range
   (shotguns: 10.1 units), and shoots the longer gun on the way, holstering between shots. It draws a gun
