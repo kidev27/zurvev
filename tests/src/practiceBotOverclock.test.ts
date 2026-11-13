@@ -145,12 +145,18 @@ test("a gun that runs dry is holstered once, then reloaded at full speed", () =>
     expect(waited).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + slack);
 });
 
-test("the gun stays holstered for holsterTime, like two key presses", () => {
-    const { bot, run } = duel("mosin", "", 30, { dt });
-    bot.weapons[0].ammo = 5000;
-    run(1, true, () => bot.curWeapIdx === Melee);
-    expect(bot.curWeapIdx).toBe(Melee);
-    const held = run(1, true, () => bot.curWeapIdx !== Melee);
-    expect(held).toBeGreaterThanOrEqual(PracticeBotOverclock.holsterTime - dt);
-    expect(held).toBeLessThanOrEqual(PracticeBotOverclock.holsterTime + 2 * dt);
+test("a holstered gun is drawn again on the next tick; holsterTime can slow that", () => {
+    const hold = (holsterTime: number) => {
+        PracticeBotOverclock.holsterTime = holsterTime;
+        const { bot, run } = duel("mosin", "", 30, { dt });
+        bot.weapons[0].ammo = 5000;
+        run(1, true, () => bot.curWeapIdx === Melee);
+        expect(bot.curWeapIdx).toBe(Melee);
+        return run(1, true, () => bot.curWeapIdx !== Melee);
+    };
+    expect(PracticeBotOverclock.holsterTime).toBe(0);
+    expect(hold(0)).toBeCloseTo(dt, 5);
+    const slow = hold(0.06);
+    expect(slow).toBeGreaterThanOrEqual(0.06 - dt);
+    expect(slow).toBeLessThanOrEqual(0.06 + 2 * dt);
 });

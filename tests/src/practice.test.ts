@@ -607,8 +607,7 @@ test("Practice single-sniper holster cycle shortens recovery without erasing swi
     expect(bot.curWeapIdx).toBe(GameConfig.WeaponSlot.Melee);
     combat.fire(true);
     expect(bot.shootStart).toBe(false);
-    // The gun stays holstered for a few ticks, like two key presses.
-    for (let tick = 0; tick < 10 && bot.curWeapIdx !== 0; tick++) combat.update(0.01, player, true);
+    combat.update(0.01, player, true);
     expect(bot.curWeapIdx).toBe(0);
     expect(bot.weapons[0].cooldown).toBe(GunDefs.mosin.switchDelay);
     expect(bot.weapons[0].cooldown).toBeLessThan(GunDefs.mosin.fireDelay);

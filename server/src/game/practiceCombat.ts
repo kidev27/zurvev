@@ -43,8 +43,8 @@ export function practiceInterceptPoint(
  * `switchDelay`, which for bolt rifles is shorter than `fireDelay`.
  *
  * - Other gun loaded and quicker to draw than waiting: swap to it and shoot.
- * - Otherwise: holster to melee for `holsterTime` and draw the same gun again.
- *   Faster fire when `switchDelay < fireDelay` (Mosin 1.75 s to about 1.1 s).
+ * - Otherwise: holster to melee and draw the same gun again on the next tick.
+ *   Faster fire when `switchDelay < fireDelay` (Mosin 1.75 s to about 1.0 s).
  *   When it is not faster (SPAS-12, M870, Model 94), the bot still does it
  *   to keep full speed. `maxCancelCost` can cap what that may cost per shot.
  *
@@ -57,8 +57,8 @@ export const PracticeBotOverclock = {
     cancelSlowdown: true,
     /** Most seconds a slow-walk swap may add to the wait for the next shot. Infinity: always swap. */
     maxCancelCost: Infinity,
-    /** Seconds the gun stays holstered before the bot draws it again: a fast player's two key presses. */
-    holsterTime: 0.06,
+    /** Seconds the gun stays holstered before the bot draws it again. 0: the next server tick. */
+    holsterTime: 0,
 };
 
 /**
@@ -252,7 +252,7 @@ export class PracticeCombat {
         return undefined;
     }
 
-    /** Put the gun away and draw it again `holsterTime` later. Ends the slow walk after a shot. */
+    /** Put the gun away and draw it again right after. Ends the slow walk after a shot. */
     private holster(slot: number, dt: number): void {
         this.player.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
         this.returnSlot = slot;
