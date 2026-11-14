@@ -26,12 +26,17 @@ import {
     PracticeMaxRespawnDelay,
     PracticeMelees,
     PracticeMinBotHealth,
+    type PracticeQsProfile,
+    PracticeQsProfiles,
+    PracticeQsProfileText,
     PracticeRandomGun,
     type PracticeRespawnMode,
     PracticeRespawnModes,
     PracticeScopes,
     type PracticeSettings,
     PracticeSliderMax,
+    practiceFireDelay,
+    practiceSwitchDelay,
     practiceWiggleToAdvanced,
     withPracticeBotSkill,
 } from "../../../shared/practice.ts";
@@ -207,11 +212,13 @@ function setGun(host: EditorHost, target: GunTarget, gun: string): void {
     host.changed();
 }
 
-function gunDetail(type: string): string {
+function gunDetail(type: string, profile: PracticeQsProfile): string {
     const def = GameObjectDefs.typeToDefSafe(type) as GunDef | undefined;
     if (!def || def.type !== "gun") return "";
     const ammo = (GameObjectDefs.typeToDefSafe(def.ammo) as AmmoDef | undefined)?.name ?? def.ammo;
-    return `${ammo} · ${def.maxClip} rounds · ${def.fireDelay} s between shots · ${def.switchDelay} s to switch to`;
+    const secs = (v: number) => `${Number(v.toFixed(3))} s`;
+    return `${ammo} · ${def.maxClip} rounds · ${secs(practiceFireDelay(type, profile))} between shots · `
+        + `${secs(practiceSwitchDelay(type, profile))} to switch to`;
 }
 
 export function renderGuns(root: HTMLElement, host: EditorHost): void {
@@ -306,7 +313,7 @@ export function renderGuns(root: HTMLElement, host: EditorHost): void {
     root.append(grid);
 
     const detail = el("div", { class: "pe-detail" });
-    detail.append(el("b", {}, itemName(selected)), el("span", { class: "pe-muted" }, gunDetail(selected)));
+    detail.append(el("b", {}, itemName(selected)), el("span", { class: "pe-muted" }, gunDetail(selected, host.settings.qsProfile)));
     root.append(detail);
 }
 
@@ -417,6 +424,30 @@ export function renderRespawnControls(root: HTMLElement, host: EditorHost): void
         }));
     }
     if (host.respawnBotsNow) root.append(button("Respawn bots now", () => host.respawnBotsNow!()));
+}
+
+export const QsProfileHint: Record<PracticeQsProfile, string> = {
+    survev: "Survev timing.",
+    resurviv: "Guns draw in a third of their switch time.",
+    nars: "Faster Mosin, SV-98 and a few others. compsurvev uses the same timing.",
+};
+
+/** Quick switch timing for the whole Practice game: you and the bots. */
+export function renderTimingControls(root: HTMLElement, host: EditorHost): void {
+    const s = host.settings;
+    root.append(sectionTitle("QUICK SWITCH"));
+    const picker = select(
+        "Quick switch timing",
+        PracticeQsProfiles.map((p) => ({ value: p, text: PracticeQsProfileText[p] })),
+        s.qsProfile,
+        (v) => {
+            s.qsProfile = v as PracticeQsProfile;
+            host.changed();
+        },
+    );
+    picker.classList.add("pe-wide");
+    root.append(picker);
+    root.append(el("p", { class: "pe-muted" }, QsProfileHint[s.qsProfile]));
 }
 
 export function renderBotList(root: HTMLElement, host: EditorHost, onPick: (i: number) => void): void {
@@ -558,6 +589,7 @@ export const EditorCss = `
 .pe .pe-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .pe .pe-row > .pe-label { width: 84px; flex: none; }
 .pe .pe-row > select, .pe .pe-row > .pe-seg { flex: 1; }
+.pe select.pe-wide { width: 100%; margin: 6px 0 2px; }
 .pe .pe-row-icon { width: 30px; height: 30px; flex: none; background: center / contain no-repeat; }
 .pe .pe-seg { display: flex; border: 1px solid var(--pe-border); border-radius: 8px; overflow: hidden; }
 .pe .pe-seg button { flex: 1; min-height: 40px; white-space: nowrap; border: 0; border-left: 1px solid var(--pe-border); background: var(--pe-tile); cursor: pointer; padding: 0 6px; }

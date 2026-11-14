@@ -24,6 +24,7 @@ import {
     renderGear,
     renderGuns,
     renderRespawnControls,
+    renderTimingControls,
     sectionTitle,
 } from "./practiceEditor.ts";
 import {
@@ -445,6 +446,7 @@ export class PracticeMenu implements EditorHost {
                 this.render();
             });
             renderRespawnControls(body, this);
+            renderTimingControls(body, this);
             body.append(el("p", { class: "pe-muted" }, "Bots restart only when their own settings change."));
         } else this.renderTools(body);
         root.append(body);

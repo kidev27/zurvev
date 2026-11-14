@@ -10,6 +10,7 @@ import {
     PracticePlayerRespawnDelay,
     type PracticeSettings,
     type PracticeStats,
+    PracticeQsTimings,
 } from "../../../shared/practice.ts";
 import type { Game } from "./game.ts";
 import type { DamageParams } from "./objects/gameObject.ts";
@@ -90,6 +91,8 @@ export class PracticeController {
             || this.settings.respawnDelay !== settings.respawnDelay;
         this.settings = settings;
         this.started = true;
+        // Quick switch timing for everyone in this Practice game, you and the bots.
+        player.game.gunTiming = settings.qsProfile === "survev" ? undefined : PracticeQsTimings[settings.qsProfile];
 
         if (botsChanged) {
             for (const slot of this.slots) {

@@ -99,7 +99,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-007 | Practice bots: healing and adrenaline | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `shared/net/practiceMsg.ts`, `client/src/ui/practiceEditor.ts` | `practiceBotHeal.test.ts` 17/17; `practice.test.ts` 60/60; `net` 10/10; full-game checks (see notes) | In-game feel. Protocol 1043: players must refresh. In the open a bot is almost never out of your sight, so it rarely heals until it can take cover (PRA-008) |
 | PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Needs Playtesting | PRA-007 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotPeek.test.ts` 6/6; `practiceBotHeal.test.ts` 26/26; full-game wall fights (see notes) | In-game feel on real maps (buildings, doors). The empty rifle in a nonstop close fight is still only reloaded by the reload rules |
 | PRA-009 | Practice bots: player move speed | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 60/60; `practiceBotOverclock.test.ts` 15/15 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
-| PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
+| PRA-003 | Quick Switch profiles | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `server/src/game/weaponManager.ts`, `server/src/game/practiceController.ts`, `client/src/ui/practiceEditor.ts` | `practiceQsProfiles.test.ts` 7/7; browser check of the dropdown | In-game feel of each profile. Surviv (original) timing not sourced |
 
 ### Notes
 
@@ -213,7 +213,15 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   3 s auto-respawn; Respawn (Space) brings you back and the bots start over. Auto-respawn can be turned off.
   Protocol 1042 (`PracticeRespawnMsg`).
 - The server already uses Survev switch rules: per-gun `switchDelay` plus a 1 s free-switch cooldown.
-  Resurviv runs on the same Survev code. Timings for the other profiles are not yet sourced.
+  Quick switch profiles (PRA-003), Practice only, dropdown "Quick switch" in the Practice menu, protocol 1044.
+  Applies to you and the bots in your Practice game (`Game.gunTiming`); every other mode is unchanged.
+  Free switch (0.25 s, once per 1 s), draw times and the pump-shotgun switch group are the same on all.
+  Survev: today's timing (default). Resurviv (github.com/NAMERIO/resurviv, main, Nov 2026): a switch to a gun
+  that is not free takes 0.33 of the gun's draw time (EU servers used 0.44 from Aug to Nov 2025), SPAS-16
+  0.29 s between shots. Nars (its client game data, protocol 1025): Mosin and SV-98 0.9 s between shots, VSS
+  0.144, Mk 12 0.144, M39 0.207, M249 0.09, SCAR 0.08, M1911 0.08, dual M1911 0.04. compsurvev.com (protocol
+  1040) has exactly the Nars values. Server-side switch code of Nars and compsurvev is not public; their
+  client code matches ours.
 
 ## Testing environment notes
 

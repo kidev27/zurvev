@@ -4,6 +4,7 @@ import {
     defaultPracticeBot,
     defaultPracticeSettings,
     type PracticeBotSettings,
+    type PracticeQsProfile,
     sanitizePracticeSettings,
 } from "../../shared/practice.ts";
 import { v2 } from "../../shared/utils/v2.ts";
@@ -14,7 +15,12 @@ export function duel(
     gun: string,
     secondary: string,
     distance: number,
-    { quickSwitch = true, dt = 0.02, bot: overrides = {} as Partial<PracticeBotSettings> } = {},
+    {
+        quickSwitch = true,
+        dt = 0.02,
+        bot: overrides = {} as Partial<PracticeBotSettings>,
+        qsProfile = "survev" as PracticeQsProfile,
+    } = {},
 ) {
     const game = createGame(TeamMode.Solo, "practice_arena", { endless: false });
     const player = game.playerBarn.addTestPlayer({ name: "Trainee" });
@@ -39,6 +45,7 @@ export function duel(
                 quickSwitch,
                 ...overrides,
             }],
+            qsProfile,
         }),
     );
     for (let i = 0; i < 20; i++) game.update(0.1);

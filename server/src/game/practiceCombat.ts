@@ -643,7 +643,7 @@ export class PracticeCombat {
             // Slow guns (bolt-actions, pumps): one shot, then hide while the gun recovers.
             // Faster guns: a short burst.
             const gun = GunDefs[p.weapons[p.curWeapIdx]?.type];
-            const slow = !!gun && gun.fireDelay >= PracticeBotOverclock.minFireDelay;
+            const slow = !!gun && this.fireDelayOf(p.weapons[p.curWeapIdx].type) >= PracticeBotOverclock.minFireDelay;
             const done = slow ? fired : this.peekSeenFor >= P.burst;
             if (done || this.peekOutFor >= P.maxOut || !this.loaded(p.curWeapIdx)) {
                 this.peekOut = false;
@@ -711,6 +711,16 @@ export class PracticeCombat {
         return def ? v2.length(def.attack.offset) + def.attack.rad : 0;
     }
 
+    /** Seconds between shots of this gun in this game (Practice timing profile applied). */
+    private fireDelayOf(type: string): number {
+        return this.player.game.gunTiming?.fireDelays[type] ?? GunDefs[type]?.fireDelay ?? 0;
+    }
+
+    /** Seconds to draw this gun on a switch that is not free, in this game. */
+    private drawTime(type: string): number {
+        return (GunDefs[type]?.switchDelay ?? 0) * (this.player.game.gunTiming?.switchDelayMult ?? 1);
+    }
+
     private loaded(slot: number): boolean {
         const weapon = this.player.weapons[slot];
         return !!GunDefs[weapon.type] && weapon.ammo > 0;
@@ -722,7 +732,7 @@ export class PracticeCombat {
         const current = GunDefs[p.weaponManager.activeWeapon];
         if (!next) return Infinity;
         if (current?.deployGroup && current.deployGroup === next.deployGroup) return next.switchDelay;
-        return p.freeSwitchTimer < 0 ? GameConfig.player.baseSwitchDelay : next.switchDelay;
+        return p.freeSwitchTimer < 0 ? GameConfig.player.baseSwitchDelay : this.drawTime(p.weapons[slot].type);
     }
 
     /** Close enough to shoot this gun, or to step in and shoot it. */
@@ -825,7 +835,7 @@ export class PracticeCombat {
         const score = (slot: number) => {
             const gun = GunDefs[this.player.weapons[slot].type];
             if (gun.bulletCount > 1) return distance < 12 ? 3 : distance < 20 ? 1 : 0;
-            if (gun.fireDelay >= 0.5) return distance > 24 ? 3 : 1;
+            if (this.fireDelayOf(this.player.weapons[slot].type) >= 0.5) return distance > 24 ? 3 : 1;
             return 2;
         };
         // A gun that reaches always beats one that does not.
@@ -880,7 +890,8 @@ export class PracticeCombat {
         const gun = GunDefs[p.weaponManager.activeWeapon];
         // A real shot leaves the gun on cooldown; a clip changed by hand does not.
         const slowShot = fired && p.weapons[active].cooldown > 0 && this.settings.quickSwitch
-            && gun?.fireDelay >= PracticeBotOverclock.minFireDelay && gun.fireMode !== "burst";
+            && this.fireDelayOf(p.weaponManager.activeWeapon) >= PracticeBotOverclock.minFireDelay
+            && gun.fireMode !== "burst";
 
         this.reloadSlot = this.planReload(distance, target);
         const using = this.updateItem(distance, target, canSee, this.reloadSlot);
@@ -920,7 +931,7 @@ export class PracticeCombat {
             // when the draw is no quicker than waiting, up to maxCancelCost.
             // A gun that just ran dry is not drawn again: the swap below ends the slow walk.
             const away = Math.max(dt, PracticeBotOverclock.holsterTime) + dt;
-            const cost = gun.switchDelay + away - p.weapons[active].cooldown;
+            const cost = this.drawTime(p.weaponManager.activeWeapon) + away - p.weapons[active].cooldown;
             const worth = cost < 0
                 || (PracticeBotOverclock.cancelSlowdown && cost <= PracticeBotOverclock.maxCancelCost);
             if (this.loaded(active) && worth) {
