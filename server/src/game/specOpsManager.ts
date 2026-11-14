@@ -135,7 +135,7 @@ import type { Loot } from "./objects/loot.ts";
 import type { Obstacle } from "./objects/obstacle.ts";
 import type { Player } from "./objects/player.ts";
 import type { Structure } from "./objects/structure.ts";
-import { PracticeCombat } from "./practiceCombat.ts";
+import { PracticeBotRange, PracticeCombat } from "./practiceCombat.ts";
 import { PracticeController, type PracticeHost } from "./practiceController.ts";
 import { SpecOpsContractRunner } from "./specOpsContracts.ts";
 import { doorFrameCenter, inferGroundLayer, MapNavGraph, navGroundLayer, stairAtPos } from "./specOpsNav.ts";
@@ -3946,6 +3946,9 @@ class AiBrain {
     dodgeSign = 1;
     /** Practice: whether the bot could see its target last tick (for reaction time). */
     practiceSawTarget = false;
+    /** Distances a practice bot moves by; unset means the gun in hand decides. */
+    private practiceMove?: { range: number; holdRange: number; closeTo: number };
+    private practiceMoveKey = "";
 
     constructor(
         player: Player,
@@ -4308,6 +4311,7 @@ class AiBrain {
                     holdRange: activeLoadout.holdRange,
                 };
             }
+            this.updatePracticeMoveRange(player);
         }
 
         this.planHouseAssault(dt, target, dist, patrolDowned, isBomber);
@@ -4626,7 +4630,8 @@ class AiBrain {
 
             let move = v2.create(0, 0);
             const hold = this.pushHoldRange(push);
-            const maxRange = this.loadout.range * (1.15 - push * 0.12);
+            const maxRange = (this.practiceMove?.range ?? this.loadout.range) * (1.15 - push * 0.12)
+                * (this.practiceMove?.closeTo ?? 1);
             // Only CQC charges from range. Dry-gun bots panic-melee only when already close.
             const meleeEngage = this.engagesMelee(dist);
             const meleeCloseDist = AiMeleeAttackRange - 0.15;
@@ -5536,8 +5541,35 @@ class AiBrain {
         return role === "medic" || role === "lieutenant" || role === "healer";
     }
 
+    /**
+     * A practice bot with two guns of different reach moves by the distance of
+     * the shorter one, so a sniper and shotgun bot closes in instead of standing
+     * off with the rifle. Firing still goes by the gun in hand.
+     */
+    private updatePracticeMoveRange(player: Player): void {
+        if (!this.practiceCombat || !PracticeBotRange.fightAtShortestGun) {
+            this.practiceMove = undefined;
+            this.practiceMoveKey = "";
+            return;
+        }
+        const guns = [GameConfig.WeaponSlot.Primary, GameConfig.WeaponSlot.Secondary]
+            .map((slot) => player.weapons[slot].type)
+            .filter((type) => GunDefs[type]);
+        const key = guns.join("|");
+        if (key === this.practiceMoveKey) return;
+        this.practiceMoveKey = key;
+        const ranges = guns.map((type) => practiceBotLoadout(type, this.practiceCombat!.settings, 0));
+        const shortest = ranges.reduce((a, b) => b.range < a.range ? b : a, ranges[0]);
+        // One gun, or two with the same reach: nothing changes.
+        const mixed = ranges.some((loadout) => loadout.range !== shortest.range);
+        this.practiceMove = mixed
+            ? { range: shortest.range, holdRange: shortest.holdRange, closeTo: PracticeBotRange.closeTo }
+            : undefined;
+    }
+
     private pushHoldRange(push: number): number {
-        const hold = this.loadout.holdRange + this.holdJitter;
+        const holdRange = this.practiceMove?.holdRange ?? this.loadout.holdRange;
+        const hold = holdRange + this.holdJitter;
         if (this.practiceCombat?.meleeEngaged) {
             return Math.min(hold, this.practiceCombat.meleeReach + (this.target?.rad ?? 1) - 0.4);
         }
@@ -5547,8 +5579,8 @@ class AiBrain {
             // backpedal out of AiMeleeAttackRange and never swing.
             return math.min(hold, AiMeleeAttackRange - 0.2);
         }
-        const rangeBias = math.clamp(this.loadout.holdRange / 50, 0, 1);
-        const minHold = math.max(4.5, this.loadout.holdRange * (0.35 + 0.3 * rangeBias));
+        const rangeBias = math.clamp(holdRange / 50, 0, 1);
+        const minHold = math.max(4.5, holdRange * (0.35 + 0.3 * rangeBias));
         return math.lerp(push, hold, minHold);
     }
 

@@ -37,6 +37,45 @@ export function practiceInterceptPoint(
 }
 
 /**
+ * How a practice bot overclocks. After a shot the gun waits `fireDelay` before
+ * the next one and the bot walks at half speed for that long. Swapping weapons
+ * ends the slow walk at once, and a gun drawn again is ready after its
+ * `switchDelay`, which for bolt rifles is shorter than `fireDelay`.
+ *
+ * - Other gun loaded and quicker to draw than waiting: swap to it and shoot.
+ * - Otherwise: holster to melee for one tick and draw the same gun again.
+ *   Faster fire when `switchDelay < fireDelay` (Mosin 1.75 s to about 1.0 s).
+ *   When it is not faster (SPAS-12, M870, Model 94), the bot still does it
+ *   to keep full speed. `maxCancelCost` can cap what that may cost per shot.
+ *
+ * Only runs when the bot's Quick switch setting is on.
+ */
+export const PracticeBotOverclock = {
+    /** Guns that fire faster than this never swap between shots. */
+    minFireDelay: 0.45,
+    /** Swap to end the slow walk even when it gains no fire rate. */
+    cancelSlowdown: true,
+    /** Most seconds a slow-walk swap may add to the wait for the next shot. Infinity: always swap. */
+    maxCancelCost: Infinity,
+};
+
+/**
+ * Where a practice bot with two guns fights.
+ *
+ * - It moves to the distance of its shortest-range gun, so both guns work there.
+ * - On the way in it shoots the gun that reaches and holsters it between shots.
+ *   It does not draw a gun that cannot reach yet.
+ */
+export const PracticeBotRange = {
+    /** Move to the shortest-range gun's distance. Off: the distance follows the gun in hand. */
+    fightAtShortestGun: true,
+    /** Walk in until the target is inside this share of that gun's fire range (shotguns 12.65 → 10.1). */
+    closeTo: 0.8,
+    /** Only draw a gun to shoot when the target is inside its fire range. */
+    drawOnlyInRange: true,
+};
+
+/**
  * When a practice bot reloads. A reload only works on the gun in hand, and the
  * bot cannot shoot while it reloads, so each rule says when that trade is worth it.
  *
@@ -76,7 +115,11 @@ function isReloadAction(action: number): boolean {
     return action === GameConfig.Action.Reload || action === GameConfig.Action.ReloadAlt;
 }
 
-/** Practice-only combat. All switches, fire, reloads and melee use the normal engine. */
+/**
+ * Practice-only combat. All switches, fire, reloads and melee use the normal engine.
+ * This class only decides when to press what a player can press; it must not
+ * change a gun's timers, ranges or damage.
+ */
 export class PracticeCombat {
     meleeEngaged = false;
     /** The gun the bot is reloading on purpose this tick; it holds fire for it. */
@@ -123,6 +166,11 @@ export class PracticeCombat {
     /** Close enough to shoot this gun, or to step in and shoot it. */
     private reaches(slot: number, distance: number): boolean {
         return distance <= this.fireRange(this.player.weapons[slot].type) * PracticeBotReload.reachSlack;
+    }
+
+    /** The target is inside this gun's fire range right now. */
+    private inFireRange(slot: number, distance: number): boolean {
+        return !PracticeBotRange.drawOnlyInRange || distance <= this.fireRange(this.player.weapons[slot].type);
     }
 
     private hasGun(slot: number): boolean {
@@ -202,6 +250,13 @@ export class PracticeCombat {
         return undefined;
     }
 
+    /** Put the gun away for one tick and draw it again. Ends the slow walk after a shot. */
+    private holster(slot: number, dt: number): void {
+        this.player.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
+        this.returnSlot = slot;
+        this.returnWait = dt;
+    }
+
     private preferredGun(distance: number): number {
         const loaded = [0, 1].filter((slot) => this.loaded(slot));
         if (!loaded.length) return this.player.curWeapIdx < 2 ? this.player.curWeapIdx : 0;
@@ -211,7 +266,9 @@ export class PracticeCombat {
             if (gun.fireDelay >= 0.5) return distance > 24 ? 3 : 1;
             return 2;
         };
-        return loaded.reduce((best, slot) => score(slot) > score(best) ? slot : best);
+        // A gun that reaches always beats one that does not.
+        const rank = (slot: number) => score(slot) + (this.inFireRange(slot, distance) ? 10 : 0);
+        return loaded.reduce((best, slot) => rank(slot) > rank(best) ? slot : best);
     }
 
     /**
@@ -255,36 +312,49 @@ export class PracticeCombat {
             return;
         }
 
+        const gun = GunDefs[p.weaponManager.activeWeapon];
+        // A real shot leaves the gun on cooldown; a clip changed by hand does not.
+        const slowShot = fired && p.weapons[active].cooldown > 0 && this.settings.quickSwitch
+            && gun?.fireDelay >= PracticeBotOverclock.minFireDelay && gun.fireMode !== "burst";
+
         this.reloadSlot = this.planReload(distance, target);
         if (this.reloadSlot !== undefined) {
             this.committedSlot = undefined;
-            if (active !== this.reloadSlot) p.weaponManager.setCurWeapIndex(this.reloadSlot);
+            if (active !== this.reloadSlot) {
+                p.weaponManager.setCurWeapIndex(this.reloadSlot);
+            } else if (slowShot && PracticeBotOverclock.cancelSlowdown) {
+                // Reloading the gun it just fired: shed the slow walk first.
+                this.holster(active, dt);
+            }
             return;
         }
 
-        const gun = GunDefs[p.weaponManager.activeWeapon];
-        if (
-            fired && canAttack && this.settings.quickSwitch && gun?.fireDelay >= 0.45
-            && gun.fireMode !== "burst" && p.actionType === GameConfig.Action.None
-        ) {
+        if (slowShot && canAttack && p.actionType === GameConfig.Action.None) {
             const other = active === 0 ? 1 : 0;
-            if (this.loaded(other) && this.switchDelay(other) + dt < p.weapons[active].cooldown) {
+            if (
+                this.loaded(other) && this.inFireRange(other, distance)
+                && this.switchDelay(other) + dt < p.weapons[active].cooldown
+            ) {
                 p.weaponManager.setCurWeapIndex(other);
                 this.committedSlot = other;
                 return;
             }
-            // One slow gun: holster for a tick, then draw it again. A shotgun
-            // whose draw time costs as much as its recovery gains nothing here.
-            if (gun.switchDelay + dt * 2 < p.weapons[active].cooldown) {
-                p.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Melee);
-                this.returnSlot = active;
-                this.returnWait = dt;
+            // One slow gun: holster for a tick, then draw it again. The swap
+            // ends the half-speed walk after a shot, so it is worth it even
+            // when the draw is no quicker than waiting, up to maxCancelCost.
+            // A gun that just ran dry is not drawn again: the swap below ends the slow walk.
+            const cost = gun.switchDelay + dt * 2 - p.weapons[active].cooldown;
+            const worth = cost < 0
+                || (PracticeBotOverclock.cancelSlowdown && cost <= PracticeBotOverclock.maxCancelCost);
+            if (this.loaded(active) && worth) {
+                this.holster(active, dt);
                 return;
             }
         }
-        if (this.committedSlot === active && this.loaded(active)) return;
+        const usable = active < 2 && this.loaded(active) && this.inFireRange(active, distance);
+        if (this.committedSlot === active && usable) return;
         if (p.actionType !== GameConfig.Action.None && active < 2 && this.loaded(active)) return;
-        if (active >= 2 || !this.loaded(active) || p.weapons[active].cooldown <= 0) {
+        if (!usable || p.weapons[active].cooldown <= 0) {
             p.weaponManager.setCurWeapIndex(this.preferredGun(distance));
         }
     }

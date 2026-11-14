@@ -585,7 +585,10 @@ function combatScenario(overrides: Partial<ReturnType<typeof defaultPracticeBot>
 }
 
 test("Practice quick switch follows an actual shot and respects native equip delay", () => {
-    const { bot, player, combat } = combatScenario({ secondary: "spas12" });
+    const { game, bot, player, combat } = combatScenario({ secondary: "spas12" });
+    // Just inside the SPAS-12's fire range; past it the bot keeps the rifle (practiceBotRange.test.ts).
+    v2.set(player.pos, v2.add(bot.pos, v2.create(12, 0)));
+    game.grid.updateObject(player);
     combat.update(0.01, player, true);
     expect(bot.curWeapIdx).toBe(0);
     bot.weaponManager.fireWeapon(false);
@@ -637,6 +640,8 @@ test("Practice can disable quick switch and preserves same-deploy shotgun delays
     disabled.combat.update(0.01, disabled.player, true);
     expect(disabled.bot.curWeapIdx).toBe(0);
     const shotguns = combatScenario({ gun: "m870", secondary: "spas12" });
+    v2.set(shotguns.player.pos, v2.add(shotguns.bot.pos, v2.create(10, 0)));
+    shotguns.game.grid.updateObject(shotguns.player);
     shotguns.bot.weaponManager.fireWeapon(false);
     shotguns.combat.update(0.01, shotguns.player, true);
     expect(shotguns.bot.curWeapIdx).toBe(1);
