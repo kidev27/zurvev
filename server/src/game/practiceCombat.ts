@@ -168,7 +168,9 @@ export function practiceFireReach(gunType: string): number {
  *   cover within `coverSearch` units that gives time for a bandage, then heals.
  * - Being hit stops the item, and it waits `hitDelay` before it tries again.
  * - Being in your sight and reach stops the item, unless `finishIfLeft` or less is left.
- * - When your health is `pushTargetAt` or less it does not heal. It pushes.
+ * - It pushes (closes in, no item, no running for cover) when it is above
+ *   `coverAt` health and you are at `pushTargetAt` or less, or you are using a
+ *   heal or boost (`denyHeals`); or whenever it leads you by `pushLead` health.
  * - Order: reload if nothing is loaded, heal if at `urgentAt` or less,
  *   reload an empty gun, heal, top up clips, adrenaline.
  * - Health: it heals while at least one bandage's worth is missing, with a med
@@ -194,8 +196,12 @@ export const PracticeBotHeal = {
     coverAt: 60,
     /** How far it looks for cover, in units. */
     coverSearch: 24,
-    /** Your health at or below this: the bot does not heal, it closes in. */
+    /** Your health at or below this, with the bot above `coverAt`: it pushes. */
     pushTargetAt: 30,
+    /** The bot this much health or more ahead of you: it pushes, as it expects to win the trade. */
+    pushLead: 30,
+    /** You using a heal or boost, with the bot above `coverAt`: it pushes to shoot you through it. */
+    denyHeals: true,
     /** How hard it closes in then, 0 to 1 (the brain's push pressure). */
     pushPressure: 1,
     /** Adrenaline below this is topped up when safe. 50 is where the speed bonus starts. */
@@ -298,6 +304,16 @@ export class PracticeCombat {
     ) {
         this.lastAmmo = player.weapons.slice(0, 2).map((w) => w.ammo);
         this.lastHealth = player.health;
+    }
+
+    /** Should the bot close in now: it is winning, you are low, or you are healing. */
+    private wantsPush(target: Player): boolean {
+        const H = PracticeBotHeal;
+        const health = this.player.health;
+        if (health - target.health >= H.pushLead) return true;
+        if (health <= H.coverAt) return false;
+        const healing = H.denyHeals && target.actionType === GameConfig.Action.UseItem;
+        return target.health <= H.pushTargetAt || healing;
     }
 
     /** The bot is using a heal or boost item right now. */
@@ -606,8 +622,7 @@ export class PracticeCombat {
         this.unseenFor = canSee ? 0 : this.unseenFor + dt;
         this.sinceHit = p.health < this.lastHealth ? 0 : this.sinceHit + dt;
         this.lastHealth = p.health;
-        this.pushing = this.settings.shootsBack && !target.dead && !target.downed
-            && target.health <= PracticeBotHeal.pushTargetAt;
+        this.pushing = this.settings.shootsBack && !target.dead && !target.downed && this.wantsPush(target);
         const active = p.curWeapIdx;
         const fired = active < 2 && p.weapons[active].ammo < this.lastAmmo[active];
         this.lastAmmo = p.weapons.slice(0, 2).map((w) => w.ammo);
