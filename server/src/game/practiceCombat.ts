@@ -1,7 +1,8 @@
 import { BulletDefs } from "../../../shared/defs/gameObjects/bulletDefs.ts";
 import { GunDefs } from "../../../shared/defs/gameObjects/gunDefs.ts";
 import { MeleeDefs } from "../../../shared/defs/gameObjects/meleeDefs.ts";
-import { GameObjectDefs } from "../../../shared/defs/register.ts";
+import { ExplosionDefs } from "../../../shared/defs/gameObjects/explosionsDefs.ts";
+import { GameObjectDefs, MapObjectDefs } from "../../../shared/defs/register.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import type { PracticeBotSettings } from "../../../shared/practice.ts";
 import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
@@ -151,6 +152,54 @@ export function practiceFireReach(gunType: string): number {
 }
 
 /**
+ * What counts as cover for a practice bot: any solid obstacle that stops
+ * bullets, including walls, doors and buildings. Never something that
+ * explodes (barrels, stoves), and never a spot inside such a thing's blast.
+ */
+export const PracticeBotCover = {
+    /** How far to look for explosives around a spot; at least the biggest blast radius. */
+    explosiveSearch: 14,
+};
+
+/**
+ * How a practice bot peeks from cover. It hides at the edge of cover that you
+ * need `hideMin` units of sidestep to see past, and steps just past the edge
+ * to see you. It waits there until its gun is ready, steps out, shoots
+ * (one shot with a slow gun such as a bolt-action or pump, otherwise a
+ * `burst`), and steps back.
+ *
+ * It does not peek while it pushes, heals or walks to heal cover, when you
+ * are closer than `minDistance` (`shotgunMinDistance` for shotgun-only bots),
+ * or with no gun that reaches you.
+ * While hidden it aims where it last saw you.
+ */
+export const PracticeBotPeek = {
+    enabled: true,
+    /** Cover within this many units of the bot. */
+    search: 16,
+    /** You closer than this: no peeking, it fights in the open. */
+    minDistance: 12,
+    /** The same for a bot whose guns are all shotguns: it peeks corners up close. */
+    shotgunMinDistance: 4,
+    /**
+     * A peek is planned: if you are where it last saw you (within this many
+     * units) when it steps out, it shoots without a fresh reaction delay,
+     * as a player who pre-aimed a corner would. You moved: normal reaction.
+     */
+    expectRadius: 3,
+    /** The cover spot must make you walk this far sideways to see the bot (about 0.5 s). */
+    hideMin: 6,
+    /** Extra step past the first spot that sees you, so the shot is not clipped by the edge. */
+    stepOut: 0.3,
+    /** Guns faster than a bolt-action: seconds out per peek once it sees you. */
+    burst: 0.8,
+    /** Back to cover after this long out without a shot. */
+    maxOut: 1.5,
+    /** A reload at cover is finished first when the gun has this many rounds or fewer. */
+    waitReloadAt: 1,
+};
+
+/**
  * When a practice bot heals and uses adrenaline. Items work as they do for
  * every player: the bot walks at half speed while it uses one, and a shot or
  * a weapon swap cancels it.
@@ -233,6 +282,31 @@ function blocksBullets(o: Obstacle, layer: number): boolean {
     return o.active && !o.dead && o.collidable && !o.isWindow && o.height >= 0.25 && !!util.sameLayer(o.layer, layer);
 }
 
+/** Blast radius of an obstacle that explodes when destroyed (barrels, stoves), else 0. */
+function blastRadius(o: Obstacle): number {
+    const def = MapObjectDefs.typeToDef(o.type, "obstacle");
+    return def?.explosion ? ExplosionDefs[def.explosion]?.rad.max ?? 0 : 0;
+}
+
+/**
+ * Cover the bot may hide behind: anything solid that stops bullets (walls, doors,
+ * buildings, crates, rocks, trees), except things that explode.
+ */
+function isCover(o: Obstacle, layer: number): boolean {
+    return blocksBullets(o, layer) && blastRadius(o) === 0;
+}
+
+/** A spot inside the blast radius of something explosive. */
+function nearExplosive(player: Player, spot: Vec2): boolean {
+    const reach = PracticeBotCover.explosiveSearch;
+    return player.game.grid.intersectCollider(collider.createCircle(spot, reach)).some((obj) => {
+        if (obj.__type !== ObjectType.Obstacle) return false;
+        const o = obj as Obstacle;
+        const blast = o.dead ? 0 : blastRadius(o);
+        return blast > 0 && v2.distance(obstacleCenter(o), spot) < blast + player.rad;
+    });
+}
+
 function obstacleCenter(o: Obstacle): Vec2 {
     const col = o.collider;
     return col.type === collider.Type.Circle ? col.pos : v2.mul(v2.add(col.min, col.max), 0.5);
@@ -299,6 +373,18 @@ export class PracticeCombat {
     /** Where the bot is walking to heal behind cover, if anywhere. The brain moves it there. */
     healCover?: Vec2;
     private coverTicker = 0;
+    /** The current peek: where it hides and where it steps out to. */
+    peek?: { cover: Vec2; out: Vec2 };
+    /** True while it steps out or stands out to shoot. */
+    peekOut = false;
+    private peekTicker = 0;
+    private peekOutFor = 0;
+    private peekSeenFor = 0;
+
+    /** Where the peek wants the bot to stand now. */
+    get peekGoal(): Vec2 | undefined {
+        return this.peek && (this.peekOut ? this.peek.out : this.peek.cover);
+    }
 
     /**
      * @param fireRange how far the bot will shoot a given gun from (the brain's
@@ -410,12 +496,12 @@ export class PracticeCombat {
         for (const obj of near) {
             if (obj.__type !== ObjectType.Obstacle) continue;
             const o = obj as Obstacle;
-            if (!blocksBullets(o, p.layer)) continue;
+            if (!isCover(o, p.layer)) continue;
             const center = obstacleCenter(o);
             const away = v2.normalizeSafe(v2.sub(center, target.pos), v2.create(1, 0));
             const spot = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
             const walk = v2.distance(p.pos, spot);
-            if (walk >= bestDist || walk > radius) continue;
+            if (walk >= bestDist || walk > radius || nearExplosive(p, spot)) continue;
             // Not inside something else, and really hidden from the target.
             const blocked = p.game.grid.intersectCollider(collider.createCircle(spot, p.rad)).some((other) =>
                 other.__type === ObjectType.Obstacle
@@ -453,11 +539,130 @@ export class PracticeCombat {
         const running = target.health >= H.runFromAt;
         this.healCover = this.findHealCover(target, running ? H.runSearch : H.coverSearch);
         if (!this.healCover && running) {
+            // Straight away from you, or turned up to 90 degrees to keep out of a barrel's blast.
             const away = v2.normalizeSafe(v2.sub(p.pos, target.pos), v2.create(1, 0));
-            const back = v2.add(p.pos, v2.mul(away, H.retreatStep));
-            p.game.map.clampToMapBounds(back, 4);
-            this.healCover = back;
+            for (const turn of [0, 45, -45, 90, -90]) {
+                const back = v2.add(p.pos, v2.mul(v2.rotate(away, math.deg2rad(turn)), H.retreatStep));
+                p.game.map.clampToMapBounds(back, 4);
+                this.healCover ??= back;
+                if (!nearExplosive(p, back)) {
+                    this.healCover = back;
+                    break;
+                }
+            }
         }
+    }
+
+    /** A spot of the bot's size here touches no solid obstacle. */
+    private standable(spot: Vec2): boolean {
+        const p = this.player;
+        return !p.game.grid.intersectCollider(collider.createCircle(spot, p.rad)).some((other) =>
+            other.__type === ObjectType.Obstacle
+            && (other as Obstacle).collidable
+            && !(other as Obstacle).dead
+            && util.sameLayer((other as Obstacle).layer, p.layer)
+            && !!collider.intersectCircle((other as Obstacle).collider, spot, p.rad)
+        );
+    }
+
+    /**
+     * The best place to peek from: a hidden spot at one edge of a cover, and the
+     * shortest step past that edge that sees the target. Short steps make quick peeks.
+     */
+    private findPeek(target: Player, reach: number): { cover: Vec2; out: Vec2 } | undefined {
+        const P = PracticeBotPeek;
+        const p = this.player;
+        let best: { cover: Vec2; out: Vec2 } | undefined;
+        let bestScore = Infinity;
+        for (const obj of p.game.grid.intersectCollider(collider.createCircle(p.pos, P.search))) {
+            if (obj.__type !== ObjectType.Obstacle) continue;
+            const o = obj as Obstacle;
+            if (!isCover(o, p.layer)) continue;
+            const center = obstacleCenter(o);
+            const away = v2.normalizeSafe(v2.sub(center, target.pos), v2.create(1, 0));
+            const side = v2.perp(away);
+            const behind = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
+            const halfSide = obstacleHalfWidth(o, side);
+            for (const sign of [1, -1]) {
+                // Hide just inside the edge, so one short step clears it.
+                const inset = Math.max(0, halfSide - p.rad - 0.3);
+                const cover = v2.add(behind, v2.mul(side, sign * inset));
+                const walk = v2.distance(p.pos, cover);
+                if (walk > P.search || walk >= bestScore || nearExplosive(p, cover)) continue;
+                if (!this.standable(cover) || peekDistanceAt(target, cover, p.rad) < P.hideMin) continue;
+                // Step out a little at a time until it sees the target.
+                for (let step = 2 * p.rad; step <= halfSide + 2 * p.rad + 3; step += 0.5) {
+                    const out = v2.add(cover, v2.mul(side, sign * step));
+                    if (!this.standable(out) || peekDistanceAt(target, out, p.rad) > 0) continue;
+                    const usable = v2.distance(out, target.pos) <= reach
+                        && practiceOnScreen(out, target.pos, target)
+                        && !nearExplosive(p, out);
+                    if (usable) {
+                        // A long step costs twice: out and back on every peek.
+                        const score = walk + 2 * (step + P.stepOut);
+                        if (score < bestScore) {
+                            bestScore = score;
+                            best = { cover, out: v2.add(cover, v2.mul(side, sign * (step + P.stepOut))) };
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Run the hide, step out, shoot, step back cycle. */
+    private updatePeek(dt: number, target: Player, distance: number, canSee: boolean, fired: boolean): void {
+        const P = PracticeBotPeek;
+        const p = this.player;
+        const reach = Math.max(0, ...[0, 1].map((slot) => this.hasGun(slot) ? this.fireRange(p.weapons[slot].type) : 0));
+        const wanted = P.enabled && this.settings.shootsBack && !this.pushing && !this.usingItem && !this.healCover
+            && distance >= (reach <= PracticeBotView.shotgunRange ? P.shotgunMinDistance : P.minDistance)
+            && reach >= distance;
+        if (!wanted) {
+            this.peek = undefined;
+            this.peekOut = false;
+            return;
+        }
+        this.peekTicker -= dt;
+        if (!this.peekOut && (!this.peek || this.peekTicker <= 0)) {
+            this.peekTicker = 0.5;
+            // Keep the spot while it still hides the bot; otherwise look again.
+            const stillHides = this.peek && peekDistanceAt(target, this.peek.cover, p.rad) >= P.hideMin;
+            if (!stillHides) this.peek = this.findPeek(target, reach);
+        }
+        if (!this.peek) {
+            this.peekOut = false;
+            return;
+        }
+
+        if (this.peekOut) {
+            this.peekOutFor += dt;
+            this.peekSeenFor = canSee ? this.peekSeenFor + dt : 0;
+            // Slow guns (bolt-actions, pumps): one shot, then hide while the gun recovers.
+            // Faster guns: a short burst.
+            const gun = GunDefs[p.weapons[p.curWeapIdx]?.type];
+            const slow = !!gun && gun.fireDelay >= PracticeBotOverclock.minFireDelay;
+            const done = slow ? fired : this.peekSeenFor >= P.burst;
+            if (done || this.peekOutFor >= P.maxOut || !this.loaded(p.curWeapIdx)) {
+                this.peekOut = false;
+            }
+            return;
+        }
+
+        // At cover: step out once the gun will be ready when the bot gets there.
+        const atCover = v2.distance(p.pos, this.peek.cover) <= 0.5;
+        if (!atCover) return;
+        const active = p.curWeapIdx;
+        if (active > 1 || !this.loaded(active)) return;
+        const step = v2.distance(this.peek.cover, this.peek.out) / GameConfig.player.moveSpeed;
+        const reloading = isReloadAction(p.actionType);
+        if (reloading && p.weapons[active].ammo <= P.waitReloadAt) return;
+        if (p.weapons[active].cooldown > step) return;
+        this.peekOut = true;
+        this.peekOutFor = 0;
+        this.peekSeenFor = 0;
     }
 
     /**
@@ -680,6 +885,9 @@ export class PracticeCombat {
         this.reloadSlot = this.planReload(distance, target);
         const using = this.updateItem(distance, target, canSee, this.reloadSlot);
         this.updateHealCover(dt, target, this.healWindow(target, distance, canSee));
+        this.updatePeek(dt, target, distance, canSee, fired);
+        // Out on a peek with a loaded gun: shoot now. The shot cancels any reload, as for a player.
+        if (this.peekOut && active < 2 && this.loaded(active)) this.reloadSlot = undefined;
         if (using) {
             // Any swap or reload would cancel the item.
             this.reloadSlot = undefined;

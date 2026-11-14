@@ -137,6 +137,7 @@ import type { Structure } from "./objects/structure.ts";
 import {
     PracticeBotHeal,
     type PracticeBotItem,
+    PracticeBotPeek,
     PracticeBotRange,
     PracticeCombat,
     practiceFireReach,
@@ -3953,6 +3954,8 @@ class AiBrain {
     dodgeSign = 1;
     /** Practice: whether the bot could see its target last tick (for reaction time). */
     practiceSawTarget = false;
+    /** Where a practice bot last saw its target; it aims there from cover. */
+    private practiceLastSeen?: Vec2;
     /** Distances a practice bot moves by; unset means the gun in hand decides. */
     private practiceMove?: { range: number; holdRange: number; closeTo: number };
     private practiceMoveKey = "";
@@ -4297,10 +4300,16 @@ class AiBrain {
         }
 
         if (this.practice && this.practiceCombat) {
-            if (canSee && (!this.practiceSawTarget || this.practiceTarget !== target)) {
+            // A planned peek pre-aims where it last saw you. If you are still there,
+            // it shoots without a fresh reaction delay; if you moved, it reacts as usual.
+            const peeking = this.practiceCombat.peekOut;
+            const expected = peeking && !!this.practiceLastSeen
+                && v2.distance(this.practiceLastSeen, target.pos) <= PracticeBotPeek.expectRadius;
+            if (canSee && (!this.practiceSawTarget || this.practiceTarget !== target) && !expected) {
                 this.acquireTicker = math.max(this.acquireTicker, this.practice.reactionSec);
                 this.practiceAimTicker = 0;
             }
+            if (canSee) this.practiceLastSeen = v2.copy(target.pos);
             this.practiceSawTarget = canSee;
             this.practiceTarget = target;
             this.practiceCombat.update(
@@ -4309,6 +4318,7 @@ class AiBrain {
                 canSee && !target.downed && !this.practice.holdFire && this.acquireTicker <= 0,
                 canSee,
             );
+
             const activeGun = player.weaponManager.activeWeapon;
             if (GunDefs[activeGun] && activeGun !== this.loadout.gun) {
                 const activeLoadout = practiceBotLoadout(activeGun, this.practiceCombat.settings, 0);
@@ -4428,6 +4438,9 @@ class AiBrain {
                     ? v2.normalizeSafe(v2.sub(this.investigatePos, player.pos))
                     : desired);
             aimTarget = v2.rotate(walkAim, this.lookScanSign * math.deg2rad(28));
+        } else if (!canSee && this.practiceCombat?.peek && this.practiceLastSeen) {
+            // Peeking from cover: hold the aim where it last saw you.
+            aimTarget = v2.normalizeSafe(v2.sub(this.practiceLastSeen, player.pos), desired);
         } else if (!canSee) {
             const approach = this.investigatePos
                 ? v2.normalizeSafe(v2.sub(this.investigatePos, player.pos))
@@ -4530,10 +4543,9 @@ class AiBrain {
             const indoorZombie = zombieMelee && !!player.game.map.mapDef.gameMode.indoorMode;
 
             // A practice bot holding cover or using an item stands still on purpose: not stuck.
+            const holdGoal = this.practiceCombat?.healCover ?? this.practiceCombat?.peekGoal;
             const holdingStill = !!this.practiceCombat
-                && (this.practiceCombat.usingItem
-                    || (!!this.practiceCombat.healCover
-                        && v2.distance(player.pos, this.practiceCombat.healCover) <= 0.3));
+                && (this.practiceCombat.usingItem || (!!holdGoal && v2.distance(player.pos, holdGoal) <= 0.3));
             this.stuckTicker += dt;
             const stuckCheckDelay = indoorZombie ? 0.75 : 0.32;
             if (this.stuckTicker > stuckCheckDelay && !stairTransit && !this.stairTarget && !holdingStill) {
@@ -4837,10 +4849,11 @@ class AiBrain {
 
             // Hurt with no time to heal here: walk to cover, then hold it. After the
             // dodge, so a dodge cannot step it back out.
-            const healCover = this.practiceCombat?.healCover;
-            if (healCover) {
-                move = v2.distance(player.pos, healCover) > 0.3
-                    ? v2.normalizeSafe(v2.sub(healCover, player.pos))
+            // Peeking from cover works the same way: walk to the cover or the side spot, then hold.
+            const coverGoal = this.practiceCombat?.healCover ?? this.practiceCombat?.peekGoal;
+            if (coverGoal) {
+                move = v2.distance(player.pos, coverGoal) > 0.3
+                    ? v2.normalizeSafe(v2.sub(coverGoal, player.pos))
                     : v2.create(0, 0);
             }
             // Healing out of sight: stay put instead of walking back into view.
@@ -4897,7 +4910,7 @@ class AiBrain {
                         );
                     // Walking to heal cover hugs a wall on purpose: with a clear line, go straight,
                     // because wall steering would turn it away. Blocked: steer around as usual.
-                    const coverStraight = !!healCover && isPathClear(player.game, player, healCover, 0.8);
+                    const coverStraight = !!coverGoal && isPathClear(player.game, player, coverGoal, 0.8);
                     player.touchMoveDir = assaultDirect || zombieGraphRoute || authoredZombieCharge || coverStraight
                         ? v2.normalizeSafe(move)
                         : steerAroundWalls(
