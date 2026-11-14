@@ -1999,6 +1999,9 @@ function lateEnemyPerks(wave: number, kind: EnemyClass): string[] {
 }
 
 /** Practice bot loadout: range and fire rhythm follow the chosen gun's type. */
+/** AI shoots from up to this multiple of its loadout range. */
+const AiFireRangeMult = 1.15;
+
 function practiceBotLoadout(gun: string, settings: PracticeBotSettings, index: number, secondary = ""): EnemyLoadout {
     const def = GameObjectDefs.typeToDef(gun, "gun") as GunDef;
     const bulletRange = BulletDefs[def.bulletType]?.distance ?? 100;
@@ -4293,6 +4296,7 @@ class AiBrain {
                 dt,
                 target,
                 canSee && !target.downed && !this.practice.holdFire && this.acquireTicker <= 0,
+                canSee,
             );
             const activeGun = player.weaponManager.activeWeapon;
             if (GunDefs[activeGun] && activeGun !== this.loadout.gun) {
@@ -4901,7 +4905,7 @@ class AiBrain {
             ? 0.28
             : math.lerp(this.waveScale, 0.7, 0.92));
         const inCone = this.fovDot < 0 || aimDot >= this.fovDot;
-        const inRange = dist <= this.loadout.range * 1.15 && dist > 0.4;
+        const inRange = dist <= this.loadout.range * AiFireRangeMult && dist > 0.4;
         const metalBlocked = pathHitsReflectMetal(
             player.game,
             player,
@@ -9849,7 +9853,11 @@ export class SpecOpsManager implements PracticeHost {
             reactionSec: practiceReactionSeconds(settings.reaction),
             holdFire: !settings.shootsBack,
         };
-        brain.practiceCombat = new PracticeCombat(player, settings);
+        brain.practiceCombat = new PracticeCombat(
+            player,
+            settings,
+            (type) => practiceBotLoadout(type, settings, index).range * AiFireRangeMult,
+        );
         // strafeSign doubles as the strafe weight: 0 = no strafing, 2 = mostly sideways.
         brain.strafeSign = (Math.random() < 0.5 ? -1 : 1) * practiceStrafeWeight(settings.strafe);
         brain.strafeFlipTicker = util.random(flipMin, flipMax);
