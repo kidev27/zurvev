@@ -11,6 +11,7 @@ import {
     type PracticeSettings,
     removePracticeLoadout,
     sanitizePracticeSettings,
+    PracticeQsProfileText,
 } from "../../../shared/practice.ts";
 import {
     botSummary,
@@ -28,6 +29,7 @@ import {
     renderGear,
     renderGuns,
     renderRespawnControls,
+    renderTimingControls,
     RespawnModeText,
     sectionTitle,
 } from "./practiceEditor.ts";
@@ -215,6 +217,7 @@ export class PracticeLoadoutMenu implements EditorHost {
                 this.render();
             });
             renderRespawnControls(list, this);
+            renderTimingControls(list, this);
             const editor = el("div", { class: "pe-bot-editor" });
             renderBotEditor(editor, this);
             bots.append(list, editor);
@@ -279,6 +282,7 @@ export class PracticeLoadoutMenu implements EditorHost {
         side.append(el("div", { style: "height: 1px; background: var(--pe-border); margin: 10px 0" }));
         row("BOTS", "", `${s.bots.length} · ${botSummary(s.bots[0])}`);
         row("RESPAWN", "", s.respawnMode === "off" ? "By hand" : `${RespawnModeText[s.respawnMode]}, ${(s.respawnDelay / 10).toFixed(1)} s`);
+        row("QUICK SWITCH", "", PracticeQsProfileText[s.qsProfile]);
         side.append(el("p", { class: "plm-note" }, "Saved on this device. Used the moment you spawn."));
         return side;
     }

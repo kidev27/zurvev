@@ -78,7 +78,8 @@ test("loaded gun cannot reach: reloads the empty sniper in the open instead", ()
         const near = duel("spas12", "mosin", distance);
         near.bot.weapons[1].ammo = 0;
         near.run(1, true);
-        expect(near.bot.curWeapIdx, `${distance} units`).toBe(0);
+        // On the shotgun, or holstered for a moment between its shots: never on the empty rifle.
+        expect([0, GameConfig.WeaponSlot.Melee], `${distance} units`).toContain(near.bot.curWeapIdx);
         expect(near.bot.weapons[1].ammo).toBe(0);
         expect(reloading(near.bot)).toBe(false);
     }

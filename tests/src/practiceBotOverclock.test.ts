@@ -90,9 +90,12 @@ test("maxCancelCost caps what a full-speed swap may cost in fire rate", () => {
     expect(shoot("spas12", "", 10, 6).holstered).toBeGreaterThan(0);
 });
 
-test("cancelSlowdown off keeps the fire-rate swaps and drops the rest", () => {
+test("cancelSlowdown off: it switches only when that fires sooner, and walks slowed otherwise", () => {
     PracticeBotOverclock.cancelSlowdown = false;
-    expect(shoot("spas12", "", 10, 6).holstered).toBe(0);
+    // A lone SPAS-12 gains only from the free switch, once a second: it waits in between.
+    const spas = shoot("spas12", "", 10, 6);
+    expect(spas.slowed).toBeGreaterThan(0.2);
+    expect(spas.gap).toBeLessThanOrEqual(GunDefs.spas12.fireDelay + slack);
     expect(shoot("mosin", "", 30, 6).gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + slack);
 });
 
@@ -159,4 +162,45 @@ test("a holstered gun is drawn again on the next tick; holsterTime can slow that
     const slow = hold(0.06);
     expect(slow).toBeGreaterThanOrEqual(0.06 - dt);
     expect(slow).toBeLessThanOrEqual(0.06 + 2 * dt);
+});
+
+/** Mean seconds between shots (one or two guns, topped up once) and the share of time slowed. */
+function pairGap(gun: string, secondary: string, distance: number, qsProfile: "survev" | "resurviv" | "nars" = "survev") {
+    const { bot, run } = duel(gun, secondary, distance, { dt, qsProfile });
+    bot.weapons[0].ammo = 5000;
+    bot.weapons[1].ammo = 5000;
+    const times: number[] = [];
+    let t = 0;
+    let ammo = 10000;
+    let slowed = 0;
+    let ticks = 0;
+    run(8, true, () => {
+        t += dt;
+        ticks++;
+        const now = bot.weapons[0].ammo + bot.weapons[1].ammo;
+        if (now < ammo) times.push(t);
+        ammo = now;
+        if (bot.shotSlowdownTimer > 0) slowed++;
+        return false;
+    });
+    return { gap: (times[times.length - 1] - times[0]) / (times.length - 1), slowed: slowed / ticks };
+}
+
+test("it plans switches around the free switch: as fast as the switch rules allow, at full speed", () => {
+    // Best possible average from a search over the same rules (offline), with 0.03 s of slack.
+    const cases = [
+        ["spas12", "", 10, "survev", 0.68],
+        ["m870", "", 10, "survev", 0.74],
+        ["mosin", "spas12", 10, "survev", 0.51],
+        ["mosin", "sv98", 30, "survev", 0.63],
+        ["m870", "spas12", 10, "survev", 0.68],
+        ["mosin", "", 30, "resurviv", 0.34],
+        ["mosin", "spas12", 10, "resurviv", 0.26],
+        ["m870", "", 10, "resurviv", 0.31],
+    ] as const;
+    for (const [gun, secondary, distance, profile, best] of cases) {
+        const { gap, slowed } = pairGap(gun, secondary, distance, profile);
+        expect(gap, `${profile} ${gun}+${secondary}`).toBeLessThanOrEqual(best + 0.03);
+        expect(slowed, `${profile} ${gun}+${secondary}`).toBeLessThan(0.08);
+    }
 });

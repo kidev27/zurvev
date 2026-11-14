@@ -4543,9 +4543,18 @@ class AiBrain {
             const indoorZombie = zombieMelee && !!player.game.map.mapDef.gameMode.indoorMode;
 
             // A practice bot holding cover or using an item stands still on purpose: not stuck.
+            // A practice bot standing still on purpose (holding cover, using an item) is not
+            // stuck, and neither is one strafing in a fight: reversing its strafe is the point.
+            // Stuck checks would make it wander off out of its own range. Walking in from far
+            // away or to a cover spot it can be stuck (on a tree, on the wrong side of a wall),
+            // so the checks stay on then.
             const holdGoal = this.practiceCombat?.healCover ?? this.practiceCombat?.peekGoal;
+            const fightRange = (this.practiceMove?.range ?? this.loadout.range)
+                * (this.practiceMove?.closeTo ?? 1) * 1.15;
             const holdingStill = !!this.practiceCombat
-                && (this.practiceCombat.usingItem || (!!holdGoal && v2.distance(player.pos, holdGoal) <= 0.3));
+                && (this.practiceCombat.usingItem
+                    || (canSee && !holdGoal && dist <= fightRange)
+                    || (!!holdGoal && v2.distance(player.pos, holdGoal) <= 0.3));
             this.stuckTicker += dt;
             const stuckCheckDelay = indoorZombie ? 0.75 : 0.32;
             if (this.stuckTicker > stuckCheckDelay && !stairTransit && !this.stairTarget && !holdingStill) {
@@ -4668,6 +4677,9 @@ class AiBrain {
 
             if (
                 push < 0.42
+                // Practice bots use their own cover (heal cover, peeks). This one
+                // also picks bushes and walks a shotgun bot out of its range.
+                && !this.practiceCombat
                 && this.coverRefreshTicker <= 0
                 && !isBomber
                 && this.alerted

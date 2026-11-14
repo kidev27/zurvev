@@ -1,3 +1,4 @@
+import type { PracticeGunTiming } from "../../../shared/practice.ts";
 import { parseSpecOpsDifficulty } from "../../../shared/defs/maps/specOpsShop.ts";
 import { TeamMode } from "../../../shared/gameConfig.ts";
 import type { Loadout } from "../../../shared/utils/loadout.ts";
@@ -62,6 +63,11 @@ export class Game {
     config: ServerGameConfig;
     modeManager: GameModeManager;
     specOps?: SpecOpsManager;
+    /**
+     * Gun timing that differs from the defaults, for this game only. Practice
+     * sets it from the player's Quick switch choice; every other mode leaves it unset.
+     */
+    gunTiming?: PracticeGunTiming;
 
     now!: number;
     profiler = new Profiler();

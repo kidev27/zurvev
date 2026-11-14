@@ -181,6 +181,69 @@ export interface PracticeSettings {
     respawnMode: PracticeRespawnMode;
     /** Delay before bots respawn, in tenths of a second. */
     respawnDelay: number;
+    /** Gun timing to play with: survev's, or another server's. */
+    qsProfile: PracticeQsProfile;
+}
+
+/* ── Quick switch timing profiles ───────────────────────────────────────── */
+
+export const PracticeQsProfiles = ["survev", "resurviv", "nars"] as const;
+export type PracticeQsProfile = (typeof PracticeQsProfiles)[number];
+
+export const PracticeQsProfileText: Record<PracticeQsProfile, string> = {
+    survev: "Survev",
+    resurviv: "Resurviv",
+    nars: "Nars",
+};
+
+/** Gun timing that differs from survev's. */
+export interface PracticeGunTiming {
+    /** Seconds between shots, by gun. */
+    fireDelays: Readonly<Record<string, number>>;
+    /**
+     * A switch to a gun that is neither free (once per 1 s) nor between guns of
+     * one switch group takes the gun's draw time times this.
+     */
+    switchDelayMult: number;
+}
+
+/**
+ * Timing per profile. The free switch (0.25 s, once per 1 s), each gun's draw
+ * time and the pump-shotgun switch group are the same everywhere.
+ *
+ * - Resurviv: from github.com/NAMERIO/resurviv (main, November 2026). Its
+ *   weaponManager draws a gun in 0.33 of its draw time (since April 2025;
+ *   EU servers used 0.44 from August to November 2025).
+ * - Nars: read from its client game data (protocol 1025), November 2026.
+ *   compsurvev.com (protocol 1040) has exactly the same values.
+ */
+export const PracticeQsTimings: Record<PracticeQsProfile, PracticeGunTiming> = {
+    survev: { fireDelays: {}, switchDelayMult: 1 },
+    resurviv: { fireDelays: { spas16: 0.29 }, switchDelayMult: 0.33 },
+    nars: {
+        fireDelays: {
+            mosin: 0.9,
+            sv98: 0.9,
+            vss: 0.16 * 0.9,
+            mk12: 0.18 * 0.8,
+            m39: 0.23 * 0.9,
+            m249: 0.09,
+            scar: 0.08,
+            colt45: 0.08,
+            colt45_dual: 0.04,
+        },
+        switchDelayMult: 1,
+    },
+};
+
+/** Seconds between shots of `gun` under `profile`. */
+export function practiceFireDelay(gun: string, profile: PracticeQsProfile): number {
+    return PracticeQsTimings[profile].fireDelays[gun] ?? (BaseDefs[gun] as GunDef | undefined)?.fireDelay ?? 0;
+}
+
+/** Seconds to draw `gun` on a switch that is not free, under `profile`. */
+export function practiceSwitchDelay(gun: string, profile: PracticeQsProfile): number {
+    return ((BaseDefs[gun] as GunDef | undefined)?.switchDelay ?? 0) * PracticeQsTimings[profile].switchDelayMult;
 }
 
 /** The advanced movement values the main wiggle slider sets. */
@@ -216,6 +279,7 @@ export function defaultPracticeSettings(): PracticeSettings {
         bots: [defaultPracticeBot()],
         respawnMode: "each",
         respawnDelay: Math.round(PracticeBotRespawnDelay * 10),
+        qsProfile: "survev",
     };
 }
 
@@ -345,6 +409,9 @@ export function sanitizePracticeSettings(raw: Partial<PracticeSettings> | undefi
         bots,
         respawnMode,
         respawnDelay: clampInt(raw?.respawnDelay, 0, PracticeMaxRespawnDelay, def.respawnDelay),
+        qsProfile: (PracticeQsProfiles as readonly string[]).includes(raw?.qsProfile as string)
+            ? (raw!.qsProfile as PracticeQsProfile)
+            : def.qsProfile,
     };
 }
 

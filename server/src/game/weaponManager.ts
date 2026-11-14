@@ -165,7 +165,9 @@ export class WeaponManager {
 
             const swappingToGun = nextWeaponDef.type == "gun";
 
-            effectiveSwitchDelay = swappingToGun ? nextWeaponDef.switchDelay : 0;
+            // A Practice timing profile can shorten the draw (Resurviv: 0.33 of it).
+            const drawMult = this.player.game.gunTiming?.switchDelayMult ?? 1;
+            effectiveSwitchDelay = swappingToGun ? nextWeaponDef.switchDelay * drawMult : 0;
 
             if (this.player.freeSwitchTimer < 0) {
                 effectiveSwitchDelay = GameConfig.player.baseSwitchDelay;
@@ -411,7 +413,7 @@ export class WeaponManager {
                         weapon.cooldown += itemDef.burstDelay!;
                     }
                     this.offHand = !this.offHand;
-                    weapon.cooldown += itemDef.fireDelay;
+                    weapon.cooldown += this.timedGunDef(this.activeWeapon, itemDef).fireDelay;
                 }
                 for (let i = 0; i < this.bursts.length; i++) {
                     this.bursts[i] -= dt;
@@ -888,6 +890,12 @@ export class WeaponManager {
         return totalDamageMult;
     }
 
+    /** The gun's timing, with this game's timing profile (Practice) applied. */
+    private timedGunDef<T extends { fireDelay: number }>(type: string, itemDef: T): T {
+        const fireDelay = this.player.game.gunTiming?.fireDelays[type];
+        return fireDelay === undefined ? itemDef : { ...itemDef, fireDelay };
+    }
+
     /**
      * Delay before the next shot. Normally the gun's fireDelay; a Pack-a-Punch
      * "variableFireRate" gun fires its first shots after a reload faster, then
@@ -914,7 +922,10 @@ export class WeaponManager {
 
         const firstShotAccuracy = weapon.recoilTime <= 0;
 
-        const fireDelay = WeaponManager.shotFireDelay(itemDef, weapon.shotsSinceReload);
+        const fireDelay = WeaponManager.shotFireDelay(
+            this.timedGunDef(this.activeWeapon, itemDef),
+            weapon.shotsSinceReload,
+        );
         weapon.shotsSinceReload++;
         weapon.cooldown = fireDelay;
         weapon.recoilTime = itemDef.recoilTime;

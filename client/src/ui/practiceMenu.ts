@@ -24,6 +24,7 @@ import {
     renderGear,
     renderGuns,
     renderRespawnControls,
+    renderTimingControls,
     sectionTitle,
 } from "./practiceEditor.ts";
 import {
@@ -152,6 +153,7 @@ function changeGroups(s: PracticeSettings): string[] {
         ...s.bots.map((b) => JSON.stringify(b)),
         `bots:${s.bots.length}`,
         JSON.stringify([s.respawnMode, s.respawnDelay]),
+        s.qsProfile,
     ];
 }
 
@@ -445,6 +447,7 @@ export class PracticeMenu implements EditorHost {
                 this.render();
             });
             renderRespawnControls(body, this);
+            renderTimingControls(body, this);
             body.append(el("p", { class: "pe-muted" }, "Bots restart only when their own settings change."));
         } else this.renderTools(body);
         root.append(body);

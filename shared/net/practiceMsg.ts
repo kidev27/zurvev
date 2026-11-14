@@ -6,6 +6,7 @@ import {
     PracticeKitItems,
     PracticeMaxBots,
     PracticeRandomGun,
+    PracticeQsProfiles,
     PracticeRespawnModes,
     PracticeScopes,
     type PracticeSettings,
@@ -66,6 +67,7 @@ export class PracticeSettingsMsg implements AbstractMsg {
         }
         s.writeBits(Math.max(0, PracticeRespawnModes.indexOf(settings.respawnMode)), 2);
         s.writeBits(settings.respawnDelay, 7);
+        s.writeBits(Math.max(0, PracticeQsProfiles.indexOf(settings.qsProfile)), 2);
     }
 
     deserialize(s: BitStream) {
@@ -109,7 +111,8 @@ export class PracticeSettingsMsg implements AbstractMsg {
         }
         const respawnMode = PracticeRespawnModes[s.readBits(2)] ?? PracticeRespawnModes[0];
         const respawnDelay = s.readBits(7);
-        this.settings = sanitizePracticeSettings({ primary, secondary, kit, bots, respawnMode, respawnDelay });
+        const qsProfile = PracticeQsProfiles[s.readBits(2)] ?? PracticeQsProfiles[0];
+        this.settings = sanitizePracticeSettings({ primary, secondary, kit, bots, respawnMode, respawnDelay, qsProfile });
     }
 }
 

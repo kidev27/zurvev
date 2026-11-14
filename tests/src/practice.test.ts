@@ -642,10 +642,11 @@ test("Practice can disable quick switch and preserves same-deploy shotgun delays
     const shotguns = combatScenario({ gun: "m870", secondary: "spas12" });
     v2.set(shotguns.player.pos, v2.add(shotguns.bot.pos, v2.create(10, 0)));
     shotguns.game.grid.updateObject(shotguns.player);
+    // The engine still charges the full draw between two pump shotguns...
     shotguns.bot.weaponManager.fireWeapon(false);
-    shotguns.combat.update(0.01, shotguns.player, true);
-    expect(shotguns.bot.curWeapIdx).toBe(1);
+    shotguns.bot.weaponManager.setCurWeapIndex(1);
     expect(shotguns.bot.weapons[1].cooldown).toBe(GunDefs.spas12.switchDelay);
+    // The bot's way around it (through melee) is tested in practiceBotOverclock.test.ts.
 });
 
 test("Practice auto melee uses the selected weapon and returns to guns out of range", () => {
