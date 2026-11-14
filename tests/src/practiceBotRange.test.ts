@@ -90,3 +90,23 @@ test("in a match, a rifle and shotgun bot snipes while it closes to shotgun rang
     // Before this, the bot drew the shotgun far away and walked in for about 5 s without a shot.
     expect(good).toBe(true);
 });
+
+test("in a match, a shotgun bot strafing in a fight stays inside its range", () => {
+    // Before, the anti-stuck code read its strafe reversals as "stuck" and sent it wandering,
+    // and an old cover step walked it to bushes: it was out of range about half the time.
+    let best = 0;
+    for (let attempt = 0; attempt < 3 && best < 0.9; attempt++) {
+        const { game, bot, distance } = match("spas12", "", 8);
+        bot.weapons[0].ammo = 5000;
+        let inRange = 0;
+        let ticks = 0;
+        for (let t = 0; t < 10; t += dt) {
+            bot.health = 100;
+            game.update(dt);
+            ticks++;
+            if (distance() <= 12.65) inRange++;
+        }
+        best = Math.max(best, inRange / ticks);
+    }
+    expect(best).toBeGreaterThan(0.9);
+});
