@@ -98,6 +98,8 @@ export interface PracticeBotSettings {
     health: number;
     /** Armor level 0–3 (helmet + vest). */
     armor: number;
+    /** Spawn with a full adrenaline bar. */
+    startAdren: boolean;
 }
 
 /* ── Your spawn kit ──────────────────────────────────────────────────────── */
@@ -202,6 +204,7 @@ export function defaultPracticeBot(): PracticeBotSettings {
         // Same as a fresh survev player: 100 HP, no armor.
         health: 100,
         armor: 0,
+        startAdren: false,
     };
 }
 
@@ -298,6 +301,7 @@ function sanitizeBot(raw: Partial<PracticeBotSettings> | undefined): PracticeBot
         shootsBack: typeof raw?.shootsBack === "boolean" ? raw.shootsBack : def.shootsBack,
         health: clampInt(raw?.health, PracticeMinBotHealth, PracticeMaxBotHealth, def.health),
         armor: clampInt(raw?.armor, 0, PracticeMaxArmor, def.armor),
+        startAdren: typeof raw?.startAdren === "boolean" ? raw.startAdren : def.startAdren,
     };
 }
 

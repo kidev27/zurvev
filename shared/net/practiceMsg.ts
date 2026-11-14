@@ -62,6 +62,7 @@ export class PracticeSettingsMsg implements AbstractMsg {
             s.writeBoolean(bot.shootsBack);
             s.writeBits(bot.health, 9);
             s.writeBits(bot.armor, 2);
+            s.writeBoolean(bot.startAdren);
         }
         s.writeBits(Math.max(0, PracticeRespawnModes.indexOf(settings.respawnMode)), 2);
         s.writeBits(settings.respawnDelay, 7);
@@ -103,6 +104,7 @@ export class PracticeSettingsMsg implements AbstractMsg {
                 shootsBack: s.readBoolean(),
                 health: s.readBits(9),
                 armor: s.readBits(2),
+                startAdren: s.readBoolean(),
             });
         }
         const respawnMode = PracticeRespawnModes[s.readBits(2)] ?? PracticeRespawnModes[0];

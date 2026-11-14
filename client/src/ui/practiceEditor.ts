@@ -522,6 +522,7 @@ export function renderBotEditor(root: HTMLElement, host: EditorHost): void {
     root.append(toggle("Shoots back", bot.shootsBack, (v) => edit((b) => (b.shootsBack = v))));
     root.append(toggle("Quick switch", bot.quickSwitch, (v) => edit((b) => (b.quickSwitch = v))));
     root.append(toggle("Auto melee up close", bot.autoMelee, (v) => edit((b) => (b.autoMelee = v))));
+    root.append(toggle("Start with full adrenaline", bot.startAdren, (v) => edit((b) => (b.startAdren = v))));
 }
 
 /* ── Styles ───────────────────────────────────────────────────────────── */
