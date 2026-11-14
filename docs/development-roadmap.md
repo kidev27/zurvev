@@ -167,6 +167,10 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   a heal in survev, so denying a heal means getting close and shooting through it. Measured, you using a med
   kit 35 units away with the bot at 90: distance when your heal ends Mosin + SPAS-12 13.1 to 5.2, AK-47 27.0
   to 6.4, Mosin 41.4 to 14.2.
+- Bot runs to heal (`PracticeBotHeal.runFromAt`, `runSearch`, `retreatStep`). At 60 health or less against you at
+  70 or more, it looks for heal cover within 40 units instead of 24, and with none it backs away from you 8 units
+  at a time until it can heal (out of your screen or reach). Bot at 35, you at 100 standing in view, 12 matches
+  of 15 s: AK-47 healed in 2 to 9 of them (health after 15 s 40 to 64), Mosin 7 to 9 (54 to 68).
 - Bot fire range fix (`PracticeBotView` in `server/src/game/practiceCombat.ts`). Bots only fired inside a fixed
   brain range (autos 30 units, pistols 34.5, shotguns 12.65), so at 40 units an AK bot walked in for about 2 s
   without a shot, and only a separate return-fire rule made it answer once you shot it. A practice bot now
