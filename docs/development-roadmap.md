@@ -97,7 +97,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-005 | Practice bots: reload and gun choice | Practice | P1 | Needs Playtesting | None | `server/src/game/practiceCombat.ts` | `practiceBotReload.test.ts` 9/9; `practice.test.ts` 59/59; full-game fights before/after (see notes) | In a nonstop close fight with no break the empty gun still waits (needs PRA-008) |
 | PRA-006 | Practice bots: overclocking and gun swaps by range | Practice | P1 | Needs Playtesting | PRA-005 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotOverclock.test.ts` 16/16; `practiceBotRange.test.ts` 8/8; `practice.test.ts` 60/60; full-game fights before/after (see notes) | In-game feel. Fast semi-autos (DMRs, pistols, M1014, M1100) still slow the bot while it shoots: needs a decision. The rifle is often empty by the time the bot is close (needs PRA-008) |
 | PRA-007 | Practice bots: healing and adrenaline | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `shared/net/practiceMsg.ts`, `client/src/ui/practiceEditor.ts` | `practiceBotHeal.test.ts` 17/17; `practice.test.ts` 60/60; `net` 10/10; full-game checks (see notes) | In-game feel. Protocol 1043: players must refresh. In the open a bot is almost never out of your sight, so it rarely heals until it can take cover (PRA-008) |
-| PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Needs Playtesting | PRA-007 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotPeek.test.ts` 6/6; `practiceBotHeal.test.ts` 26/26; full-game wall fights (see notes) | In-game feel on real maps (buildings, doors). The empty rifle in a nonstop close fight is still only reloaded by the reload rules |
+| PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Needs Playtesting | PRA-007 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotPeek.test.ts` 11/11; `practiceBotHeal.test.ts` 26/26; full-game wall and rock fights on each Quick switch profile (see notes) | In-game feel on real maps (buildings, doors). The empty rifle in a nonstop close fight is still only reloaded by the reload rules |
 | PRA-009 | Practice bots: player move speed | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 60/60; `practiceBotOverclock.test.ts` 15/15 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `server/src/game/weaponManager.ts`, `server/src/game/practiceController.ts`, `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/practiceEditor.ts` | `practiceQsProfiles.test.ts` 8/8; `practiceBotOverclock.test.ts` 16/16; `practiceBotRange.test.ts` 8/8; browser check of the dropdown; full fights per profile (see notes) | In-game feel of each profile. Surviv (original) timing not sourced |
 
@@ -190,6 +190,19 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   shot). Shotgun-only bots peek corners from 4 units. Container wall, 30 units, 5 fights of 15 s: Mosin step-out
   to shot 0.89 to 0.15 s, peeks with a shot 40 of 43 to 55 of 55, time you can see it 7.2 to 1.5 s; SV-98
   behind a rock 0.50 to 0.18 s; AK-47 first shot 0.50 to 0.13 s; SPAS-12 at 10 units 0 peeks to 77 shots in 79.
+- Quick peeks, third pass (PRA-008). Measured from a playtest clip of a player peeking a rock with a sniper:
+  he steps out about 2 units, shoots 0.05 to 0.17 s after starting to move, and is back in cover by about
+  0.4 s. Bot changes (decisions only): no reaction delay on its own peeks wherever you moved
+  (`PracticeBotPeek.expectRadius` is now Infinity; the accuracy setting still decides hits); the step-out spot
+  needs a clear bullet line 0.5 units to each side (`shotClearance`), since a line grazing a metal edge made
+  it hold fire; at its spot (or when it should be there) and not seeing you for 0.2 s (`giveUp`) it goes back
+  and plans again, instead of standing out up to 1.5 s; right before stepping out it re-plans if you moved
+  more than 1 unit (`replanMove`); a planned spot more than 16 units away is dropped (a spot planned before
+  a long move kept "hiding" it and walked it off across the map: 0 peeks and 2 shots in 12 s); out on a peek
+  it shoots the ready gun in hand instead of swapping to its preferred gun. Rock or container wall at 28
+  units, 12 s, on all three Quick switch profiles: with you strafing 3 units, Mosin step-out to shot 0.6 to
+  0.19-0.23 s, time out per peek 0.6 to 0.25 s; Mosin+SV-98 on Survev 1.1 to 0.23 s; peeks that found you
+  gone 0.2-0.3 s instead of up to 1.5 s.
 - Bot fire range fix (`PracticeBotView` in `server/src/game/practiceCombat.ts`). Bots only fired inside a fixed
   brain range (autos 30 units, pistols 34.5, shotguns 12.65), so at 40 units an AK bot walked in for about 2 s
   without a shot, and only a separate return-fire rule made it answer once you shot it. A practice bot now

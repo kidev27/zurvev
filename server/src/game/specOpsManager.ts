@@ -4300,8 +4300,8 @@ class AiBrain {
         }
 
         if (this.practice && this.practiceCombat) {
-            // A planned peek pre-aims where it last saw you. If you are still there,
-            // it shoots without a fresh reaction delay; if you moved, it reacts as usual.
+            // A planned peek pre-aims where it last saw you and adjusts, as a player does:
+            // no fresh reaction delay if you are within PracticeBotPeek.expectRadius of it.
             const peeking = this.practiceCombat.peekOut;
             const expected = peeking && !!this.practiceLastSeen
                 && v2.distance(this.practiceLastSeen, target.pos) <= PracticeBotPeek.expectRadius;

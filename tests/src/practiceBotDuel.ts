@@ -84,7 +84,7 @@ export function duel(
 }
 
 /** A whole Practice match with one bot, its brain running, `start` units from a player who cannot die. */
-export function match(gun: string, secondary: string, start: number) {
+export function match(gun: string, secondary: string, start: number, qsProfile: PracticeQsProfile = "survev") {
     const game = createGame(TeamMode.Solo, "practice_arena", { endless: false });
     const player = game.playerBarn.addTestPlayer({ name: "Trainee" });
     player.debug.godMode = true;
@@ -93,6 +93,7 @@ export function match(gun: string, secondary: string, start: number) {
         player,
         sanitizePracticeSettings({
             ...defaultPracticeSettings(),
+            qsProfile,
             bots: [{ ...defaultPracticeBot(), gun, secondary, quickSwitch: true }],
         }),
     );

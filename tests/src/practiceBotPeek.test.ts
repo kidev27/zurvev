@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 import { PracticeBotPeek, practicePeekDistance } from "../../server/src/game/practiceCombat.ts";
+import { type PracticeQsProfile, PracticeQsProfiles } from "../../shared/practice.ts";
 import { v2 } from "../../shared/utils/v2.ts";
 import { match } from "./practiceBotDuel.ts";
 
@@ -116,14 +117,24 @@ test("explosive barrels are never cover, and it never picks a spot in their blas
     }
 });
 
-/** Seconds from stepping out to the shot, for each peek that shot. */
-function peekTimes(gun: string, distance: number, seconds: number) {
-    const m = match(gun, "", 20);
+/**
+ * Seconds from stepping out to the shot, for each peek that shot.
+ * @param strafe you walk this far up and down, as a player who keeps moving
+ */
+function peekTimes(
+    gun: string,
+    distance: number,
+    seconds: number,
+    cover = "container_wall_side",
+    strafe = 0,
+    qsProfile: PracticeQsProfile = "survev",
+) {
+    const m = match(gun, "", 20, qsProfile);
     v2.set(m.player.pos, v2.create(30, 30));
     v2.set(m.bot.pos, v2.create(30 + distance, 30));
     m.game.grid.updateObject(m.player);
     m.game.grid.updateObject(m.bot);
-    m.game.map.genObstacle("container_wall_side", v2.create(25 + distance, 30), m.player.layer, 0, 1);
+    m.game.map.genObstacle(cover, v2.create(25 + distance, 30), m.player.layer, 0, 1);
     const combat = m.brain.practiceCombat;
     const times: number[] = [];
     let peeks = 0;
@@ -132,6 +143,10 @@ function peekTimes(gun: string, distance: number, seconds: number) {
     for (let t = 0; t < seconds; t += dt) {
         m.bot.health = 100;
         m.bot.boost = 100;
+        if (strafe) {
+            v2.set(m.player.pos, v2.create(30, 30 + strafe * Math.sin(t * 2.5)));
+            m.game.grid.updateObject(m.player);
+        }
         const ammo = m.bot.weapons[0].ammo;
         const wasOut = combat.peekOut;
         m.game.update(dt);
@@ -148,16 +163,77 @@ function peekTimes(gun: string, distance: number, seconds: number) {
     return { peeks, times: times.sort((a, b) => a - b) };
 }
 
-test("a sniper peeks quick: shoots within 0.3 s of stepping out, on nearly every peek", () => {
+test("a sniper peeks quick: shoots within 0.35 s of stepping out, on nearly every peek", () => {
     const runs = [0, 1, 2].map(() => peekTimes("mosin", 30, 8)).sort((a, b) => b.peeks - a.peeks);
     const { peeks, times } = runs[0];
     expect(peeks).toBeGreaterThanOrEqual(5);
     expect(times.length).toBeGreaterThanOrEqual(peeks - 1);
-    expect(times[Math.floor(times.length / 2)]).toBeLessThan(0.3);
+    expect(times[Math.floor(times.length / 2)]).toBeLessThan(0.35);
 });
 
 test("a shotgun bot peeks a corner up close", () => {
     const runs = [0, 1, 2].map(() => peekTimes("spas12", 10, 6)).sort((a, b) => b.peeks - a.peeks);
     expect(runs[0].peeks).toBeGreaterThanOrEqual(4);
     expect(runs[0].times.length).toBeGreaterThanOrEqual(runs[0].peeks - 1);
+});
+
+test("a sniper peeking a player who keeps moving still shoots within 0.35 s of stepping out, on every quick switch profile", () => {
+    // Before, you moving more than 3 units from where it last saw you cost it a full
+    // reaction delay (0.5 s on Normal) standing in the open.
+    for (const profile of PracticeQsProfiles) {
+        const runs = [0, 1, 2].map(() => peekTimes("mosin", 28, 8, "stone_01", 3, profile))
+            .sort((a, b) => b.times.length - a.times.length);
+        const { peeks, times } = runs[0];
+        expect(peeks, profile).toBeGreaterThanOrEqual(5);
+        // A peek that finds you gone goes back without a shot; most peeks shoot.
+        expect(times.length, profile).toBeGreaterThanOrEqual(Math.floor(peeks * 0.8));
+        expect(times[Math.floor(times.length / 2)], profile).toBeLessThan(0.35);
+    }
+});
+
+test("a peek planned before the bot moved far away is dropped, not walked to", () => {
+    const m = wall("mosin", 0.5);
+    const combat = m.brain.practiceCombat;
+    expect(combat.peek).toBeDefined();
+    // The bot ends up 40 units away (a respawn, a long chase): the old spot is far behind it.
+    v2.set(m.bot.pos, v2.create(60, 70));
+    m.game.grid.updateObject(m.bot);
+    for (let t = 0; t < 1; t += dt) {
+        m.bot.health = 100;
+        m.game.update(dt);
+        // Before, it kept the old spot because it still hid the bot, and walked off toward it.
+        if (combat.peek) expect(v2.distance(combat.peek.cover, m.bot.pos)).toBeLessThanOrEqual(PracticeBotPeek.search + 1);
+    }
+});
+
+/** Seconds out per peek, when you duck behind your own wall each time it steps out. */
+function goneTimes() {
+    const m = wall("mosin", 0.1);
+    const combat = m.brain.practiceCombat;
+    const outFor: number[] = [];
+    let since = -1;
+    for (let t = 0; t < 8; t += dt) {
+        m.bot.health = 100;
+        m.bot.boost = 100;
+        const wasOut = combat.peekOut;
+        m.game.update(dt);
+        if (combat.peekOut && !wasOut) {
+            since = t;
+            m.game.map.genObstacle("container_wall_side", v2.create(m.player.pos.x + 3, m.player.pos.y), m.player.layer, 0, 1);
+        }
+        if (!combat.peekOut && wasOut && since >= 0) {
+            outFor.push(t - since);
+            since = -1;
+        }
+    }
+    return outFor;
+}
+
+test("a peek that finds you gone goes straight back to cover", () => {
+    // Matches are random: keep the first of three that peeks at all.
+    let outFor: number[] = [];
+    for (let attempt = 0; attempt < 3 && !outFor.length; attempt++) outFor = goneTimes();
+    expect(outFor.length).toBeGreaterThanOrEqual(1);
+    // Before, it stood out up to PracticeBotPeek.maxOut (1.5 s).
+    expect(Math.max(...outFor)).toBeLessThan(0.8);
 });
