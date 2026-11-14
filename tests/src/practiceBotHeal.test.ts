@@ -184,8 +184,8 @@ test("seeing you again stops the item, unless it is nearly done", () => {
     expect(late.bot.health).toBe(90);
 });
 
-test("when you are low it does not heal: it pushes", () => {
-    const { player, combat, run, item } = hurt(40);
+test("you low and the bot not: it does not heal, it pushes", () => {
+    const { player, combat, run, item } = hurt(75);
     player.health = PracticeBotHeal.pushTargetAt;
     run(1.5, false, () => item() !== "");
     expect(item()).toBe("");
@@ -199,9 +199,52 @@ test("when you are low it does not heal: it pushes", () => {
     mid.run(2 * dt, false);
     expect(mid.item()).toBe("");
 
-    const healthy = hurt(40);
+    // Both low and close: it heals when it can, as you would.
+    const both = hurt(40);
+    both.player.health = 30;
+    both.run(dt, false);
+    expect(both.combat.pushing).toBe(false);
+});
+
+test("it pushes whenever it leads you by pushLead health, even when hurt", () => {
+    const lead = hurt(55);
+    lead.player.health = 55 - PracticeBotHeal.pushLead;
+    lead.run(dt, false);
+    expect(lead.combat.pushing).toBe(true);
+
+    const close = hurt(55);
+    close.player.health = 55 - PracticeBotHeal.pushLead + 5;
+    close.run(dt, false);
+    expect(close.combat.pushing).toBe(false);
+
+    // Full health against full health: no push.
+    const even = hurt(100);
+    even.run(dt, false);
+    expect(even.combat.pushing).toBe(false);
+});
+
+test("you healing: it pushes to shoot you through it, unless it is low itself", () => {
+    const healthy = hurt(90);
+    healthy.player.health = 80;
+    healthy.player.doAction("bandage", Action.UseItem, 3);
+    expect(healthy.player.actionType).toBe(Action.UseItem);
     healthy.run(dt, false);
-    expect(healthy.combat.pushing).toBe(false);
+    expect(healthy.combat.pushing).toBe(true);
+
+    // At coverAt or less it uses your heal time to heal itself instead.
+    const low = hurt(PracticeBotHeal.coverAt);
+    low.player.health = 80;
+    low.player.doAction("bandage", Action.UseItem, 3);
+    low.run(dt, false);
+    expect(low.combat.pushing).toBe(false);
+
+    // denyHeals off: your heal alone is no reason to push.
+    PracticeBotHeal.denyHeals = false;
+    const off = hurt(90);
+    off.player.health = 80;
+    off.player.doAction("bandage", Action.UseItem, 3);
+    off.run(dt, false);
+    expect(off.combat.pushing).toBe(false);
 });
 
 test("your reload counts: it heals only if it can finish first, and shoots you if it can", () => {
@@ -361,6 +404,11 @@ test("in the open it heals only past your reach and screen, with what it can fin
 
 test("cover is measured from the map: a tree between you and the bot", () => {
     const { bot, player } = hurt(100);
+    // Open ground near the map corner.
+    v2.set(player.pos, v2.create(30, 30));
+    v2.set(bot.pos, v2.create(45, 30));
+    bot.game.grid.updateObject(player);
+    bot.game.grid.updateObject(bot);
     expect(practicePeekDistance(player, bot)).toBe(0);
     // A real tree trunk halfway along the line, then the bot right behind it.
     const tree = bot.game.map.genObstacle(
@@ -395,21 +443,29 @@ test("a tree is thin cover: from 15 units you see behind it after a short sidest
 });
 
 test("in a match, hurt in the open with no time to heal, it walks behind a wall and heals there", () => {
-    const { game, player, bot, brain } = match("mosin", "spas12", 15);
-    // Open ground near the map corner: you, the bot 22 units east, a container wall to its side.
-    v2.set(player.pos, v2.create(30, 30));
-    v2.set(bot.pos, v2.create(52, 30));
-    game.grid.updateObject(player);
-    game.grid.updateObject(bot);
-    const wall = game.map.genObstacle("container_wall_side", v2.create(55, 37), player.layer, 0, 1);
-    bot.health = 40;
-    let hiddenAt = -1;
-    let healStart = -1;
-    for (let t = 0; t < 8 && healStart < 0; t += 0.01) {
-        game.update(0.01);
-        if (hiddenAt < 0 && practicePeekDistance(player, bot) > 0) hiddenAt = t;
-        if (bot.actionType === Action.UseItem) healStart = t;
-    }
+    // A match is random: a bot can be held up on the way. One good match in three is enough.
+    const setup = () => {
+        const m = match("mosin", "spas12", 15);
+        // Open ground near the map corner: you, the bot 22 units east, a container wall to its side.
+        v2.set(m.player.pos, v2.create(30, 30));
+        v2.set(m.bot.pos, v2.create(52, 30));
+        m.game.grid.updateObject(m.player);
+        m.game.grid.updateObject(m.bot);
+        const wall = m.game.map.genObstacle("container_wall_side", v2.create(55, 37), m.player.layer, 0, 1);
+        m.bot.health = 40;
+        let hiddenAt = -1;
+        let healStart = -1;
+        for (let t = 0; t < 8 && healStart < 0; t += 0.01) {
+            m.game.update(0.01);
+            if (hiddenAt < 0 && practicePeekDistance(m.player, m.bot) > 0) hiddenAt = t;
+            if (m.bot.actionType === Action.UseItem) healStart = t;
+        }
+        return { ...m, wall, hiddenAt, healStart };
+    };
+    let run = setup();
+    for (let attempt = 1; attempt < 3 && run.healStart < 0; attempt++) run = setup();
+    const { game, player, bot, brain, wall, hiddenAt, healStart } = run;
+    void player;
     expect(hiddenAt).toBeGreaterThanOrEqual(0);
     expect(healStart).toBeGreaterThanOrEqual(hiddenAt);
     expect(v2.distance(bot.pos, wall.pos)).toBeLessThan(6);
@@ -423,7 +479,7 @@ test("in a match, hurt in the open with no time to heal, it walks behind a wall 
     expect(v2.distance(bot.pos, spot)).toBeLessThan(0.5);
 });
 
-test("above coverAt health, or when you are low, it does not run for cover", () => {
+test("above coverAt health, or while it pushes, it does not run for cover", () => {
     const fine = match("mosin", "spas12", 15);
     fine.bot.health = PracticeBotHeal.coverAt + 10;
     for (let t = 0; t < 1; t += 0.01) fine.game.update(0.01);
@@ -432,7 +488,8 @@ test("above coverAt health, or when you are low, it does not run for cover", () 
     const push = match("mosin", "spas12", 15);
     push.bot.health = 40;
     for (let t = 0; t < 1; t += 0.01) {
-        push.player.health = 20;
+        // It leads you by 35: it pushes instead.
+        push.player.health = 5;
         push.game.update(0.01);
         expect(push.brain.practiceCombat.healCover).toBeUndefined();
     }

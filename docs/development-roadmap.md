@@ -161,6 +161,12 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   on the way: a practice bot told to stand still kept walking (no movement input reset), and the brain's
   anti-stuck nudge moved a bot that was holding cover on purpose. Measured with you circling it at walking
   speed (16 fights of 45 s): items started 14 to 5, items you interrupted 13 to 2, finished 1 to 3.
+- Bot pushes (`PracticeBotHeal.pushLead`, `pushTargetAt`, `denyHeals`). A practice bot closes in (no item, no
+  running for cover) when it leads you by 30 health or more, or when it is above 60 health and you are at 30
+  or less or using a heal or boost. At 60 or less it uses your heal time to heal itself. Damage does not cancel
+  a heal in survev, so denying a heal means getting close and shooting through it. Measured, you using a med
+  kit 35 units away with the bot at 90: distance when your heal ends Mosin + SPAS-12 13.1 to 5.2, AK-47 27.0
+  to 6.4, Mosin 41.4 to 14.2.
 - Bot fire range fix (`PracticeBotView` in `server/src/game/practiceCombat.ts`). Bots only fired inside a fixed
   brain range (autos 30 units, pistols 34.5, shotguns 12.65), so at 40 units an AK bot walked in for about 2 s
   without a shot, and only a separate return-fire rule made it answer once you shot it. A practice bot now
