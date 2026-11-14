@@ -41,6 +41,8 @@ export function duel(
     bot.dir = v2.create(1, 0);
     game.grid.updateObject(bot);
     game.grid.updateObject(player);
+    // The warm-up fight may have left a holster half done; start from a clean hand.
+    (combat as unknown as { returnSlot?: number }).returnSlot = undefined;
     bot.weaponManager.setCurWeapIndex(0);
     bot.weapons[0].cooldown = 0;
     bot.freeSwitchTimer = -1;

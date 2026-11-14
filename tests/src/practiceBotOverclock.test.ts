@@ -8,6 +8,8 @@ const Action = GameConfig.Action;
 const Melee = GameConfig.WeaponSlot.Melee;
 const dt = 0.01;
 const defaults = { ...PracticeBotOverclock };
+/** The gun is ready this long after a shot at the latest: its draw time plus the holster. */
+const slack = PracticeBotOverclock.holsterTime + 0.05;
 
 afterEach(() => {
     Object.assign(PracticeBotOverclock, defaults);
@@ -60,7 +62,7 @@ test("a bolt rifle is holstered after each shot and fires at its draw time", () 
     const { gap, slowed } = shoot("mosin", "", 30, 12);
     expect(GunDefs.mosin.fireDelay).toBeGreaterThan(GunDefs.mosin.switchDelay);
     expect(gap).toBeGreaterThanOrEqual(GunDefs.mosin.switchDelay);
-    expect(gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + 0.05);
+    expect(gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + slack);
     expect(slowed).toBeLessThan(0.05);
 });
 
@@ -73,7 +75,7 @@ test.for(["spas12", "m870", "scout_elite", "model94", "blr", "winchester1887"])(
         expect(slowed).toBeLessThan(0.05);
         expect(holstered).toBeGreaterThan(0);
         // The gun is ready again once it is drawn.
-        expect(gap).toBeLessThanOrEqual(def.switchDelay + 0.05);
+        expect(gap).toBeLessThanOrEqual(def.switchDelay + slack);
     },
 );
 
@@ -91,7 +93,7 @@ test("maxCancelCost caps what a full-speed swap may cost in fire rate", () => {
 test("cancelSlowdown off keeps the fire-rate swaps and drops the rest", () => {
     PracticeBotOverclock.cancelSlowdown = false;
     expect(shoot("spas12", "", 10, 6).holstered).toBe(0);
-    expect(shoot("mosin", "", 30, 6).gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + 0.05);
+    expect(shoot("mosin", "", 30, 6).gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + slack);
 });
 
 test("with Quick switch off the bot never swaps between shots", () => {
@@ -105,7 +107,7 @@ test("with Quick switch off the bot never swaps between shots", () => {
 test("with the other gun empty the bot overclocks the loaded one and does not reload", () => {
     const { bot, gap, slowed, reloaded, shots } = shoot("mosin", "spas12", 30, 8, { secondaryAmmo: 0 });
     expect(shots).toBeGreaterThanOrEqual(7);
-    expect(gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + 0.05);
+    expect(gap).toBeLessThanOrEqual(GunDefs.mosin.switchDelay + slack);
     expect(slowed).toBeLessThan(0.05);
     expect(reloaded).toBe(false);
     expect(bot.weapons[1].ammo).toBe(0);
@@ -113,7 +115,7 @@ test("with the other gun empty the bot overclocks the loaded one and does not re
 
 test("the same holds for a shotgun with an empty rifle behind it", () => {
     const { bot, gap, slowed, reloaded } = shoot("spas12", "mosin", 10, 8, { secondaryAmmo: 0 });
-    expect(gap).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + 0.05);
+    expect(gap).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + slack);
     expect(slowed).toBeLessThan(0.05);
     expect(reloaded).toBe(false);
     expect(bot.weapons[1].ammo).toBe(0);
@@ -133,12 +135,28 @@ test("a gun that runs dry is holstered once, then reloaded at full speed", () =>
     bot.weapons[0].ammo = 1;
     run(1, true, () => bot.weapons[0].ammo === 0);
     expect(bot.shotSlowdownTimer).toBeGreaterThan(0);
-    run(4 * dt, true);
+    run(PracticeBotOverclock.holsterTime + 4 * dt, true);
     expect(bot.shotSlowdownTimer).toBe(0);
     expect(bot.curWeapIdx).toBe(0);
     run(4 * dt, true);
     expect(bot.actionType === Action.Reload || bot.actionType === Action.ReloadAlt).toBe(true);
     // The next shell goes out as soon as the gun allows it.
     const waited = run(2, true, () => bot.weapons[0].ammo === 0 && bot.shotSlowdownTimer > 0);
-    expect(waited).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + 0.05);
+    expect(waited).toBeLessThanOrEqual(GunDefs.spas12.switchDelay + slack);
+});
+
+test("a holstered gun is drawn again on the next tick; holsterTime can slow that", () => {
+    const hold = (holsterTime: number) => {
+        PracticeBotOverclock.holsterTime = holsterTime;
+        const { bot, run } = duel("mosin", "", 30, { dt });
+        bot.weapons[0].ammo = 5000;
+        run(1, true, () => bot.curWeapIdx === Melee);
+        expect(bot.curWeapIdx).toBe(Melee);
+        return run(1, true, () => bot.curWeapIdx !== Melee);
+    };
+    expect(PracticeBotOverclock.holsterTime).toBe(0);
+    expect(hold(0)).toBeCloseTo(dt, 5);
+    const slow = hold(0.06);
+    expect(slow).toBeGreaterThanOrEqual(0.06 - dt);
+    expect(slow).toBeLessThanOrEqual(0.06 + 2 * dt);
 });

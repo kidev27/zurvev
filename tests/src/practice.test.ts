@@ -951,3 +951,10 @@ test("PracticeRespawnMsg round-trips", () => {
     back.deserialize(stream);
     expect([back.hold, back.now]).toEqual([true, false]);
 });
+
+test("Practice bots move at player speed whatever the Strafe setting", () => {
+    for (const strafe of [0, 5, 10]) {
+        const { game } = startPractice({ bots: [{ ...defaultPracticeBot(), strafe }] });
+        expect(bots(game)[0].specOpsSpeedMult).toBe(1);
+    }
+});
