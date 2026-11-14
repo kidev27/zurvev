@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { PracticeBotHeal, practicePeekDistance } from "../../server/src/game/practiceCombat.ts";
+import { PracticeBotHeal, PracticeBotView, practicePeekDistance } from "../../server/src/game/practiceCombat.ts";
 import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { GameConfig } from "../../shared/gameConfig.ts";
 import { PracticeSettingsMsg } from "../../shared/net/practiceMsg.ts";
@@ -341,8 +341,9 @@ test("in a match, a hurt bot heals once you are far away, at the half speed ever
 });
 
 test("in the open it heals only past your reach and screen, with what it can finish", () => {
-    // Your screen with a 1x scope reaches about 50 units sideways.
-    const sees = GameConfig.scopeZoomRadius.desktop["1xscope"] * PracticeBotHeal.screenAspect;
+    // Your screen reaches your scope's view radius times 16/9 sideways (about 50 units with a 1x).
+    const scope = hurt(100).player.scope;
+    const sees = GameConfig.scopeZoomRadius.desktop[scope] * PracticeBotView.screenAspect;
     const at = (seconds: number) => sees + seconds * GameConfig.player.moveSpeed;
 
     const near = hurt(40, {}, "mosin", "spas12", at(0) - 5);
