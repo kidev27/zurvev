@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { PracticeBotHeal } from "../../server/src/game/practiceCombat.ts";
+import { PracticeBotHeal, practicePeekDistance } from "../../server/src/game/practiceCombat.ts";
 import { GunDefs } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { GameConfig } from "../../shared/gameConfig.ts";
 import { PracticeSettingsMsg } from "../../shared/net/practiceMsg.ts";
@@ -47,11 +47,14 @@ function hurt(
         state.sinceHit = Infinity;
     };
     setHealth(health);
-    // The warm-up fight may have ended with the target out of sight.
-    (d.combat as unknown as { unseenFor: number }).unseenFor = 0;
+    // "Out of sight" in these tests means deep cover: you would walk 120 units (10 s) to see it.
+    let peek = 120;
+    d.combat.peekDistance = () => peek;
+    /** How far you must walk sideways to see the bot. */
+    const cover = (units: number) => (peek = units);
     const item = () => d.bot.actionType === Action.UseItem ? d.bot.actionItem : "";
     const count = (type: "bandage" | "healthkit" | "soda" | "painkiller") => d.bot.invManager.get(type);
-    return { ...d, item, count, setHealth };
+    return { ...d, item, count, setHealth, cover };
 }
 
 test("a bot spawns with a full level 3 pack of heals and boosts", () => {
@@ -67,18 +70,35 @@ test("Start with full adrenaline is off by default and fills the bar when on", (
     expect(duel("mosin", "", 30, { bot: { shootsBack: false, startAdren: true } }).bot.boost).toBeGreaterThan(95);
 });
 
-test("out of sight and hurt, it waits safeDelay and then heals", () => {
+test("behind deep cover it heals, and stops when one more bandage would be wasted", () => {
     const { bot, run, item, count } = hurt(75);
-    run(PracticeBotHeal.safeDelay - 2 * dt, false);
-    expect(item()).toBe("");
-    run(4 * dt, false);
+    run(0.5, false, () => item() !== "");
     expect(item()).toBe("bandage");
     run(3.2, false, () => bot.health > 75);
     expect(bot.health).toBe(90);
     expect(count("bandage")).toBe(29);
-    // Less than one bandage missing: it stops.
     run(1.5, false, () => item() !== "");
     expect(item()).toBe("");
+});
+
+test("behind cover you can get around quickly it uses only what it can finish", () => {
+    // 48 units to walk: 4 s. A med kit (6 s) does not fit; a bandage (3 s) does.
+    const mid = hurt(40);
+    mid.cover(48);
+    mid.run(0.5, false, () => mid.item() !== "");
+    expect(mid.item()).toBe("bandage");
+
+    // 30 units: 2.5 s. Nothing fits.
+    const thin = hurt(40);
+    thin.cover(30);
+    thin.run(1.5, false, () => thin.item() !== "");
+    expect(thin.item()).toBe("");
+
+    // Pills (5 s) fall back to soda (3 s) the same way.
+    const boost = hurt(100, {}, "mosin", "spas12", 10, true);
+    boost.cover(48);
+    boost.run(0.5, false, () => boost.item() !== "");
+    expect(boost.item()).toBe("soda");
 });
 
 test("it takes the quicker way back to full: med kit past two bandages", () => {
@@ -184,16 +204,22 @@ test("when you are low it does not heal: it pushes", () => {
     expect(healthy.combat.pushing).toBe(false);
 });
 
-test("while you reload in view it heals only if none of its guns reaches you", () => {
-    // Shotgun only, 30 units away: nothing to shoot with, so your reload is a free heal.
+test("your reload counts: it heals only if it can finish first, and shoots you if it can", () => {
+    // Shotgun only, 30 units away: it cannot shoot you. Your 4 s reload fits a bandage, not a med kit.
     const far = hurt(40, {}, "spas12", "", 30);
-    far.player.doAction("mosin", Action.Reload, 30);
-    far.run(1, true, () => far.item() !== "");
-    expect(far.item()).toBe("healthkit");
+    far.player.doAction("mosin", Action.Reload, 4);
+    far.run(0.5, true, () => far.item() !== "");
+    expect(far.item()).toBe("bandage");
+
+    // A 10 s reload fits the med kit.
+    const long = hurt(40, {}, "spas12", "", 30);
+    long.player.doAction("mosin", Action.Reload, 10);
+    long.run(0.5, true, () => long.item() !== "");
+    expect(long.item()).toBe("healthkit");
 
     // Same reload inside its range: it shoots you instead.
     const near = hurt(40, {}, "spas12", "", 10);
-    near.player.doAction("mosin", Action.Reload, 30);
+    near.player.doAction("mosin", Action.Reload, 10);
     near.run(1, true, () => near.item() !== "");
     expect(near.item()).toBe("");
     expect(near.shots[0]).toBeGreaterThanOrEqual(1);
@@ -314,12 +340,99 @@ test("in a match, a hurt bot heals once you are far away, at the half speed ever
     expect(movedWhileUsing).toBeLessThanOrEqual(GameConfig.player.moveSpeed / 2 * usingTime + 0.5);
 });
 
-test("in view but farther than farDistance counts as safe", () => {
-    const far = hurt(75, {}, "mosin", "spas12", PracticeBotHeal.farDistance + 10);
-    far.run(1, true, () => far.item() !== "");
-    expect(far.item()).toBe("bandage");
+test("in the open it heals only past your reach and screen, with what it can finish", () => {
+    // Your screen with a 1x scope reaches about 50 units sideways.
+    const sees = GameConfig.scopeZoomRadius.desktop["1xscope"] * PracticeBotHeal.screenAspect;
+    const at = (seconds: number) => sees + seconds * GameConfig.player.moveSpeed;
 
-    const near = hurt(75, {}, "mosin", "spas12", PracticeBotHeal.farDistance - 10);
+    const near = hurt(40, {}, "mosin", "spas12", at(0) - 5);
     near.run(1, true, () => near.item() !== "");
     expect(near.item()).toBe("");
+
+    const mid = hurt(40, {}, "mosin", "spas12", at(4.5));
+    mid.run(0.5, true, () => mid.item() !== "");
+    expect(mid.item()).toBe("bandage");
+
+    const far = hurt(40, {}, "mosin", "spas12", at(8));
+    far.run(0.5, true, () => far.item() !== "");
+    expect(far.item()).toBe("healthkit");
+});
+
+test("cover is measured from the map: a tree between you and the bot", () => {
+    const { bot, player } = hurt(100);
+    expect(practicePeekDistance(player, bot)).toBe(0);
+    // A real tree trunk halfway along the line, then the bot right behind it.
+    const tree = bot.game.map.genObstacle(
+        "tree_01",
+        v2.lerp(0.5, player.pos, bot.pos),
+        player.layer,
+    );
+    const away = v2.normalizeSafe(v2.sub(bot.pos, player.pos));
+    v2.set(bot.pos, v2.add(tree.pos, v2.mul(away, 2)));
+    bot.game.grid.updateObject(bot);
+    const real = practicePeekDistance(player, bot);
+    expect(real).toBeGreaterThan(2);
+    // Hugging the trunk hides it better than standing far behind it.
+    v2.set(bot.pos, v2.add(tree.pos, v2.mul(away, 6)));
+    bot.game.grid.updateObject(bot);
+    expect(practicePeekDistance(player, bot)).toBeLessThan(real);
+});
+
+test("a tree is thin cover: from 15 units you see behind it after a short sidestep", () => {
+    const { game, player, bot } = match("mosin", "spas12", 15);
+    // Open ground near the map corner.
+    v2.set(player.pos, v2.create(30, 30));
+    v2.set(bot.pos, v2.create(45, 30));
+    game.grid.updateObject(player);
+    const tree = game.map.genObstacle("tree_01", v2.create(42.2, 30), player.layer);
+    const away = v2.normalizeSafe(v2.sub(tree.pos, player.pos));
+    v2.set(bot.pos, v2.add(tree.pos, v2.mul(away, 2.8)));
+    game.grid.updateObject(bot);
+    const seconds = practicePeekDistance(player, bot) / GameConfig.player.moveSpeed;
+    expect(seconds).toBeGreaterThan(0);
+    expect(seconds).toBeLessThan(2);
+});
+
+test("in a match, hurt in the open with no time to heal, it walks behind a wall and heals there", () => {
+    const { game, player, bot, brain } = match("mosin", "spas12", 15);
+    // Open ground near the map corner: you, the bot 22 units east, a container wall to its side.
+    v2.set(player.pos, v2.create(30, 30));
+    v2.set(bot.pos, v2.create(52, 30));
+    game.grid.updateObject(player);
+    game.grid.updateObject(bot);
+    const wall = game.map.genObstacle("container_wall_side", v2.create(55, 37), player.layer, 0, 1);
+    bot.health = 40;
+    let hiddenAt = -1;
+    let healStart = -1;
+    for (let t = 0; t < 8 && healStart < 0; t += 0.01) {
+        game.update(0.01);
+        if (hiddenAt < 0 && practicePeekDistance(player, bot) > 0) hiddenAt = t;
+        if (bot.actionType === Action.UseItem) healStart = t;
+    }
+    expect(hiddenAt).toBeGreaterThanOrEqual(0);
+    expect(healStart).toBeGreaterThanOrEqual(hiddenAt);
+    expect(v2.distance(bot.pos, wall.pos)).toBeLessThan(6);
+    // The window behind the wall fits a bandage, not a med kit.
+    expect(bot.actionItem).toBe("bandage");
+    expect(brain.practiceCombat.healCover).toBeUndefined();
+    // It stands still behind the wall until the bandage is done.
+    const spot = v2.copy(bot.pos);
+    for (let t = 0; t < 3.2 && bot.actionType === Action.UseItem; t += 0.01) game.update(0.01);
+    expect(bot.health).toBe(55);
+    expect(v2.distance(bot.pos, spot)).toBeLessThan(0.5);
+});
+
+test("above coverAt health, or when you are low, it does not run for cover", () => {
+    const fine = match("mosin", "spas12", 15);
+    fine.bot.health = PracticeBotHeal.coverAt + 10;
+    for (let t = 0; t < 1; t += 0.01) fine.game.update(0.01);
+    expect(fine.brain.practiceCombat.healCover).toBeUndefined();
+
+    const push = match("mosin", "spas12", 15);
+    push.bot.health = 40;
+    for (let t = 0; t < 1; t += 0.01) {
+        push.player.health = 20;
+        push.game.update(0.01);
+        expect(push.brain.practiceCombat.healCover).toBeUndefined();
+    }
 });
