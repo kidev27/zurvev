@@ -494,3 +494,37 @@ test("above coverAt health, or while it pushes, it does not run for cover", () =
         expect(push.brain.practiceCombat.healCover).toBeUndefined();
     }
 });
+
+test("low against a healthy target, with no cover around, it backs away from you", () => {
+    // No cover anywhere: search radius 0.
+    PracticeBotHeal.coverSearch = 0;
+    PracticeBotHeal.runSearch = 0;
+    const run = hurt(40);
+    run.player.health = PracticeBotHeal.runFromAt;
+    run.run(dt, true);
+    const goal = run.combat.healCover!;
+    expect(goal).toBeDefined();
+    const away = v2.normalizeSafe(v2.sub(run.bot.pos, run.player.pos));
+    expect(v2.dot(v2.normalizeSafe(v2.sub(goal, run.bot.pos)), away)).toBeGreaterThan(0.99);
+    expect(v2.distance(goal, run.bot.pos)).toBeCloseTo(PracticeBotHeal.retreatStep, 0);
+
+    // You below runFromAt: it stays and fights.
+    const stay = hurt(40);
+    stay.player.health = PracticeBotHeal.runFromAt - 10;
+    stay.run(dt, true);
+    expect(stay.combat.healCover).toBeUndefined();
+});
+
+test("in a match, low against a healthy target in the open, it gets away and heals", () => {
+    let healed = false;
+    for (let attempt = 0; attempt < 3 && !healed; attempt++) {
+        const { game, player, bot } = match("ak47", "", 20);
+        bot.health = 35;
+        for (let t = 0; t < 15 && !healed; t += 0.01) {
+            game.update(0.01);
+            healed = bot.actionType === Action.UseItem && bot.actionItem !== "soda" && bot.actionItem !== "painkiller";
+        }
+        void player;
+    }
+    expect(healed).toBe(true);
+});

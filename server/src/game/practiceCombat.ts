@@ -166,6 +166,8 @@ export function practiceFireReach(gunType: string): number {
  *   (bandage for a med kit, soda for pills). Nothing fits: no item.
  * - At `coverAt` health or less with nothing that fits, it walks to the nearest
  *   cover within `coverSearch` units that gives time for a bandage, then heals.
+ *   If you are at `runFromAt` health or more it runs: cover within `runSearch`,
+ *   and with none, it backs away from you until it is far enough to heal.
  * - Being hit stops the item, and it waits `hitDelay` before it tries again.
  * - Being in your sight and reach stops the item, unless `finishIfLeft` or less is left.
  * - It pushes (closes in, no item, no running for cover) when it is above
@@ -196,6 +198,11 @@ export const PracticeBotHeal = {
     coverAt: 60,
     /** How far it looks for cover, in units. */
     coverSearch: 24,
+    /** Your health at or above this while it is low: it runs, looking `runSearch` units for cover. */
+    runFromAt: 70,
+    runSearch: 40,
+    /** Running with no cover found: it backs away from you this far at a time, until it can heal. */
+    retreatStep: 8,
     /** Your health at or below this, with the bot above `coverAt`: it pushes. */
     pushTargetAt: 30,
     /** The bot this much health or more ahead of you: it pushes, as it expects to win the trade. */
@@ -392,14 +399,14 @@ export class PracticeCombat {
      * The nearest spot behind cover where the target would need time for a
      * bandage to see the bot. Undefined when none is within `coverSearch`.
      */
-    private findHealCover(target: Player): Vec2 | undefined {
+    private findHealCover(target: Player, radius: number): Vec2 | undefined {
         const H = PracticeBotHeal;
         const p = this.player;
         const speed = GameConfig.player.moveSpeed;
         const need = (useTime("bandage") + H.margin) * speed;
         let best: Vec2 | undefined;
         let bestDist = Infinity;
-        const near = p.game.grid.intersectCollider(collider.createCircle(p.pos, H.coverSearch));
+        const near = p.game.grid.intersectCollider(collider.createCircle(p.pos, radius));
         for (const obj of near) {
             if (obj.__type !== ObjectType.Obstacle) continue;
             const o = obj as Obstacle;
@@ -408,7 +415,7 @@ export class PracticeCombat {
             const away = v2.normalizeSafe(v2.sub(center, target.pos), v2.create(1, 0));
             const spot = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
             const walk = v2.distance(p.pos, spot);
-            if (walk >= bestDist || walk > H.coverSearch) continue;
+            if (walk >= bestDist || walk > radius) continue;
             // Not inside something else, and really hidden from the target.
             const blocked = p.game.grid.intersectCollider(collider.createCircle(spot, p.rad)).some((other) =>
                 other.__type === ObjectType.Obstacle
@@ -442,7 +449,15 @@ export class PracticeCombat {
         this.coverTicker -= dt;
         if (this.coverTicker > 0 && this.healCover) return;
         this.coverTicker = 0.5;
-        this.healCover = this.findHealCover(target);
+        // Against a healthy target it runs: farther for cover, and if there is none, away from you.
+        const running = target.health >= H.runFromAt;
+        this.healCover = this.findHealCover(target, running ? H.runSearch : H.coverSearch);
+        if (!this.healCover && running) {
+            const away = v2.normalizeSafe(v2.sub(p.pos, target.pos), v2.create(1, 0));
+            const back = v2.add(p.pos, v2.mul(away, H.retreatStep));
+            p.game.map.clampToMapBounds(back, 4);
+            this.healCover = back;
+        }
     }
 
     /**
