@@ -134,7 +134,14 @@ import type { Loot } from "./objects/loot.ts";
 import type { Obstacle } from "./objects/obstacle.ts";
 import type { Player } from "./objects/player.ts";
 import type { Structure } from "./objects/structure.ts";
-import { PracticeBotHeal, type PracticeBotItem, PracticeBotRange, PracticeCombat } from "./practiceCombat.ts";
+import {
+    PracticeBotHeal,
+    type PracticeBotItem,
+    PracticeBotRange,
+    PracticeCombat,
+    practiceFireReach,
+    practiceOnScreen,
+} from "./practiceCombat.ts";
 import { PracticeController, type PracticeHost } from "./practiceController.ts";
 import { SpecOpsContractRunner } from "./specOpsContracts.ts";
 import { doorFrameCenter, inferGroundLayer, MapNavGraph, navGroundLayer, stairAtPos } from "./specOpsNav.ts";
@@ -4937,7 +4944,12 @@ class AiBrain {
             ? 0.28
             : math.lerp(this.waveScale, 0.7, 0.92));
         const inCone = this.fovDot < 0 || aimDot >= this.fovDot;
-        const inRange = dist <= this.loadout.range * AiFireRangeMult && dist > 0.4;
+        // Practice bots shoot as far as the bullets fly, at what your scope would show them.
+        const inRange = this.practiceCombat
+            ? dist > 0.4
+                && dist <= practiceFireReach(player.weaponManager.activeWeapon)
+                && practiceOnScreen(player.pos, target.pos, target)
+            : dist <= this.loadout.range * AiFireRangeMult && dist > 0.4;
         const metalBlocked = pathHitsReflectMetal(
             player.game,
             player,
@@ -9924,7 +9936,7 @@ export class SpecOpsManager implements PracticeHost {
         brain.practiceCombat = new PracticeCombat(
             player,
             settings,
-            (type) => practiceBotLoadout(type, settings, index).range * AiFireRangeMult,
+            (type) => practiceFireReach(type),
         );
         // strafeSign doubles as the strafe weight: 0 = no strafing, 2 = mostly sideways.
         brain.strafeSign = (Math.random() < 0.5 ? -1 : 1) * practiceStrafeWeight(settings.strafe);

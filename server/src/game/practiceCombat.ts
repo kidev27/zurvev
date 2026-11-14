@@ -119,6 +119,38 @@ export const PracticeBotReload = {
 };
 
 /**
+ * What a practice bot can see and shoot at.
+ *
+ * - It sees what a player with your scope sees: a screen `screenAspect` times
+ *   wider than tall, with your scope's view radius up and down.
+ * - It shoots a gun as far as the gun's bullets fly. Shotguns only up close
+ *   (`shotgunRange`), where their pellets land.
+ */
+export const PracticeBotView = {
+    screenAspect: 16 / 9,
+    shotgunRange: 11 * 1.15,
+};
+
+/** Half-height of the screen a player with `viewer`'s scope sees. */
+function viewRadius(viewer: Player): number {
+    return GameConfig.scopeZoomRadius.desktop[viewer.scope] ?? GameConfig.scopeZoomRadius.desktop["1xscope"];
+}
+
+/** `pos` is on the screen of a player standing at `from` with `scopeOf`'s scope. */
+export function practiceOnScreen(from: Vec2, pos: Vec2, scopeOf: Player): boolean {
+    const radius = viewRadius(scopeOf);
+    return Math.abs(pos.x - from.x) <= radius * PracticeBotView.screenAspect && Math.abs(pos.y - from.y) <= radius;
+}
+
+/** How far a practice bot will shoot this gun: its bullet distance, or `shotgunRange` for shotguns. */
+export function practiceFireReach(gunType: string): number {
+    const gun = GunDefs[gunType];
+    if (!gun) return 0;
+    const bullet = BulletDefs[gun.bulletType]?.distance ?? 0;
+    return gun.bulletCount > 1 ? Math.min(PracticeBotView.shotgunRange, bullet) : bullet;
+}
+
+/**
  * When a practice bot heals and uses adrenaline. Items work as they do for
  * every player: the bot walks at half speed while it uses one, and a shot or
  * a weapon swap cancels it.
@@ -126,7 +158,8 @@ export const PracticeBotReload = {
  * - It starts an item only if it can finish before you can shoot it. That time
  *   (the "window") is the longest of:
  *   - behind hard cover: how far you must walk sideways to see it, at your speed;
- *   - in the open: how far it is past the reach of your guns or your screen;
+ *   - in the open: how far it is past the reach of your guns or your screen
+ *     (`PracticeBotView.screenAspect` times your scope's view radius);
  *   plus what is left of your reload or item.
  * - You reloading or healing where it can shoot you: it shoots instead.
  * - It picks the item it wants; if that does not fit the window, a shorter one
@@ -151,8 +184,6 @@ export const PracticeBotHeal = {
     margin: 0.3,
     /** Count the rest of your reload or item in the window. */
     whenTargetBusy: true,
-    /** Width of your screen over its height, to turn your scope's view radius into a side distance. */
-    screenAspect: 16 / 9,
     /** s after taking damage before the bot starts an item. */
     hitDelay: 1,
     /** Finish an item with this many seconds or fewer left, even when you can shoot it. */
@@ -315,7 +346,7 @@ export class PracticeCombat {
                 return gun ? BulletDefs[gun.bulletType]?.distance ?? 0 : 0;
             }),
         );
-        const sees = (target.zoom || GameConfig.scopeZoomRadius.desktop["1xscope"]) * H.screenAspect;
+        const sees = viewRadius(target) * PracticeBotView.screenAspect;
         const far = Math.max(0, distance - Math.min(reach, sees)) / speed;
         const peek = canSee ? 0 : this.peekDistance(target) / speed;
         const busy = H.whenTargetBusy

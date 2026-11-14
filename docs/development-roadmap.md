@@ -161,6 +161,12 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   on the way: a practice bot told to stand still kept walking (no movement input reset), and the brain's
   anti-stuck nudge moved a bot that was holding cover on purpose. Measured with you circling it at walking
   speed (16 fights of 45 s): items started 14 to 5, items you interrupted 13 to 2, finished 1 to 3.
+- Bot fire range fix (`PracticeBotView` in `server/src/game/practiceCombat.ts`). Bots only fired inside a fixed
+  brain range (autos 30 units, pistols 34.5, shotguns 12.65), so at 40 units an AK bot walked in for about 2 s
+  without a shot, and only a separate return-fire rule made it answer once you shot it. A practice bot now
+  shoots as far as its gun's bullets fly (AK 200, Mosin 500) at anything on the screen a player with your
+  scope sees (view radius up and down, 16/9 of it sideways). Shotguns still only within 12.65. Movement
+  distances are unchanged. Median first shot with you 40 to 48 units away on screen: about 2 s to 0.3 to 0.5 s.
 - Bots move like a player (PRA-009). Move speed is 100% of player speed at every setting; it used to
   follow the Strafe setting (55% at 0, 80% at 5, 105% at 10), which no player has. The slider is now called
   "Strafe amount" and only changes how much the bot moves sideways. Weapon swap timing is unchanged: the
