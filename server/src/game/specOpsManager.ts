@@ -134,7 +134,7 @@ import type { Loot } from "./objects/loot.ts";
 import type { Obstacle } from "./objects/obstacle.ts";
 import type { Player } from "./objects/player.ts";
 import type { Structure } from "./objects/structure.ts";
-import { PracticeBotRange, PracticeCombat } from "./practiceCombat.ts";
+import { PracticeBotHeal, type PracticeBotItem, PracticeBotRange, PracticeCombat } from "./practiceCombat.ts";
 import { PracticeController, type PracticeHost } from "./practiceController.ts";
 import { SpecOpsContractRunner } from "./specOpsContracts.ts";
 import { doorFrameCenter, inferGroundLayer, MapNavGraph, navGroundLayer, stairAtPos } from "./specOpsNav.ts";
@@ -4144,7 +4144,8 @@ class AiBrain {
             }
         }
 
-        if (player.actionType === GameConfig.Action.UseItem) return;
+        // A practice bot keeps thinking and moving while it uses an item, as a player does.
+        if (player.actionType === GameConfig.Action.UseItem && !this.practiceCombat) return;
 
         this.updateCommandAura(dt);
 
@@ -4483,7 +4484,11 @@ class AiBrain {
             : dist;
         player.toMouseLen = math.min(throwDist, GameConfig.player.throwableMaxMouseDist);
 
-        const push = this.kind === "enemy" ? manager.pushPressure : 0;
+        const push = this.practiceCombat?.pushing
+            ? PracticeBotHeal.pushPressure
+            : this.kind === "enemy"
+            ? manager.pushPressure
+            : 0;
         if (push > 0.3) {
             this.acquireTicker = math.min(this.acquireTicker, 0.18 * (1.15 - push));
         }
@@ -4813,6 +4818,9 @@ class AiBrain {
             } else {
                 move = v2.mul(v2.perp(desired), this.strafeSign);
             }
+
+            // Healing out of sight: stay put instead of walking back into view.
+            if (this.practiceCombat?.usingItem && !canSee) move = v2.create(0, 0);
 
             if (this.practice) {
                 move = this.applyPracticeDodge(dt, move, desired, target);
@@ -9867,9 +9875,18 @@ export class SpecOpsManager implements PracticeHost {
         player.helmet = gear.helmet;
         player.chest = gear.chest;
         player.specOpsArmor = 0;
+        // A bot's health tops out at its Health setting, as a player's does at 100.
+        // Without this an enemy AI can reach 280 through med kits and adrenaline.
+        player.zombieMaxHealth = settings.health;
         player.health = settings.health;
         player.specOpsDamageMult = 1;
         player.specOpsBounty = 0;
+        // Heal and boost items, in a pack big enough to hold them.
+        player.backpack = PracticeBotHeal.backpack;
+        for (const item of Object.keys(PracticeBotHeal.kit) as PracticeBotItem[]) {
+            player.invManager.give(item, PracticeBotHeal.kit[item]);
+        }
+        if (settings.startAdren) player.boost = 100;
         player.setDirty();
 
         const brain = new AiBrain(player, loadout, 18, "enemy");

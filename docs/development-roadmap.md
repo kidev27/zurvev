@@ -96,7 +96,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-004 | Practice menu redesign and respawn when ready | Practice | P2 | Needs Playtesting | PRA-001 | `client/src/ui/practiceEditor.ts`, `client/src/ui/practiceMenu.ts`, `server/src/game/practiceController.ts`, `shared/net/practiceMsg.ts` | `practice.test.ts` 59/59 (bots freeze while dead, hold and Respawn now, bots restart); scripted browser run, 25 checks | Live check in the game |
 | PRA-005 | Practice bots: reload and gun choice | Practice | P1 | Needs Playtesting | None | `server/src/game/practiceCombat.ts` | `practiceBotReload.test.ts` 9/9; `practice.test.ts` 59/59; full-game fights before/after (see notes) | In a nonstop close fight with no break the empty gun still waits (needs PRA-008) |
 | PRA-006 | Practice bots: overclocking and gun swaps by range | Practice | P1 | Needs Playtesting | PRA-005 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotOverclock.test.ts` 14/14; `practiceBotRange.test.ts` 7/7; `practice.test.ts` 59/59; full-game fights before/after (see notes) | In-game feel. Fast semi-autos (DMRs, pistols, M1014, M1100) still slow the bot while it shoots: needs a decision. The rifle is often empty by the time the bot is close (needs PRA-008) |
-| PRA-007 | Practice bots: healing and boosts | Practice | P1 | Ready | None | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | Not started | Rules need approval |
+| PRA-007 | Practice bots: healing and adrenaline | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `shared/net/practiceMsg.ts`, `client/src/ui/practiceEditor.ts` | `practiceBotHeal.test.ts` 17/17; `practice.test.ts` 60/60; `net` 10/10; full-game checks (see notes) | In-game feel. Protocol 1043: players must refresh. In the open a bot is almost never out of your sight, so it rarely heals until it can take cover (PRA-008) |
 | PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Ready | None | `server/src/game/specOpsManager.ts` | Not started | Rules need approval; bot range follows the gun in hand today |
 | PRA-009 | Practice bots: player move speed | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 60/60; `practiceBotOverclock.test.ts` 15/15 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Blocked | None | `server/src/game/weaponManager.ts`, `shared/gameConfig.ts`, `shared/practice.ts` | Not started | Reliable timing references for each profile |
@@ -135,6 +135,21 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   is holstered once before its reload. Measured in 60 to 120 s full-game fights: time at half speed
   24-77% to 1%, movement 6-8.5 to 9.6 units/s; Model 94 shots per minute 55 to 43, BLR 81 50 to 37.
   Guns faster than 0.45 s (DMRs, pistols, M1014, M1100, autos) are not swapped and still slow the bot.
+- Bot healing and adrenaline (`PracticeBotHeal` in `server/src/game/practiceCombat.ts`). Every bot that
+  shoots back spawns with a level 3 pack: 30 bandages, 4 med kits, 15 sodas, 4 pills. Items work as for
+  any player (bandage 3 s +15, med kit 6 s +100, soda 3 s +25 adrenaline, pills 5 s +50; half speed while
+  using; a shot or swap cancels). The bot starts an item only when safe: it has not seen you for 0.4 s, or
+  you are farther than 110 units, or you are reloading or using an item and none of its loaded guns
+  reaches you. Taking damage stops the item and it waits 1 s; seeing you again stops it unless 0.5 s or
+  less is left. When your health is 30 or less it does not heal and closes in instead. Order when safe:
+  reload if nothing is loaded, heal if at 50 health or less, reload an empty gun, heal, top up clips,
+  adrenaline. It heals while a bandage's worth (15) is missing and uses a med kit when the bandages would
+  take longer (more than 30 missing). Adrenaline under 50 is topped up: pills under 25, else soda. New
+  per-bot setting "Start with full adrenaline" (default off), so protocol is 1043. A bot's health now tops
+  out at its Health setting; the game allowed enemy AI up to 280, which med kits and adrenaline would have
+  reached. Measured: 20 s with you at 20 health, a Mosin bot's average distance goes 47.7 to 14.1, SPAS-12
+  14.5 to 5.5. In the open against a player who never hides the bot was out of sight 1 to 4 s in 96 s and
+  used 0.3 med kits; healing depends on cover (PRA-008).
 - Bots move like a player (PRA-009). Move speed is 100% of player speed at every setting; it used to
   follow the Strafe setting (55% at 0, 80% at 5, 105% at 10), which no player has. The slider is now called
   "Strafe amount" and only changes how much the bot moves sideways. Weapon swap timing is unchanged: the

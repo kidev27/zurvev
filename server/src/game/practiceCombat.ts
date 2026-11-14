@@ -1,6 +1,7 @@
 import { BulletDefs } from "../../../shared/defs/gameObjects/bulletDefs.ts";
 import { GunDefs } from "../../../shared/defs/gameObjects/gunDefs.ts";
 import { MeleeDefs } from "../../../shared/defs/gameObjects/meleeDefs.ts";
+import { GameObjectDefs } from "../../../shared/defs/register.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import type { PracticeBotSettings } from "../../../shared/practice.ts";
 import { math } from "../../../shared/utils/math.ts";
@@ -113,6 +114,51 @@ export const PracticeBotReload = {
     finishIfLeft: 0.75,
 };
 
+/**
+ * When a practice bot heals and uses adrenaline. Items work as they do for
+ * every player: the bot walks at half speed while it uses one, and a shot or
+ * a weapon swap cancels it.
+ *
+ * - It starts an item only when safe: it has not seen you for `safeDelay`, or
+ *   you are farther than `farDistance`, or you are reloading or using an item
+ *   and none of its loaded guns reaches you.
+ * - Being hit stops the item, and it waits `hitDelay` before it tries again.
+ * - Seeing you again stops the item, unless it has `finishIfLeft` or less to go.
+ * - When your health is `pushTargetAt` or less it does not heal. It pushes.
+ * - Order when safe: reload if nothing is loaded, heal if at `urgentAt` or less,
+ *   reload an empty gun, heal, top up clips, adrenaline.
+ * - Health: it heals while at least one bandage's worth is missing, with a med
+ *   kit when that is quicker than the bandages (more than 30 missing).
+ *
+ * A bot that does not shoot back (a target dummy) never uses items.
+ */
+export const PracticeBotHeal = {
+    /** What every bot spawns with: a full level 3 pack. */
+    kit: { bandage: 30, healthkit: 4, soda: 15, painkiller: 4 } as Record<PracticeBotItem, number>,
+    backpack: "backpack03",
+    /** s without seeing you before the bot counts as safe. */
+    safeDelay: 0.4,
+    /** Also safe while you reload or use an item, if no loaded gun of the bot reaches you. */
+    whenTargetBusy: true,
+    /** Also safe when you are farther away than this: past what a 15x scope shows. */
+    farDistance: 110,
+    /** s after taking damage before the bot starts an item. */
+    hitDelay: 1,
+    /** Finish an item with this many seconds or fewer left, even when you see it. */
+    finishIfLeft: 0.5,
+    /** Health at or below this: healing comes before reloading an empty gun. */
+    urgentAt: 50,
+    /** Your health at or below this: the bot does not heal, it closes in. */
+    pushTargetAt: 30,
+    /** How hard it closes in then, 0 to 1 (the brain's push pressure). */
+    pushPressure: 1,
+    /** Adrenaline below this is topped up when safe. 50 is where the speed bonus starts. */
+    boostBelow: 50,
+    /** Adrenaline below this: pills (+50). Otherwise soda (+25). */
+    pillsBelow: 25,
+};
+export type PracticeBotItem = "bandage" | "healthkit" | "soda" | "painkiller";
+
 function isReloadAction(action: number): boolean {
     return action === GameConfig.Action.Reload || action === GameConfig.Action.ReloadAlt;
 }
@@ -133,6 +179,10 @@ export class PracticeCombat {
     private unseenFor = 0;
     /** Ammo in the gun when "finish this reload" began, so one finish covers one reload. */
     private finishAmmo?: number;
+    private lastHealth: number;
+    private sinceHit = Infinity;
+    /** The target is low: the brain closes in and the bot does not heal. */
+    pushing = false;
 
     /**
      * @param fireRange how far the bot will shoot a given gun from (the brain's
@@ -144,6 +194,79 @@ export class PracticeCombat {
         private readonly fireRange: (gun: string) => number = () => Infinity,
     ) {
         this.lastAmmo = player.weapons.slice(0, 2).map((w) => w.ammo);
+        this.lastHealth = player.health;
+    }
+
+    /** The bot is using a heal or boost item right now. */
+    get usingItem(): boolean {
+        return this.player.actionType === GameConfig.Action.UseItem;
+    }
+
+    /**
+     * The item the bot would use if it were safe, most urgent first.
+     *
+     * Health: nothing while less than one bandage is missing. Otherwise the
+     * quicker way back to full: a med kit when the bandages would take longer.
+     */
+    private wantedItem(): PracticeBotItem | undefined {
+        const H = PracticeBotHeal;
+        const p = this.player;
+        const has = (item: PracticeBotItem) => p.invManager.get(item) > 0;
+        const bandage = GameObjectDefs.typeToDef("bandage", "heal");
+        const medkit = GameObjectDefs.typeToDef("healthkit", "heal");
+        // The game refuses a heal item at or above its maxHeal (100).
+        const missing = Math.min(p.maxHealth, bandage.maxHeal) - p.health;
+        if (missing >= bandage.heal) {
+            const bandageTime = Math.ceil(missing / bandage.heal) * bandage.useTime;
+            if (has("healthkit") && (bandageTime > medkit.useTime || !has("bandage"))) return "healthkit";
+            if (has("bandage")) return "bandage";
+        }
+        if (p.boost < H.boostBelow) {
+            if (p.boost < H.pillsBelow && has("painkiller")) return "painkiller";
+            if (has("soda")) return "soda";
+            if (has("painkiller")) return "painkiller";
+        }
+        return undefined;
+    }
+
+    /**
+     * Start, keep or drop a heal or boost item.
+     * @param reloadSlot the gun the reload rules want reloaded now, if any
+     * @returns true while an item is in use; the bot then leaves its weapons alone
+     */
+    private updateItem(distance: number, target: Player, reloadSlot: number | undefined): boolean {
+        const H = PracticeBotHeal;
+        const p = this.player;
+        if (!this.settings.shootsBack) return false;
+        const targetBusy = isReloadAction(target.actionType) || target.actionType === GameConfig.Action.UseItem;
+        const canShoot = [0, 1].some((slot) =>
+            this.loaded(slot) && distance <= this.fireRange(p.weapons[slot].type)
+        );
+        const unseen = this.unseenFor >= H.safeDelay;
+        const safe = unseen || distance > H.farDistance || (H.whenTargetBusy && targetBusy && !canShoot);
+
+        if (this.usingItem) {
+            const left = p.action.duration - p.action.time;
+            const hit = this.sinceHit === 0;
+            if (hit || this.pushing || (!safe && left > H.finishIfLeft)) p.cancelAction();
+            return this.usingItem;
+        }
+        if (!safe || this.pushing || this.sinceHit < H.hitDelay) return false;
+        const item = this.wantedItem();
+        if (!item) return false;
+
+        const heal = item === "bandage" || item === "healthkit";
+        const urgent = heal && p.health <= H.urgentAt;
+        const noneLoaded = !this.loaded(0) && !this.loaded(1);
+        const emptyReload = reloadSlot !== undefined && p.weapons[reloadSlot].ammo === 0;
+        // A gun that can shoot comes before anything; adrenaline comes after every reload.
+        if (noneLoaded && emptyReload) return false;
+        if (emptyReload && !urgent) return false;
+        if (!heal && reloadSlot !== undefined) return false;
+
+        if (heal) p.useHealingItem(item);
+        else p.useBoostItem(item);
+        return this.usingItem;
     }
 
     get meleeReach(): number {
@@ -280,6 +403,10 @@ export class PracticeCombat {
     update(dt: number, target: Player, canAttack: boolean, canSee = canAttack): void {
         const p = this.player;
         this.unseenFor = canSee ? 0 : this.unseenFor + dt;
+        this.sinceHit = p.health < this.lastHealth ? 0 : this.sinceHit + dt;
+        this.lastHealth = p.health;
+        this.pushing = this.settings.shootsBack && !target.dead && !target.downed
+            && target.health <= PracticeBotHeal.pushTargetAt;
         const active = p.curWeapIdx;
         const fired = active < 2 && p.weapons[active].ammo < this.lastAmmo[active];
         this.lastAmmo = p.weapons.slice(0, 2).map((w) => w.ammo);
@@ -320,6 +447,12 @@ export class PracticeCombat {
             && gun?.fireDelay >= PracticeBotOverclock.minFireDelay && gun.fireMode !== "burst";
 
         this.reloadSlot = this.planReload(distance, target);
+        if (this.updateItem(distance, target, this.reloadSlot)) {
+            // Any swap or reload would cancel the item.
+            this.reloadSlot = undefined;
+            this.committedSlot = undefined;
+            return;
+        }
         if (this.reloadSlot !== undefined) {
             this.committedSlot = undefined;
             if (active !== this.reloadSlot) {

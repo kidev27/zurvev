@@ -1,6 +1,11 @@
 import type { PracticeCombat } from "../../server/src/game/practiceCombat.ts";
 import { TeamMode } from "../../shared/gameConfig.ts";
-import { defaultPracticeBot, defaultPracticeSettings, sanitizePracticeSettings } from "../../shared/practice.ts";
+import {
+    defaultPracticeBot,
+    defaultPracticeSettings,
+    type PracticeBotSettings,
+    sanitizePracticeSettings,
+} from "../../shared/practice.ts";
 import { v2 } from "../../shared/utils/v2.ts";
 import { createGame } from "./gameTestHelpers.ts";
 
@@ -9,10 +14,12 @@ export function duel(
     gun: string,
     secondary: string,
     distance: number,
-    { quickSwitch = true, dt = 0.02 } = {},
+    { quickSwitch = true, dt = 0.02, bot: overrides = {} as Partial<PracticeBotSettings> } = {},
 ) {
     const game = createGame(TeamMode.Solo, "practice_arena", { endless: false });
     const player = game.playerBarn.addTestPlayer({ name: "Trainee" });
+    // The warm-up fight below must not kill the target.
+    player.debug.godMode = true;
     game.update(0.1);
     game.specOps!.practice!.applySettings(
         player,
@@ -30,6 +37,7 @@ export function duel(
                 dodge: 0,
                 autoMelee: false,
                 quickSwitch,
+                ...overrides,
             }],
         }),
     );
@@ -66,4 +74,30 @@ export function duel(
         return seconds;
     };
     return { game, player, bot, combat, run, shots, dt };
+}
+
+/** A whole Practice match with one bot, its brain running, `start` units from a player who cannot die. */
+export function match(gun: string, secondary: string, start: number) {
+    const game = createGame(TeamMode.Solo, "practice_arena", { endless: false });
+    const player = game.playerBarn.addTestPlayer({ name: "Trainee" });
+    player.debug.godMode = true;
+    game.update(0.1);
+    game.specOps!.practice!.applySettings(
+        player,
+        sanitizePracticeSettings({
+            ...defaultPracticeSettings(),
+            bots: [{ ...defaultPracticeBot(), gun, secondary, quickSwitch: true }],
+        }),
+    );
+    for (let i = 0; i < 20; i++) game.update(0.1);
+    const bot = game.playerBarn.livingPlayers.find((p) => p.specOpsAi)!;
+    const away = v2.normalizeSafe(v2.sub(bot.pos, player.pos), v2.create(1, 0));
+    v2.set(bot.pos, v2.add(player.pos, v2.mul(away, start)));
+    game.grid.updateObject(bot);
+    const brain = game.specOps!.getBrainPublic(bot)! as unknown as {
+        practiceMove?: { range: number; holdRange: number; closeTo: number };
+        practiceCombat: PracticeCombat;
+    };
+    const distance = () => v2.distance(bot.pos, player.pos);
+    return { game, player, bot, brain, distance };
 }
