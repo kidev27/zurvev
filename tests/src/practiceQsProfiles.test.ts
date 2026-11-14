@@ -124,3 +124,20 @@ test("bots play by the same profile: a Nars Mosin bot fires every 0.9 s or so", 
         expect(median).toBeLessThanOrEqual(high);
     }
 });
+
+test("changing the profile mid-game applies at once, to you and the bots, and keeps the bots", () => {
+    const { game, player } = practiceWith("survev");
+    const practice = game.specOps!.practice!;
+    const botsBefore = game.playerBarn.livingPlayers.filter((p) => p.specOpsAi);
+    expect(botsBefore.length).toBeGreaterThan(0);
+    for (const qsProfile of ["resurviv", "nars", "survev"] as const) {
+        for (let t = 0; t < 0.5; t += dt) game.update(dt);
+        const applied = practice.applySettings(player, { ...practice.settings, qsProfile });
+        expect(applied).toBe(true);
+        expect(game.gunTiming?.switchDelayMult ?? 1).toBe(qsProfile === "resurviv" ? 0.33 : 1);
+        expect(game.gunTiming?.fireDelays.mosin).toBe(qsProfile === "nars" ? 0.9 : undefined);
+    }
+    // Only the timing changed: the same bots are still in the game.
+    const botsAfter = game.playerBarn.livingPlayers.filter((p) => p.specOpsAi);
+    expect(botsAfter).toEqual(botsBefore);
+});

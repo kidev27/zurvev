@@ -153,6 +153,7 @@ function changeGroups(s: PracticeSettings): string[] {
         ...s.bots.map((b) => JSON.stringify(b)),
         `bots:${s.bots.length}`,
         JSON.stringify([s.respawnMode, s.respawnDelay]),
+        s.qsProfile,
     ];
 }
 
