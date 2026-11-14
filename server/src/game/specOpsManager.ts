@@ -137,6 +137,7 @@ import type { Structure } from "./objects/structure.ts";
 import {
     PracticeBotHeal,
     type PracticeBotItem,
+    PracticeBotPeek,
     PracticeBotRange,
     PracticeCombat,
     practiceFireReach,
@@ -4299,9 +4300,12 @@ class AiBrain {
         }
 
         if (this.practice && this.practiceCombat) {
-            // A planned peek started its reaction time when it stepped out, aimed where it last saw you.
+            // A planned peek pre-aims where it last saw you. If you are still there,
+            // it shoots without a fresh reaction delay; if you moved, it reacts as usual.
             const peeking = this.practiceCombat.peekOut;
-            if (canSee && (!this.practiceSawTarget || this.practiceTarget !== target) && !peeking) {
+            const expected = peeking && !!this.practiceLastSeen
+                && v2.distance(this.practiceLastSeen, target.pos) <= PracticeBotPeek.expectRadius;
+            if (canSee && (!this.practiceSawTarget || this.practiceTarget !== target) && !expected) {
                 this.acquireTicker = math.max(this.acquireTicker, this.practice.reactionSec);
                 this.practiceAimTicker = 0;
             }
@@ -4314,9 +4318,7 @@ class AiBrain {
                 canSee && !target.downed && !this.practice.holdFire && this.acquireTicker <= 0,
                 canSee,
             );
-            if (this.practiceCombat.peekOut && !peeking) {
-                this.acquireTicker = math.max(this.acquireTicker, this.practice.reactionSec);
-            }
+
             const activeGun = player.weaponManager.activeWeapon;
             if (GunDefs[activeGun] && activeGun !== this.loadout.gun) {
                 const activeLoadout = practiceBotLoadout(activeGun, this.practiceCombat.settings, 0);

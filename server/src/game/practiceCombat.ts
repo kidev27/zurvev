@@ -162,14 +162,15 @@ export const PracticeBotCover = {
 };
 
 /**
- * How a practice bot peeks from cover. It hides behind cover that you need
- * `hideMin` units of sidestep to see past, with a spot one step to the side
- * that sees you. It waits there until its gun is ready, steps out, shoots
+ * How a practice bot peeks from cover. It hides at the edge of cover that you
+ * need `hideMin` units of sidestep to see past, and steps just past the edge
+ * to see you. It waits there until its gun is ready, steps out, shoots
  * (one shot with a slow gun such as a bolt-action or pump, otherwise a
  * `burst`), and steps back.
  *
  * It does not peek while it pushes, heals or walks to heal cover, when you
- * are closer than `minDistance`, or with no gun that reaches you.
+ * are closer than `minDistance` (`shotgunMinDistance` for shotgun-only bots),
+ * or with no gun that reaches you.
  * While hidden it aims where it last saw you.
  */
 export const PracticeBotPeek = {
@@ -178,10 +179,18 @@ export const PracticeBotPeek = {
     search: 16,
     /** You closer than this: no peeking, it fights in the open. */
     minDistance: 12,
+    /** The same for a bot whose guns are all shotguns: it peeks corners up close. */
+    shotgunMinDistance: 4,
+    /**
+     * A peek is planned: if you are where it last saw you (within this many
+     * units) when it steps out, it shoots without a fresh reaction delay,
+     * as a player who pre-aimed a corner would. You moved: normal reaction.
+     */
+    expectRadius: 3,
     /** The cover spot must make you walk this far sideways to see the bot (about 0.5 s). */
     hideMin: 6,
-    /** Extra room past the cover's edge at the spot it peeks from. */
-    stepOut: 0.6,
+    /** Extra step past the first spot that sees you, so the shot is not clipped by the edge. */
+    stepOut: 0.3,
     /** Guns faster than a bolt-action: seconds out per peek once it sees you. */
     burst: 0.8,
     /** Back to cover after this long out without a shot. */
@@ -556,30 +565,48 @@ export class PracticeCombat {
         );
     }
 
-    /** The nearest cover with a hidden spot and a side spot that sees the target. */
+    /**
+     * The best place to peek from: a hidden spot at one edge of a cover, and the
+     * shortest step past that edge that sees the target. Short steps make quick peeks.
+     */
     private findPeek(target: Player, reach: number): { cover: Vec2; out: Vec2 } | undefined {
         const P = PracticeBotPeek;
         const p = this.player;
         let best: { cover: Vec2; out: Vec2 } | undefined;
-        let bestDist = Infinity;
+        let bestScore = Infinity;
         for (const obj of p.game.grid.intersectCollider(collider.createCircle(p.pos, P.search))) {
             if (obj.__type !== ObjectType.Obstacle) continue;
             const o = obj as Obstacle;
             if (!isCover(o, p.layer)) continue;
             const center = obstacleCenter(o);
             const away = v2.normalizeSafe(v2.sub(center, target.pos), v2.create(1, 0));
-            const cover = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
-            const walk = v2.distance(p.pos, cover);
-            if (walk >= bestDist || walk > P.search || nearExplosive(p, cover)) continue;
-            if (!this.standable(cover) || peekDistanceAt(target, cover, p.rad) < P.hideMin) continue;
             const side = v2.perp(away);
+            const behind = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
+            const halfSide = obstacleHalfWidth(o, side);
             for (const sign of [1, -1]) {
-                const out = v2.add(cover, v2.mul(side, sign * (obstacleHalfWidth(o, side) + p.rad + P.stepOut)));
-                if (v2.distance(out, target.pos) > reach || !practiceOnScreen(out, target.pos, target)) continue;
-                if (!this.standable(out) || peekDistanceAt(target, out, p.rad) > 0 || nearExplosive(p, out)) continue;
-                best = { cover, out };
-                bestDist = walk;
-                break;
+                // Hide just inside the edge, so one short step clears it.
+                const inset = Math.max(0, halfSide - p.rad - 0.3);
+                const cover = v2.add(behind, v2.mul(side, sign * inset));
+                const walk = v2.distance(p.pos, cover);
+                if (walk > P.search || walk >= bestScore || nearExplosive(p, cover)) continue;
+                if (!this.standable(cover) || peekDistanceAt(target, cover, p.rad) < P.hideMin) continue;
+                // Step out a little at a time until it sees the target.
+                for (let step = 2 * p.rad; step <= halfSide + 2 * p.rad + 3; step += 0.5) {
+                    const out = v2.add(cover, v2.mul(side, sign * step));
+                    if (!this.standable(out) || peekDistanceAt(target, out, p.rad) > 0) continue;
+                    const usable = v2.distance(out, target.pos) <= reach
+                        && practiceOnScreen(out, target.pos, target)
+                        && !nearExplosive(p, out);
+                    if (usable) {
+                        // A long step costs twice: out and back on every peek.
+                        const score = walk + 2 * (step + P.stepOut);
+                        if (score < bestScore) {
+                            bestScore = score;
+                            best = { cover, out: v2.add(cover, v2.mul(side, sign * (step + P.stepOut))) };
+                        }
+                    }
+                    break;
+                }
             }
         }
         return best;
@@ -591,7 +618,8 @@ export class PracticeCombat {
         const p = this.player;
         const reach = Math.max(0, ...[0, 1].map((slot) => this.hasGun(slot) ? this.fireRange(p.weapons[slot].type) : 0));
         const wanted = P.enabled && this.settings.shootsBack && !this.pushing && !this.usingItem && !this.healCover
-            && distance >= P.minDistance && reach >= distance;
+            && distance >= (reach <= PracticeBotView.shotgunRange ? P.shotgunMinDistance : P.minDistance)
+            && reach >= distance;
         if (!wanted) {
             this.peek = undefined;
             this.peekOut = false;
@@ -858,6 +886,8 @@ export class PracticeCombat {
         const using = this.updateItem(distance, target, canSee, this.reloadSlot);
         this.updateHealCover(dt, target, this.healWindow(target, distance, canSee));
         this.updatePeek(dt, target, distance, canSee, fired);
+        // Out on a peek with a loaded gun: shoot now. The shot cancels any reload, as for a player.
+        if (this.peekOut && active < 2 && this.loaded(active)) this.reloadSlot = undefined;
         if (using) {
             // Any swap or reload would cancel the item.
             this.reloadSlot = undefined;

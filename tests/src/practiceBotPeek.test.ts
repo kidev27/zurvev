@@ -115,3 +115,49 @@ test("explosive barrels are never cover, and it never picks a spot in their blas
         }
     }
 });
+
+/** Seconds from stepping out to the shot, for each peek that shot. */
+function peekTimes(gun: string, distance: number, seconds: number) {
+    const m = match(gun, "", 20);
+    v2.set(m.player.pos, v2.create(30, 30));
+    v2.set(m.bot.pos, v2.create(30 + distance, 30));
+    m.game.grid.updateObject(m.player);
+    m.game.grid.updateObject(m.bot);
+    m.game.map.genObstacle("container_wall_side", v2.create(25 + distance, 30), m.player.layer, 0, 1);
+    const combat = m.brain.practiceCombat;
+    const times: number[] = [];
+    let peeks = 0;
+    let outAt = -1;
+    let shot = false;
+    for (let t = 0; t < seconds; t += dt) {
+        m.bot.health = 100;
+        m.bot.boost = 100;
+        const ammo = m.bot.weapons[0].ammo;
+        const wasOut = combat.peekOut;
+        m.game.update(dt);
+        if (combat.peekOut && !wasOut) {
+            peeks++;
+            outAt = t;
+            shot = false;
+        }
+        if (combat.peekOut && !shot && m.bot.weapons[0].ammo < ammo) {
+            shot = true;
+            times.push(t - outAt);
+        }
+    }
+    return { peeks, times: times.sort((a, b) => a - b) };
+}
+
+test("a sniper peeks quick: shoots within 0.3 s of stepping out, on nearly every peek", () => {
+    const runs = [0, 1, 2].map(() => peekTimes("mosin", 30, 8)).sort((a, b) => b.peeks - a.peeks);
+    const { peeks, times } = runs[0];
+    expect(peeks).toBeGreaterThanOrEqual(5);
+    expect(times.length).toBeGreaterThanOrEqual(peeks - 1);
+    expect(times[Math.floor(times.length / 2)]).toBeLessThan(0.3);
+});
+
+test("a shotgun bot peeks a corner up close", () => {
+    const runs = [0, 1, 2].map(() => peekTimes("spas12", 10, 6)).sort((a, b) => b.peeks - a.peeks);
+    expect(runs[0].peeks).toBeGreaterThanOrEqual(4);
+    expect(runs[0].times.length).toBeGreaterThanOrEqual(runs[0].peeks - 1);
+});

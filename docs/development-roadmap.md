@@ -182,6 +182,14 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   you, 30 units, 6 fights of 20 s each: time you can see the bot Mosin 13.8 to 8.0 s, SV-98 14.9 to 4.9, AK-47
   15.6 to 7.8; its shots per second you can see it Mosin 0.68 to 1.72, SV-98 0.61 to 2.71, AK-47 5.1 to 7.6.
   Automatic guns fire fewer shots in total (AK-47 79 to 60), because they spend time hidden.
+- Quick peeks (PRA-008, second pass). The bot hides just inside the edge of the cover and steps out only as far
+  as it needs to see you (plus 0.3), so a peek is one short step. A planned peek pre-aims where it last saw you;
+  if you are still within 3 units of that spot it shoots without a fresh reaction delay, as a player holding a
+  pre-aimed corner would; if you moved, its Reaction setting applies. Out on a peek with a loaded gun it shoots
+  even if the reload rules wanted to finish a round first (that held some peeks in view for 0.35 s without a
+  shot). Shotgun-only bots peek corners from 4 units. Container wall, 30 units, 5 fights of 15 s: Mosin step-out
+  to shot 0.89 to 0.15 s, peeks with a shot 40 of 43 to 55 of 55, time you can see it 7.2 to 1.5 s; SV-98
+  behind a rock 0.50 to 0.18 s; AK-47 first shot 0.50 to 0.13 s; SPAS-12 at 10 units 0 peeks to 77 shots in 79.
 - Bot fire range fix (`PracticeBotView` in `server/src/game/practiceCombat.ts`). Bots only fired inside a fixed
   brain range (autos 30 units, pistols 34.5, shotguns 12.65), so at 40 units an AK bot walked in for about 2 s
   without a shot, and only a separate return-fire rule made it answer once you shot it. A practice bot now
