@@ -4522,9 +4522,14 @@ class AiBrain {
             const reversing = v2.dot(stepDir, this.lastStepDir) < -0.45 && moved > 0.08;
             const indoorZombie = zombieMelee && !!player.game.map.mapDef.gameMode.indoorMode;
 
+            // A practice bot holding cover or using an item stands still on purpose: not stuck.
+            const holdingStill = !!this.practiceCombat
+                && (this.practiceCombat.usingItem
+                    || (!!this.practiceCombat.healCover
+                        && v2.distance(player.pos, this.practiceCombat.healCover) <= 0.3));
             this.stuckTicker += dt;
             const stuckCheckDelay = indoorZombie ? 0.75 : 0.32;
-            if (this.stuckTicker > stuckCheckDelay && !stairTransit && !this.stairTarget) {
+            if (this.stuckTicker > stuckCheckDelay && !stairTransit && !this.stairTarget && !holdingStill) {
                 if (moved < 0.14 || looping || reversing) {
                     this.stuckStrikes++;
                     this.pathSideSign *= -1;
@@ -4819,12 +4824,20 @@ class AiBrain {
                 move = v2.mul(v2.perp(desired), this.strafeSign);
             }
 
-            // Healing out of sight: stay put instead of walking back into view.
-            if (this.practiceCombat?.usingItem && !canSee) move = v2.create(0, 0);
-
             if (this.practice) {
                 move = this.applyPracticeDodge(dt, move, desired, target);
             }
+
+            // Hurt with no time to heal here: walk to cover, then hold it. After the
+            // dodge, so a dodge cannot step it back out.
+            const healCover = this.practiceCombat?.healCover;
+            if (healCover) {
+                move = v2.distance(player.pos, healCover) > 0.3
+                    ? v2.normalizeSafe(v2.sub(healCover, player.pos))
+                    : v2.create(0, 0);
+            }
+            // Healing out of sight: stay put instead of walking back into view.
+            if (this.practiceCombat?.usingItem && !canSee) move = v2.create(0, 0);
 
             const sep = crowdingSteer(player.game, player, target);
             if (v2.length(sep) > 0.05) {
@@ -4875,7 +4888,10 @@ class AiBrain {
                             player.rad,
                             navGroundLayer(player.layer),
                         );
-                    player.touchMoveDir = assaultDirect || zombieGraphRoute || authoredZombieCharge
+                    // Walking to heal cover hugs a wall on purpose: with a clear line, go straight,
+                    // because wall steering would turn it away. Blocked: steer around as usual.
+                    const coverStraight = !!healCover && isPathClear(player.game, player, healCover, 0.8);
+                    player.touchMoveDir = assaultDirect || zombieGraphRoute || authoredZombieCharge || coverStraight
                         ? v2.normalizeSafe(move)
                         : steerAroundWalls(
                             player.game,
@@ -4887,6 +4903,9 @@ class AiBrain {
                         );
                     player.touchMoveLen = 255;
                 }
+            } else if (this.practice) {
+                // A practice bot told to stand still stops. Other modes keep their last step.
+                player.touchMoveActive = false;
             }
 
             if (doorBlock) {

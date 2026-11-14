@@ -4,8 +4,12 @@ import { MeleeDefs } from "../../../shared/defs/gameObjects/meleeDefs.ts";
 import { GameObjectDefs } from "../../../shared/defs/register.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import type { PracticeBotSettings } from "../../../shared/practice.ts";
+import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
+import { collider } from "../../../shared/utils/collider.ts";
 import { math } from "../../../shared/utils/math.ts";
+import { util } from "../../../shared/utils/util.ts";
 import { v2, type Vec2 } from "../../../shared/utils/v2.ts";
+import type { Obstacle } from "./objects/obstacle.ts";
 import type { Player } from "./objects/player.ts";
 
 /** Solve projectile interception, including the distance from body to muzzle. */
@@ -119,13 +123,20 @@ export const PracticeBotReload = {
  * every player: the bot walks at half speed while it uses one, and a shot or
  * a weapon swap cancels it.
  *
- * - It starts an item only when safe: it has not seen you for `safeDelay`, or
- *   you are farther than `farDistance`, or you are reloading or using an item
- *   and none of its loaded guns reaches you.
+ * - It starts an item only if it can finish before you can shoot it. That time
+ *   (the "window") is the longest of:
+ *   - behind hard cover: how far you must walk sideways to see it, at your speed;
+ *   - in the open: how far it is past the reach of your guns or your screen;
+ *   plus what is left of your reload or item.
+ * - You reloading or healing where it can shoot you: it shoots instead.
+ * - It picks the item it wants; if that does not fit the window, a shorter one
+ *   (bandage for a med kit, soda for pills). Nothing fits: no item.
+ * - At `coverAt` health or less with nothing that fits, it walks to the nearest
+ *   cover within `coverSearch` units that gives time for a bandage, then heals.
  * - Being hit stops the item, and it waits `hitDelay` before it tries again.
- * - Seeing you again stops the item, unless it has `finishIfLeft` or less to go.
+ * - Being in your sight and reach stops the item, unless `finishIfLeft` or less is left.
  * - When your health is `pushTargetAt` or less it does not heal. It pushes.
- * - Order when safe: reload if nothing is loaded, heal if at `urgentAt` or less,
+ * - Order: reload if nothing is loaded, heal if at `urgentAt` or less,
  *   reload an empty gun, heal, top up clips, adrenaline.
  * - Health: it heals while at least one bandage's worth is missing, with a med
  *   kit when that is quicker than the bandages (more than 30 missing).
@@ -136,18 +147,22 @@ export const PracticeBotHeal = {
     /** What every bot spawns with: a full level 3 pack. */
     kit: { bandage: 30, healthkit: 4, soda: 15, painkiller: 4 } as Record<PracticeBotItem, number>,
     backpack: "backpack03",
-    /** s without seeing you before the bot counts as safe. */
-    safeDelay: 0.4,
-    /** Also safe while you reload or use an item, if no loaded gun of the bot reaches you. */
+    /** Spare seconds the window must have on top of the item's use time. */
+    margin: 0.3,
+    /** Count the rest of your reload or item in the window. */
     whenTargetBusy: true,
-    /** Also safe when you are farther away than this: past what a 15x scope shows. */
-    farDistance: 110,
+    /** Width of your screen over its height, to turn your scope's view radius into a side distance. */
+    screenAspect: 16 / 9,
     /** s after taking damage before the bot starts an item. */
     hitDelay: 1,
-    /** Finish an item with this many seconds or fewer left, even when you see it. */
+    /** Finish an item with this many seconds or fewer left, even when you can shoot it. */
     finishIfLeft: 0.5,
     /** Health at or below this: healing comes before reloading an empty gun. */
     urgentAt: 50,
+    /** Health at or below this, with no time to heal where it stands: walk to cover first. */
+    coverAt: 60,
+    /** How far it looks for cover, in units. */
+    coverSearch: 24,
     /** Your health at or below this: the bot does not heal, it closes in. */
     pushTargetAt: 30,
     /** How hard it closes in then, 0 to 1 (the brain's push pressure). */
@@ -158,6 +173,58 @@ export const PracticeBotHeal = {
     pillsBelow: 25,
 };
 export type PracticeBotItem = "bandage" | "healthkit" | "soda" | "painkiller";
+
+/**
+ * How far `viewer` must walk sideways before it can see `hidden`: for each
+ * bullet-stopping obstacle between them, the line has to clear the obstacle's
+ * edge. The line pivots at `hidden`, so a shift at the obstacle grows by
+ * (distance to hidden / obstacle to hidden) back at the viewer. 0 when nothing blocks.
+ */
+export function practicePeekDistance(viewer: Player, hidden: Player): number {
+    if (!util.sameLayer(viewer.layer, hidden.layer)) return 0;
+    return peekDistanceAt(viewer, hidden.pos, hidden.rad);
+}
+
+function blocksBullets(o: Obstacle, layer: number): boolean {
+    return o.active && !o.dead && o.collidable && !o.isWindow && o.height >= 0.25 && !!util.sameLayer(o.layer, layer);
+}
+
+function obstacleCenter(o: Obstacle): Vec2 {
+    const col = o.collider;
+    return col.type === collider.Type.Circle ? col.pos : v2.mul(v2.add(col.min, col.max), 0.5);
+}
+
+/** Half the obstacle's width across `axis` (a unit vector). */
+function obstacleHalfWidth(o: Obstacle, axis: Vec2): number {
+    const col = o.collider;
+    return col.type === collider.Type.Circle
+        ? col.rad
+        : Math.abs((col.max.x - col.min.x) / 2 * axis.x) + Math.abs((col.max.y - col.min.y) / 2 * axis.y);
+}
+
+function peekDistanceAt(viewer: Player, to: Vec2, rad: number): number {
+    const from = viewer.pos;
+    const length = v2.distance(from, to);
+    if (length < 0.5) return 0;
+    const dir = v2.div(v2.sub(to, from), length);
+    const side = v2.perp(dir);
+    let needed = 0;
+    for (const obj of viewer.game.grid.intersectLineSegment(from, to)) {
+        if (obj.__type !== ObjectType.Obstacle) continue;
+        const o = obj as Obstacle;
+        if (!blocksBullets(o, viewer.layer) || !collider.intersectSegment(o.collider, from, to)) continue;
+        const center = obstacleCenter(o);
+        const offset = v2.dot(v2.sub(center, from), side);
+        const toHidden = Math.max(0.5, length - v2.dot(v2.sub(center, from), dir));
+        const shiftAtObstacle = Math.max(0, obstacleHalfWidth(o, side) + rad - Math.abs(offset));
+        needed = Math.max(needed, shiftAtObstacle * length / toHidden);
+    }
+    return needed;
+}
+
+function useTime(item: PracticeBotItem): number {
+    return (GameObjectDefs.typeToDef(item, item === "bandage" || item === "healthkit" ? "heal" : "boost")).useTime;
+}
 
 function isReloadAction(action: number): boolean {
     return action === GameConfig.Action.Reload || action === GameConfig.Action.ReloadAlt;
@@ -183,6 +250,11 @@ export class PracticeCombat {
     private sinceHit = Infinity;
     /** The target is low: the brain closes in and the bot does not heal. */
     pushing = false;
+    /** How far the target must walk sideways to see the bot. Tests replace it. */
+    peekDistance = (target: Player) => practicePeekDistance(target, this.player);
+    /** Where the bot is walking to heal behind cover, if anywhere. The brain moves it there. */
+    healCover?: Vec2;
+    private coverTicker = 0;
 
     /**
      * @param fireRange how far the bot will shoot a given gun from (the brain's
@@ -230,29 +302,125 @@ export class PracticeCombat {
     }
 
     /**
+     * Seconds before the target could shoot the bot, if the bot stayed where it is.
+     * 0 means it can shoot now.
+     */
+    healWindow(target: Player, distance: number, canSee: boolean): number {
+        const H = PracticeBotHeal;
+        const speed = GameConfig.player.moveSpeed;
+        const reach = Math.max(
+            0,
+            ...[0, 1].map((slot) => {
+                const gun = GunDefs[target.weapons[slot]?.type];
+                return gun ? BulletDefs[gun.bulletType]?.distance ?? 0 : 0;
+            }),
+        );
+        const sees = (target.zoom || GameConfig.scopeZoomRadius.desktop["1xscope"]) * H.screenAspect;
+        const far = Math.max(0, distance - Math.min(reach, sees)) / speed;
+        const peek = canSee ? 0 : this.peekDistance(target) / speed;
+        const busy = H.whenTargetBusy
+                && (isReloadAction(target.actionType) || target.actionType === GameConfig.Action.UseItem)
+            ? Math.max(0, target.action.duration - target.action.time)
+            : 0;
+        return Math.max(far, peek) + busy;
+    }
+
+    /** The item to use within `window` seconds: the wanted one, or a shorter one that does the same job. */
+    private itemFor(window: number): PracticeBotItem | undefined {
+        const wanted = this.wantedItem();
+        if (!wanted) return undefined;
+        const fallback: Record<PracticeBotItem, PracticeBotItem[]> = {
+            healthkit: ["healthkit", "bandage"],
+            bandage: ["bandage"],
+            painkiller: ["painkiller", "soda"],
+            soda: ["soda"],
+        };
+        return fallback[wanted].find((item) =>
+            this.player.invManager.get(item) > 0
+            && useTime(item) + PracticeBotHeal.margin <= window
+        );
+    }
+
+    /**
+     * The nearest spot behind cover where the target would need time for a
+     * bandage to see the bot. Undefined when none is within `coverSearch`.
+     */
+    private findHealCover(target: Player): Vec2 | undefined {
+        const H = PracticeBotHeal;
+        const p = this.player;
+        const speed = GameConfig.player.moveSpeed;
+        const need = (useTime("bandage") + H.margin) * speed;
+        let best: Vec2 | undefined;
+        let bestDist = Infinity;
+        const near = p.game.grid.intersectCollider(collider.createCircle(p.pos, H.coverSearch));
+        for (const obj of near) {
+            if (obj.__type !== ObjectType.Obstacle) continue;
+            const o = obj as Obstacle;
+            if (!blocksBullets(o, p.layer)) continue;
+            const center = obstacleCenter(o);
+            const away = v2.normalizeSafe(v2.sub(center, target.pos), v2.create(1, 0));
+            const spot = v2.add(center, v2.mul(away, obstacleHalfWidth(o, away) + p.rad + 0.5));
+            const walk = v2.distance(p.pos, spot);
+            if (walk >= bestDist || walk > H.coverSearch) continue;
+            // Not inside something else, and really hidden from the target.
+            const blocked = p.game.grid.intersectCollider(collider.createCircle(spot, p.rad)).some((other) =>
+                other.__type === ObjectType.Obstacle
+                && (other as Obstacle).collidable
+                && !(other as Obstacle).dead
+                && util.sameLayer((other as Obstacle).layer, p.layer)
+                && !!collider.intersectCircle((other as Obstacle).collider, spot, p.rad)
+            );
+            if (blocked || peekDistanceAt(target, spot, p.rad) < need) continue;
+            best = spot;
+            bestDist = walk;
+        }
+        return best;
+    }
+
+    /** Decide where to walk to heal. Kept for half a second at a time. */
+    private updateHealCover(dt: number, target: Player, window: number): void {
+        const H = PracticeBotHeal;
+        const p = this.player;
+        const wanted = this.wantedItem();
+        const needsCover = this.settings.shootsBack
+            && !this.pushing
+            && !this.usingItem
+            && p.health <= H.coverAt
+            && (wanted === "bandage" || wanted === "healthkit")
+            && !this.itemFor(window);
+        if (!needsCover) {
+            this.healCover = undefined;
+            return;
+        }
+        this.coverTicker -= dt;
+        if (this.coverTicker > 0 && this.healCover) return;
+        this.coverTicker = 0.5;
+        this.healCover = this.findHealCover(target);
+    }
+
+    /**
      * Start, keep or drop a heal or boost item.
      * @param reloadSlot the gun the reload rules want reloaded now, if any
      * @returns true while an item is in use; the bot then leaves its weapons alone
      */
-    private updateItem(distance: number, target: Player, reloadSlot: number | undefined): boolean {
+    private updateItem(distance: number, target: Player, canSee: boolean, reloadSlot: number | undefined): boolean {
         const H = PracticeBotHeal;
         const p = this.player;
         if (!this.settings.shootsBack) return false;
-        const targetBusy = isReloadAction(target.actionType) || target.actionType === GameConfig.Action.UseItem;
-        const canShoot = [0, 1].some((slot) =>
-            this.loaded(slot) && distance <= this.fireRange(p.weapons[slot].type)
-        );
-        const unseen = this.unseenFor >= H.safeDelay;
-        const safe = unseen || distance > H.farDistance || (H.whenTargetBusy && targetBusy && !canShoot);
+        const window = this.healWindow(target, distance, canSee);
 
         if (this.usingItem) {
             const left = p.action.duration - p.action.time;
             const hit = this.sinceHit === 0;
-            if (hit || this.pushing || (!safe && left > H.finishIfLeft)) p.cancelAction();
+            if (hit || this.pushing || (window <= 0 && left > H.finishIfLeft)) p.cancelAction();
             return this.usingItem;
         }
-        if (!safe || this.pushing || this.sinceHit < H.hitDelay) return false;
-        const item = this.wantedItem();
+        if (this.pushing || this.sinceHit < H.hitDelay) return false;
+        // You reloading or healing in its sight and reach: it punishes that instead.
+        const targetBusy = isReloadAction(target.actionType) || target.actionType === GameConfig.Action.UseItem;
+        const canShoot = [0, 1].some((slot) => this.loaded(slot) && distance <= this.fireRange(p.weapons[slot].type));
+        if (canSee && targetBusy && canShoot) return false;
+        const item = this.itemFor(window);
         if (!item) return false;
 
         const heal = item === "bandage" || item === "healthkit";
@@ -262,6 +430,8 @@ export class PracticeCombat {
         // A gun that can shoot comes before anything; adrenaline comes after every reload.
         if (noneLoaded && emptyReload) return false;
         if (emptyReload && !urgent) return false;
+        // Just out of sight: unless it is urgent, give the reload rules their moment first.
+        if (!urgent && !canSee && this.unseenFor < PracticeBotReload.safeDelay) return false;
         if (!heal && reloadSlot !== undefined) return false;
 
         if (heal) p.useHealingItem(item);
@@ -447,7 +617,9 @@ export class PracticeCombat {
             && gun?.fireDelay >= PracticeBotOverclock.minFireDelay && gun.fireMode !== "burst";
 
         this.reloadSlot = this.planReload(distance, target);
-        if (this.updateItem(distance, target, this.reloadSlot)) {
+        const using = this.updateItem(distance, target, canSee, this.reloadSlot);
+        this.updateHealCover(dt, target, this.healWindow(target, distance, canSee));
+        if (using) {
             // Any swap or reload would cancel the item.
             this.reloadSlot = undefined;
             this.committedSlot = undefined;

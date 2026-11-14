@@ -150,6 +150,17 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   reached. Measured: 20 s with you at 20 health, a Mosin bot's average distance goes 47.7 to 14.1, SPAS-12
   14.5 to 5.5. In the open against a player who never hides the bot was out of sight 1 to 4 s in 96 s and
   used 0.3 med kits; healing depends on cover (PRA-008).
+- Heal only when it can finish (PRA-007, second pass). The bot starts an item only if it can finish before
+  you could shoot it. That window is the longest of: behind cover, how far you must walk sideways to see
+  it (from the obstacle's size and where you both stand) at player speed; in the open, how far it is past
+  your guns' bullet reach or your screen (scope view radius x 16/9). Your remaining reload or item time is
+  added. It uses the item it wants or a shorter one (bandage for med kit, soda for pills) that fits with
+  0.3 s to spare. A tree from 15 units gives about 1 s, a container wall from 22 units about 3.4 s. At 60
+  health or less with nothing that fits, it walks to the nearest cover within 24 units that fits a bandage,
+  then heals there standing still. You reloading or healing where it can shoot you: it shoots. Fixes found
+  on the way: a practice bot told to stand still kept walking (no movement input reset), and the brain's
+  anti-stuck nudge moved a bot that was holding cover on purpose. Measured with you circling it at walking
+  speed (16 fights of 45 s): items started 14 to 5, items you interrupted 13 to 2, finished 1 to 3.
 - Bots move like a player (PRA-009). Move speed is 100% of player speed at every setting; it used to
   follow the Strafe setting (55% at 0, 80% at 5, 105% at 10), which no player has. The slider is now called
   "Strafe amount" and only changes how much the bot moves sideways. Weapon swap timing is unchanged: the
