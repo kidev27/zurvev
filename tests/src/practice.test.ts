@@ -131,6 +131,7 @@ test("Practice settings message round-trips", () => {
             backpack: 3,
             scope: "8xscope",
             fillAmmo: false,
+            adren: "always",
             counts: { ...defaultPracticeKit().counts, bandage: 12, healthkit: 2, frag: 5, mirv: 1 },
         },
         bots: [
@@ -165,6 +166,31 @@ test("Practice settings message round-trips", () => {
     const decoded = new PracticeSettingsMsg();
     decoded.deserialize(stream);
     expect(decoded.settings).toEqual(msg.settings);
+});
+
+test("Adrenaline setting: none, full at spawn (then it drains), or always full", () => {
+    const off = startPractice({ bots: [] });
+    expect(off.player.boost).toBe(0);
+
+    // startPractice runs 2 s after the kit is given, so a little has drained.
+    const start = startPractice({ bots: [], kit: { ...defaultPracticeKit(), adren: "start" } });
+    expect(start.player.boost).toBeGreaterThan(98);
+    for (let i = 0; i < 100; i++) start.game.update(0.1);
+    expect(start.player.boost).toBeLessThan(100);
+    // Full again on every respawn.
+    killPlayer(start.player);
+    for (let i = 0; i < (PracticePlayerRespawnDelay + 1) * 10; i++) start.game.update(0.1);
+    expect(start.player.dead).toBe(false);
+    expect(start.player.boost).toBeGreaterThan(98);
+
+    const always = startPractice({ bots: [], kit: { ...defaultPracticeKit(), adren: "always" } });
+    for (let i = 0; i < 100; i++) always.game.update(0.1);
+    // Topped up every tick; at most one tick of drain shows.
+    expect(always.player.boost).toBeGreaterThan(99.5);
+
+    // Old saved setups without the field load as none.
+    const { adren: _, ...oldKit } = defaultPracticeKit();
+    expect(sanitizePracticeSettings({ ...defaultPracticeSettings(), kit: oldKit as never }).kit.adren).toBe("off");
 });
 
 test("Practice stats message round-trips", () => {

@@ -10050,7 +10050,7 @@ export class SpecOpsManager implements PracticeHost {
 
         player.health = player.maxHealth;
         player.specOpsArmor = 0;
-        player.boost = 0;
+        player.boost = kit.adren === "off" ? 0 : 100;
         player.setDirty();
     }
 

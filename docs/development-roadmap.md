@@ -100,6 +100,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-008 | Practice bots: cover, peek shooting, pushing a low player | Practice | P1 | Needs Playtesting | PRA-007 | `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts` | `practiceBotPeek.test.ts` 11/11; `practiceBotHeal.test.ts` 26/26; full-game wall and rock fights on each Quick switch profile (see notes) | In-game feel on real maps (buildings, doors). The empty rifle in a nonstop close fight is still only reloaded by the reload rules |
 | PRA-009 | Practice bots: player move speed | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 60/60; `practiceBotOverclock.test.ts` 15/15 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `server/src/game/weaponManager.ts`, `server/src/game/practiceController.ts`, `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/practiceEditor.ts` | `practiceQsProfiles.test.ts` 8/8; `practiceBotOverclock.test.ts` 16/16; `practiceBotRange.test.ts` 8/8; browser check of the dropdown; full fights per profile (see notes) | In-game feel of each profile. Surviv (original) timing not sourced |
+| PRA-010 | Your adrenaline: none, full at spawn, or always full | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `shared/net/practiceMsg.ts`, `server/src/game/specOpsManager.ts`, `server/src/game/practiceController.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 61/61; browser check of the dropdown | Protocol 1045: players must refresh after deploy |
 
 ### Notes
 
@@ -190,6 +191,9 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   shot). Shotgun-only bots peek corners from 4 units. Container wall, 30 units, 5 fights of 15 s: Mosin step-out
   to shot 0.89 to 0.15 s, peeks with a shot 40 of 43 to 55 of 55, time you can see it 7.2 to 1.5 s; SV-98
   behind a rock 0.50 to 0.18 s; AK-47 first shot 0.50 to 0.13 s; SPAS-12 at 10 units 0 peeks to 77 shots in 79.
+- Your adrenaline (PRA-010). Gear & Kit has an Adrenaline dropdown: None (default), Full at spawn (100 at
+  every spawn, then it drains as usual), or Always full (topped up to 100 every tick while alive). Saved with
+  the loadout; older saved loadouts load as None. Bots keep their own "Start with full adrenaline" toggle.
 - Quick peeks, third pass (PRA-008). Measured from a playtest clip of a player peeking a rock with a sniper:
   he steps out about 2 units, shoots 0.05 to 0.17 s after starting to move, and is back in cover by about
   0.4 s. Bot changes (decisions only): no reaction delay on its own peeks wherever you moved

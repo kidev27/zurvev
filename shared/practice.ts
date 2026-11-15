@@ -127,6 +127,16 @@ export const PracticeKitMaxCount = 99;
 export const PracticeMaxGearLevel = 4;
 export const PracticeMaxPackLevel = 3;
 
+/** Your adrenaline: none, full at every spawn (then it drains), or kept full. */
+export const PracticeAdrenModes = ["off", "start", "always"] as const;
+export type PracticeAdrenMode = (typeof PracticeAdrenModes)[number];
+
+export const PracticeAdrenText: Record<PracticeAdrenMode, string> = {
+    off: "None",
+    start: "Full at spawn",
+    always: "Always full",
+};
+
 export interface PracticeKit {
     melee: string;
     /** 0 = none, 1–4. */
@@ -138,6 +148,7 @@ export interface PracticeKit {
     scope: string;
     /** Fill reserve ammo for your guns up to what the backpack holds. */
     fillAmmo: boolean;
+    adren: PracticeAdrenMode;
     counts: Record<PracticeKitItem, number>;
 }
 
@@ -149,6 +160,7 @@ export function defaultPracticeKit(): PracticeKit {
         backpack: 0,
         scope: "1xscope",
         fillAmmo: true,
+        adren: "off",
         counts: {
             bandage: 0,
             healthkit: 0,
@@ -384,6 +396,9 @@ function sanitizeKit(raw: Partial<PracticeKit> | undefined): PracticeKit {
             ? raw.scope
             : def.scope,
         fillAmmo: typeof raw?.fillAmmo === "boolean" ? raw.fillAmmo : def.fillAmmo,
+        adren: (PracticeAdrenModes as readonly string[]).includes(raw?.adren as string)
+            ? (raw!.adren as PracticeAdrenMode)
+            : def.adren,
         counts,
     };
 }

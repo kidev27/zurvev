@@ -24,6 +24,9 @@ import {
     PracticeMaxPackLevel,
     PracticeMaxReaction,
     PracticeMaxRespawnDelay,
+    type PracticeAdrenMode,
+    PracticeAdrenModes,
+    PracticeAdrenText,
     PracticeMelees,
     PracticeMinBotHealth,
     type PracticeQsProfile,
@@ -169,6 +172,11 @@ function toggle(label: string, checked: boolean, onSet: (v: boolean) => void): H
     input.addEventListener("change", () => onSet(input.checked));
     row.append(input, label);
     return row;
+}
+
+/** Kit summary suffix for your adrenaline setting. */
+export function adrenNote(mode: PracticeAdrenMode): string {
+    return mode === "off" ? "" : ` · adren ${PracticeAdrenText[mode].toLowerCase()}`;
 }
 
 function labeledRow(label: string, control: HTMLElement, icon?: string): HTMLDivElement {
@@ -358,6 +366,12 @@ export function renderGear(root: HTMLElement, host: EditorHost): void {
     const head = el("div", { class: "pe-title-row" });
     head.append(sectionTitle("KIT"), toggle("Full ammo for your guns", kit.fillAmmo, (v) => set(() => (kit.fillAmmo = v))()));
     root.append(head);
+    root.append(labeledRow("ADRENALINE", select(
+        "Adrenaline",
+        PracticeAdrenModes.map((m) => ({ value: m, text: PracticeAdrenText[m] })),
+        kit.adren,
+        (v) => set(() => (kit.adren = v as PracticeAdrenMode))(),
+    )));
     const grid = el("div", { class: "pe-kit" });
     for (const item of PracticeKitItems) {
         const cell = el("div", { class: "pe-kit-item" });

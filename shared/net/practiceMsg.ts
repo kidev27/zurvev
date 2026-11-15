@@ -3,6 +3,7 @@ import { GameObjectDefs } from "../defs/register.ts";
 import {
     defaultPracticeSettings,
     emptyPracticeStats,
+    PracticeAdrenModes,
     PracticeKitItems,
     PracticeMaxBots,
     PracticeRandomGun,
@@ -42,6 +43,7 @@ export class PracticeSettingsMsg implements AbstractMsg {
         s.writeBits(kit.backpack, 2);
         s.writeBits(Math.max(0, (PracticeScopes as readonly string[]).indexOf(kit.scope)), 3);
         s.writeBoolean(kit.fillAmmo);
+        s.writeBits(Math.max(0, PracticeAdrenModes.indexOf(kit.adren)), 2);
         for (const item of PracticeKitItems) s.writeBits(kit.counts[item], 7);
         s.writeBits(settings.bots.length, 3);
         for (const bot of settings.bots) {
@@ -79,9 +81,10 @@ export class PracticeSettingsMsg implements AbstractMsg {
         const backpack = s.readBits(2);
         const scope = PracticeScopes[s.readBits(3)] ?? PracticeScopes[0];
         const fillAmmo = s.readBoolean();
+        const adren = PracticeAdrenModes[s.readBits(2)] ?? PracticeAdrenModes[0];
         const counts = {} as Record<(typeof PracticeKitItems)[number], number>;
         for (const item of PracticeKitItems) counts[item] = s.readBits(7);
-        const kit = { melee, helmet, vest, backpack, scope, fillAmmo, counts };
+        const kit = { melee, helmet, vest, backpack, scope, fillAmmo, adren, counts };
         const count = Math.min(s.readBits(3), PracticeMaxBots);
         const bots = [];
         for (let i = 0; i < count; i++) {

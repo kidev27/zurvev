@@ -14,6 +14,7 @@ import {
     PracticeQsProfileText,
 } from "../../../shared/practice.ts";
 import {
+    adrenNote,
     botSummary,
     button,
     type EditorHost,
@@ -278,7 +279,7 @@ export class PracticeLoadoutMenu implements EditorHost {
         const lv = (n: number) => (n ? `Lv ${n}` : "none");
         row("GEAR", "", `Helmet ${lv(s.kit.helmet)} · vest ${lv(s.kit.vest)} · pack ${s.kit.backpack} · ${s.kit.scope.replace("scope", "")}`);
         const kit = Object.entries(s.kit.counts).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${itemName(k)}`);
-        row("KIT", "", `${kit.length ? kit.join(", ") : "Nothing extra"}${s.kit.fillAmmo ? " · full ammo" : ""}`);
+        row("KIT", "", `${kit.length ? kit.join(", ") : "Nothing extra"}${s.kit.fillAmmo ? " · full ammo" : ""}${adrenNote(s.kit.adren)}`);
         side.append(el("div", { style: "height: 1px; background: var(--pe-border); margin: 10px 0" }));
         row("BOTS", "", `${s.bots.length} · ${botSummary(s.bots[0])}`);
         row("RESPAWN", "", s.respawnMode === "off" ? "By hand" : `${RespawnModeText[s.respawnMode]}, ${(s.respawnDelay / 10).toFixed(1)} s`);
