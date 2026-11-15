@@ -24,6 +24,9 @@ export const ZombieAmmoCapMult = 1.2;
 /** Pressure Charges have their own cap, for the Cannon and its Mk II alike. */
 export const ZombiePressureChargeCap = 64;
 
+/** Rockets have their own cap, for the Rocket Launcher and its Mk II alike. */
+export const ZombieRocketCap = 12;
+
 /**
  * Zombies ammo caps (players always carry a level-1 bag here). Max Ammo fills to these and
  * box/Pack-a-Punch reserve is capped by them. Fireteam keeps `SpecOpsBagSizes`.
@@ -38,6 +41,7 @@ export const ZombieAmmoBagSizes: Record<string, number[]> = {
         }),
     ),
     pressure_charge: Array(5).fill(ZombiePressureChargeCap),
+    rocket: Array(5).fill(ZombieRocketCap),
 };
 
 /**

@@ -402,6 +402,7 @@ test("Issue #74 Zombies reserve caps: +20% rounded to the nearest whole number, 
         "308sub": 43,
         tesla_cell: 43,
         pressure_charge: 64,
+        rocket: 12,
     });
     for (const [ammo, base] of Object.entries(ZombieAmmoBaseCaps)) {
         expect(ZombieAmmoBagSizes[ammo].every((cap) => cap === Math.round(base * 1.2)), ammo).toBe(true);

@@ -1902,6 +1902,7 @@ export function loadStaticDomImages() {
         "ui-loot-45acp": "img/loot/loot-ammo-box.svg",
         "ui-loot-pressure_charge": "img/loot/loot-ammo-pressure-charge.svg",
         "ui-loot-tesla_cell": "img/loot/loot-ammo-tesla-cell.svg",
+        "ui-loot-rocket": "img/loot/loot-ammo-rocket.svg",
     };
 
     for (const [id, img] of Object.entries(lootImages)) {

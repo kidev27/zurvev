@@ -11,6 +11,7 @@ import {
     ZombiePackAPunchTracer,
 } from "../maps/zombiePackAPunch.ts";
 import { type BulletDef, BulletDefs } from "./bulletDefs.ts";
+import { ThrowableDefs } from "./throwableDefs.ts";
 
 export interface GunDef {
     readonly type: "gun";
@@ -3886,6 +3887,7 @@ const WonderGunAmmo: Record<string, string> = {
     pressure_cannon: "pressure_charge",
     tesla_rifle: "tesla_cell",
     gravegun: "12gauge",
+    rocket_launcher: "rocket",
 };
 
 for (
@@ -3914,6 +3916,24 @@ for (
             shotSpread: 0,
             bulletType: "bullet_tesla",
             sound: { shoot: "tesla_rifle_01", reload: "tesla_rifle_reload_01", reloadDuration: 3.8 },
+        },
+        rocket_launcher: {
+            name: "Rocket Launcher",
+            maxClip: 1,
+            // Spare rockets with a Mystery Box launcher, on top of the loaded one.
+            ammoSpawnCount: 6,
+            reloadTime: 2.6,
+            fireDelay: 1,
+            barrelLength: 3.6,
+            bulletCount: 1,
+            shotSpread: 0,
+            // The rocket is the projectile; the invisible bullet does nothing (as on the Potato Cannon).
+            bulletType: "bullet_invis",
+            sound: {
+                shoot: "potato_cannon_01",
+                reload: "potato_cannon_reload_01",
+                deploy: "potato_cannon_switch_01",
+            },
         },
         gravegun: {
             name: "Gravegun",
@@ -3948,6 +3968,19 @@ for (
         worldImg: { sprite: `gun-${type}-top.img`, scale: { x: 0.5, y: 0.5 } },
     });
 }
+
+// The Rocket Launcher rests on the shoulder like the Potato Cannon and fires a rocket.
+util.mergeDeep(BaseDefs.rocket_launcher, {
+    isLauncher: true,
+    projType: "rocket_proj",
+    barrelOffset: -1,
+    worldImg: {
+        leftHandOffset: { x: 7, y: 2 },
+        gunOffset: { x: -10, y: -4 },
+        recoil: 8,
+        handsBelow: true,
+    },
+});
 
 export const GunDefs: Record<string, GunDef> = { ...BaseDefs, ...SkinDefs };
 
@@ -4024,6 +4057,8 @@ for (const [base, name] of Object.entries(ZombiePackAPunchNames)) {
     });
     // A Mark II pistol must not merge with a normal pistol into a dual-wield pair.
     delete upgraded.dualWieldType;
+    // Explosions don't scale with gun damage: a Mark II launcher fires its own stronger rocket.
+    if (def.projType && ThrowableDefs[`${def.projType}_pap`]) upgraded.projType = `${def.projType}_pap`;
     if (special?.kind === "burstToAuto") {
         upgraded.fireMode = "auto";
         upgraded.fireDelay = special.fireDelay;

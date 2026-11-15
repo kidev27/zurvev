@@ -17,6 +17,7 @@ export const ZombiePackAPunchNames: Record<string, string> = {
     pressure_cannon: "Pressure Cannon Mk II",
     tesla_rifle: "Tesla Rifle Mk II",
     gravegun: "Gravegun Mk II",
+    rocket_launcher: "Rocket Launcher Mk II",
     ppsh41: "PPSh-41 Mk II",
     mp40: "MP40 Mk II",
     fal: "FN FAL Mk II",

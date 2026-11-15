@@ -55,6 +55,10 @@ export interface ThrowableDef {
     emoteId?: number;
     noPotatoSwap?: boolean;
     destroyNonCollidables?: boolean;
+    /** Flies straight at its launch height (rockets): no gravity, no ground drag. */
+    noGravity?: boolean;
+    /** The sprite points where it flies instead of spinning (rockets). */
+    faceDir?: boolean;
     trail?: {
         maxLength: number;
         width: number;
@@ -979,3 +983,68 @@ export const ThrowableDefs: Record<string, ThrowableDef> = {
         emoteId: 210,
     },
 };
+
+/**
+ * Zombies Rocket Launcher rockets: straight and fast, exploding on a zombie, a solid
+ * obstacle or wall, or in the air at max range (`fuseTime` x speed = 60 units).
+ * The Mk II rocket only swaps in a stronger explosion.
+ */
+export const ZombieRocket = { speed: 55, range: 60 } as const;
+
+function zombieRocket(explosionType: string): ThrowableDef {
+    return {
+        name: "Rocket",
+        type: "throwable",
+        quality: 0,
+        explosionType,
+        inventoryOrder: 0,
+        noPotatoSwap: true,
+        cookable: false,
+        forceMaxThrowDistance: true,
+        explodeOnImpact: true,
+        playerCollision: true,
+        noGravity: true,
+        faceDir: true,
+        fuseTime: ZombieRocket.range / ZombieRocket.speed,
+        aimDistance: ZombieRocket.range,
+        rad: 1,
+        throwPhysics: {
+            playerVelMult: 0,
+            velZ: 0,
+            speed: ZombieRocket.speed,
+            spinVel: 0,
+            spinDrag: 0,
+            fixedCollisionHeight: 0.25,
+        },
+        speed: { equip: 0, attack: 0 },
+        lootImg: {
+            sprite: "proj-rocket-01.img",
+            tint: 0xffffff,
+            border: "loot-circle-outer-01.img",
+            borderTint: 0,
+            scale: 0.2,
+        },
+        worldImg: {
+            sprite: "proj-rocket-01.img",
+            scale: 0.25,
+            tint: 0xffffff,
+        },
+        handImg: {},
+        useThrowParticles: false,
+        sound: {
+            pullPin: "",
+            throwing: "",
+            pickup: "",
+            deploy: "",
+        },
+        trail: {
+            maxLength: 30,
+            width: 2.4,
+            alpha: 0.75,
+            tint: 0xb4b4b4,
+        },
+    };
+}
+
+ThrowableDefs.rocket_proj = zombieRocket("explosion_rocket");
+ThrowableDefs.rocket_proj_pap = zombieRocket("explosion_rocket_pap");

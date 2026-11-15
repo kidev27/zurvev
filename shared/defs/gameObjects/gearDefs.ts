@@ -586,6 +586,22 @@ const AmmoDefs: Record<string, AmmoDef> = {
             pickup: "ammo_pickup_01",
         },
     },
+    rocket: {
+        name: "Rocket",
+        type: "ammo",
+        special: true,
+        hideWhenEmpty: true,
+        minStackSize: 1,
+        lootImg: {
+            sprite: "loot-ammo-rocket.img",
+            scale: 0.22,
+            tint: 0xffffff,
+            tintDark: 0xffffff,
+        },
+        sound: {
+            pickup: "ammo_pickup_01",
+        },
+    },
     tesla_cell: {
         name: "Tesla Cell",
         type: "ammo",
