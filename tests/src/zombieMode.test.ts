@@ -388,26 +388,28 @@ test("Issue #74 Brute tuning: 800 HP cap, 1.75x melee, 10% slower on every diffi
     }
 });
 
-test("Issue #74 Zombies reserve caps: +20% rounded to the nearest whole number, Pressure Charges 64", () => {
-    expect(ZombieAmmoCapMult).toBe(1.2);
-    expect(ZombiePressureChargeCap).toBe(64);
+test("Zombies reserve caps: +20% twice, rounded to the nearest multiple of 5; Pressure Charges 75, Rockets 15", () => {
+    expect(ZombieAmmoCapMult).toBeCloseTo(1.44, 10);
+    expect(ZombiePressureChargeCap).toBe(75);
     const caps = Object.fromEntries(Object.entries(ZombieAmmoBagSizes).map(([ammo, sizes]) => [ammo, sizes[1]]));
     expect(caps).toEqual({
-        "9mm": 360,
-        "762mm": 324,
-        "556mm": 324,
-        "45acp": 324,
-        "12gauge": 48,
-        "50AE": 101,
-        "308sub": 43,
-        tesla_cell: 43,
-        pressure_charge: 64,
-        rocket: 12,
+        "9mm": 430,
+        "762mm": 390,
+        "556mm": 390,
+        "45acp": 390,
+        "12gauge": 60,
+        "50AE": 120,
+        "308sub": 50,
+        tesla_cell: 50,
+        pressure_charge: 75,
+        rocket: 15,
     });
     for (const [ammo, base] of Object.entries(ZombieAmmoBaseCaps)) {
-        expect(ZombieAmmoBagSizes[ammo].every((cap) => cap === Math.round(base * 1.2)), ammo).toBe(true);
+        const cap = Math.round((base * 1.44) / 5) * 5;
+        expect(ZombieAmmoBagSizes[ammo].every((c) => c === cap && c % 5 === 0), ammo).toBe(true);
     }
-    expect(ZombieAmmoBagSizes.pressure_charge.every((cap) => cap === 64)).toBe(true);
+    expect(ZombieAmmoBagSizes.pressure_charge.every((cap) => cap === 75)).toBe(true);
+    expect(ZombieAmmoBagSizes.rocket.every((cap) => cap === 15)).toBe(true);
     // Every gun Zombies hands out fires an ammo with a Zombies cap.
     for (const type of [...ZombieMysteryBoxWeapons, ...ZombieWonderWeapons.map((w) => w.type), "m9", "m1911"]) {
         const ammo = (GameObjectDefs.typeToDef(type, "gun") as GunDef).ammo;

@@ -155,9 +155,9 @@ test.each(zombieClasses)("pressure blast and Tesla arcs cannot damage %s through
 });
 
 const wonderAmmoCases = [
-    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 64, clip: 2, boxSpare: 12, mk2Clip: 3 },
-    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 43, clip: 3, boxSpare: 12, mk2Clip: 5 },
-    { gun: "rocket_launcher", ammo: "rocket", cap: 12, clip: 1, boxSpare: 6, mk2Clip: 2 },
+    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 75, clip: 2, boxSpare: 12, mk2Clip: 3 },
+    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 50, clip: 3, boxSpare: 12, mk2Clip: 5 },
+    { gun: "rocket_launcher", ammo: "rocket", cap: 15, clip: 1, boxSpare: 6, mk2Clip: 2 },
 ] as const;
 
 for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
@@ -255,20 +255,20 @@ for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
     });
 }
 
-test("drop rates (issue #74): 4% per kill for each, 2 at a time; owning both rolls each", () => {
+test("drop rates: Pressure Charges and Tesla Cells 6% per kill, 2 at a time; Rockets 5%, 1; owning several rolls each", () => {
     for (const ammo of ["pressure_charge", "tesla_cell"]) {
-        expect(ZombieWonderAmmoDrops[ammo].killChance, ammo).toBe(0.04);
+        expect(ZombieWonderAmmoDrops[ammo].killChance, ammo).toBe(0.06);
         expect(ZombieWonderAmmoDrops[ammo].count, ammo).toBe(2);
     }
-    expect(ZombieWonderAmmoDrops.rocket).toEqual({ killChance: 0.03, count: 1, lifetime: 20 });
+    expect(ZombieWonderAmmoDrops.rocket).toEqual({ killChance: 0.05, count: 1, lifetime: 20 });
     const { shooter, ops, zombie } = arena();
     shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
     shooter.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "tesla_rifle", 3);
     // One roll per ammo, in ZombieWonderAmmo order: Pressure Charges, then Tesla Cells.
     const rolls = (...r: number[]) => () => r.shift()!;
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), rolls(0.039, 0.04)).map((l) => [l.type, l.count]))
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), rolls(0.059, 0.06)).map((l) => [l.type, l.count]))
         .toEqual([["pressure_charge", 2]]);
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), rolls(0.04, 0.039)).map((l) => [l.type, l.count]))
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), rolls(0.06, 0.059)).map((l) => [l.type, l.count]))
         .toEqual([["tesla_cell", 2]]);
     expect(ops.maybeDropWonderAmmo(shooter, zombie(8), rolls(0.01, 0.01)).map((l) => l.type)).toEqual([
         "pressure_charge",
@@ -276,13 +276,31 @@ test("drop rates (issue #74): 4% per kill for each, 2 at a time; owning both rol
     ]);
 });
 
-test("Pressure Cannon Mk II shares the 64-charge cap, and Max Ammo fills it", () => {
+test("Pressure Cannon Mk II shares the 75-charge cap, and Max Ammo fills it", () => {
     const { shooter, ops } = arena();
     shooter.weaponManager.setWeapon(primary, packAPunchType("pressure_cannon"), 3);
     shooter.invManager.set("pressure_charge", 0);
-    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(64);
+    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(75);
     ops.activateZombiePowerUp("zombie_powerup_max_ammo");
-    expect(shooter.invManager.get("pressure_charge")).toBe(64);
+    expect(shooter.invManager.get("pressure_charge")).toBe(75);
+});
+
+test("Rocket Launcher uses its own recorded shot and reload, at normal speed inside the reload", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { default: soundDefs } = await import("../../client/src/soundDefs.ts");
+    for (const type of ["rocket_launcher", packAPunchType("rocket_launcher")]) {
+        const def = GameObjectDefs.typeToDef(type, "gun");
+        expect(def.sound.shoot, type).toBe("rocket_launcher_01");
+        expect(def.sound.reload, type).toBe("rocket_launcher_reload_01");
+        expect(def.sound.reloadDuration, type).toBeUndefined();
+    }
+    for (const name of ["rocket_launcher_01", "rocket_launcher_reload_01"]) {
+        const sound = soundDefs.Sounds.players[name];
+        expect(sound.path).toBe(`audio/guns/${name}.mp3`);
+        const file = readFileSync(new URL(`../../client/public/${sound.path}`, import.meta.url));
+        // MP3: an ID3 tag or a frame sync.
+        expect(file.toString("ascii", 0, 3) === "ID3" || (file[0] === 0xff && (file[1] & 0xe0) === 0xe0), name).toBe(true);
+    }
 });
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
@@ -421,7 +439,7 @@ test("a buy gate blocks the pressure blast until the squad opens it", () => {
     expect(game.bulletBarn.damages.some((damage) => damage.obj === target)).toBe(true);
 });
 
-// The Rocket Launcher borrows the Potato Cannon's sounds until it has its own recording.
+// The Rocket Launcher's recordings are MP3 with no reloadDuration; they have their own test.
 for (const { type } of added.filter((w) => w.type !== "rocket_launcher")) {
     test(`${type}: the custom reload recording matches its declared timing and Mk II variant`, async () => {
         const { readFileSync } = await import("node:fs");

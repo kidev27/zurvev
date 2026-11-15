@@ -3930,8 +3930,8 @@ for (
             // The rocket is the projectile; the invisible bullet does nothing (as on the Potato Cannon).
             bulletType: "bullet_invis",
             sound: {
-                shoot: "potato_cannon_01",
-                reload: "potato_cannon_reload_01",
+                shoot: "rocket_launcher_01",
+                reload: "rocket_launcher_reload_01",
                 deploy: "potato_cannon_switch_01",
             },
         },

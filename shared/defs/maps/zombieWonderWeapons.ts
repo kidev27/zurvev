@@ -18,9 +18,9 @@ export const ZombieWonderAmmo: readonly string[] = ["pressure_charge", "tesla_ce
  * a gun that fires that ammo; anyone can pick it up. lifetime is in seconds.
  */
 export const ZombieWonderAmmoDrops: Record<string, { killChance: number; count: number; lifetime: number }> = {
-    pressure_charge: { killChance: 0.04, count: 2, lifetime: 20 },
-    tesla_cell: { killChance: 0.04, count: 2, lifetime: 20 },
-    rocket: { killChance: 0.03, count: 1, lifetime: 20 },
+    pressure_charge: { killChance: 0.06, count: 2, lifetime: 20 },
+    tesla_cell: { killChance: 0.06, count: 2, lifetime: 20 },
+    rocket: { killChance: 0.05, count: 1, lifetime: 20 },
 };
 
 export const ZombiePressureBlast = {

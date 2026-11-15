@@ -18,25 +18,37 @@ export const ZombieAmmoBaseCaps: Record<string, number> = {
     tesla_cell: 36,
 };
 
-/** All gun ammo except Pressure Charges carries this much more in Zombies (issue #74). */
-export const ZombieAmmoCapMult = 1.2;
+/**
+ * All gun ammo except Pressure Charges and Rockets carries this much more in Zombies:
+ * +20% in issue #74, then +20% again.
+ */
+export const ZombieAmmoCapMult = 1.2 * 1.2;
 
-/** Pressure Charges have their own cap, for the Cannon and its Mk II alike. */
-export const ZombiePressureChargeCap = 64;
+/** Zombies caps are rounded to the nearest multiple of this. */
+export const ZombieAmmoCapStep = 5;
 
-/** Rockets have their own cap, for the Rocket Launcher and its Mk II alike. */
-export const ZombieRocketCap = 12;
+/** Nearest multiple of ZombieAmmoCapStep. */
+export function zombieAmmoCapRound(amount: number): number {
+    return Math.round(amount / ZombieAmmoCapStep) * ZombieAmmoCapStep;
+}
+
+/** Pressure Charges have their own cap, for the Cannon and its Mk II alike: 64 x 1.2 = 76.8. */
+export const ZombiePressureChargeCap = zombieAmmoCapRound(64 * 1.2);
+
+/** Rockets have their own cap, for the Rocket Launcher and its Mk II alike: 12 x 1.2 = 14.4. */
+export const ZombieRocketCap = zombieAmmoCapRound(12 * 1.2);
 
 /**
  * Zombies ammo caps (players always carry a level-1 bag here). Max Ammo fills to these and
  * box/Pack-a-Punch reserve is capped by them. Fireteam keeps `SpecOpsBagSizes`.
- * Each cap is base x ZombieAmmoCapMult rounded to the nearest whole number (Math.round):
- * 9mm 360, 7.62/5.56/.45 324, 12 gauge 48, .50 AE 101 (100.8), .308 43 and Tesla 43 (43.2).
+ * Each cap is base x ZombieAmmoCapMult rounded to the nearest multiple of 5 (zombieAmmoCapRound):
+ * 9mm 430 (432), 7.62/5.56/.45 390 (388.8), 12 gauge 60 (57.6), .50 AE 120 (121), .308 and
+ * Tesla 50 (51.8), Pressure Charges 75 (76.8), Rockets 15 (14.4).
  */
 export const ZombieAmmoBagSizes: Record<string, number[]> = {
     ...Object.fromEntries(
         Object.entries(ZombieAmmoBaseCaps).map(([ammo, base]) => {
-            const cap = Math.round(base * ZombieAmmoCapMult);
+            const cap = zombieAmmoCapRound(base * ZombieAmmoCapMult);
             return [ammo, [cap, cap, cap, cap, cap]];
         }),
     ),
