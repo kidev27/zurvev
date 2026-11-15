@@ -50,7 +50,12 @@ import {
     ZombiePackAPunchTracer,
     ZombiePackAPunchType,
 } from "../../shared/defs/maps/zombiePackAPunch.ts";
-import { ZombieAmmoBagSizes } from "../../shared/defs/maps/zombieIndoorDefs.ts";
+import {
+    ZombieAmmoBagSizes,
+    ZombieAmmoBaseCaps,
+    ZombieAmmoCapMult,
+    ZombiePressureChargeCap,
+} from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { zombiePerkMachine, ZombiePerkMachines, ZombiePerkMachineTypes } from "../../shared/defs/maps/zombiePerks.ts";
 import {
     isZombiePowerUpType,
@@ -369,6 +374,114 @@ test("Zombies maps use smaller ammo bags that Max Ammo fills; Fireteam keeps Spe
     game.specOps!.activateZombiePowerUp("zombie_powerup_max_ammo");
     expect(operator.invManager.get("9mm")).toBe(ZombieAmmoBagSizes["9mm"][1]);
     expect(operator.invManager.get("762mm")).toBe(ZombieAmmoBagSizes["762mm"][1]);
+});
+
+test("Issue #74 Brute tuning: 800 HP cap, 1.75x melee, 10% slower on every difficulty", () => {
+    const { brute } = ZombieVariants;
+    expect(brute.healthCap).toBe(800);
+    expect(brute.meleeDamageMult).toBe(1.75);
+    expect(zombieEnemyHealth(200, "veteran", "zombie_brute")).toBe(800);
+    for (const difficulty of SpecOpsDifficulties) {
+        // Was 0.8x the walker speed; now 0.9 of that.
+        expect(zombieSpeedMult("zombie_brute", difficulty), difficulty)
+            .toBeCloseTo(ZombieSpeedByDifficulty[difficulty] * 0.8 * 0.9, 10);
+    }
+});
+
+test("Issue #74 Zombies reserve caps: +20% rounded to the nearest whole number, Pressure Charges 64", () => {
+    expect(ZombieAmmoCapMult).toBe(1.2);
+    expect(ZombiePressureChargeCap).toBe(64);
+    const caps = Object.fromEntries(Object.entries(ZombieAmmoBagSizes).map(([ammo, sizes]) => [ammo, sizes[1]]));
+    expect(caps).toEqual({
+        "9mm": 360,
+        "762mm": 324,
+        "556mm": 324,
+        "45acp": 324,
+        "12gauge": 48,
+        "50AE": 101,
+        "308sub": 43,
+        tesla_cell: 43,
+        pressure_charge: 64,
+    });
+    for (const [ammo, base] of Object.entries(ZombieAmmoBaseCaps)) {
+        expect(ZombieAmmoBagSizes[ammo].every((cap) => cap === Math.round(base * 1.2)), ammo).toBe(true);
+    }
+    expect(ZombieAmmoBagSizes.pressure_charge.every((cap) => cap === 64)).toBe(true);
+    // Every gun Zombies hands out fires an ammo with a Zombies cap.
+    for (const type of [...ZombieMysteryBoxWeapons, ...ZombieWonderWeapons.map((w) => w.type), "m9", "m1911"]) {
+        const ammo = (GameObjectDefs.typeToDef(type, "gun") as GunDef).ammo;
+        expect(ZombieAmmoBagSizes[ammo], `${type} ${ammo}`).toBeDefined();
+    }
+
+    // Max Ammo fills every gun ammo to the new caps.
+    const game = startZombieRound();
+    const operator = game.playerBarn.livingPlayers.find((p) => !p.specOpsAi)!;
+    for (const ammo of Object.keys(ZombieAmmoBaseCaps)) {
+        if (ammo !== "tesla_cell") operator.invManager.set(ammo as never, 0);
+    }
+    game.specOps!.activateZombiePowerUp("zombie_powerup_max_ammo");
+    for (const ammo of Object.keys(ZombieAmmoBaseCaps)) {
+        if (ammo === "tesla_cell") continue;
+        expect(operator.invManager.get(ammo as never), ammo).toBe(ZombieAmmoBagSizes[ammo][1]);
+    }
+});
+
+/**
+ * Power-ups spawned over `kills` lucky kills, a new round each time the cap is hit.
+ * `bonusEvery` Infinity gives the rule before issue #74.
+ */
+function powerUpCounts(players: number, kills: number, bonusEvery: number) {
+    const game = startZombieRound(players);
+    const ops = game.specOps!;
+    const zombie = ops.livingEnemies()[0];
+    const counts: Record<string, number> = Object.fromEntries(ZombiePowerUpTypes.map((t) => [t, 0]));
+    (ops as unknown as { spawnZombiePowerUp: (type: string) => object }).spawnZombiePowerUp = (type) => {
+        counts[type]++;
+        return {};
+    };
+    const saved = ZombiePowerUpDrops.maxAmmoBonusEvery;
+    ZombiePowerUpDrops.maxAmmoBonusEvery = bonusEvery;
+    try {
+        for (let i = 0; i < kills; i++) {
+            if (ops.zombieRoundDrops >= ZombiePowerUpDrops.roundCap) ops.zombieRoundDrops = 0;
+            ops.onZombieKilledForDrops(zombie, 0, 0);
+        }
+    } finally {
+        ZombiePowerUpDrops.maxAmmoBonusEvery = saved;
+    }
+    return { counts, scale: ops.zombieDropTeamScale() };
+}
+
+test("Issue #74 Max Ammo comes 1.125x as often, solo and duo; other power-ups unchanged", () => {
+    expect(ZombiePowerUpDrops.maxAmmoBonusEvery).toBe(8);
+    for (const players of [1, 2]) {
+        // 320 earned drops = 80 hat refills = 10 bonus Max Ammo, the last owed after kill 317.
+        const before = powerUpCounts(players, 320, Infinity);
+        const after = powerUpCounts(players, 320, 8);
+        if (players === 2) expect(after.scale).toBeGreaterThan(1);
+        for (const type of ZombiePowerUpTypes) expect(before.counts[type], `${players} ${type}`).toBe(80);
+        expect(after.counts.zombie_powerup_max_ammo, `${players}`).toBe(90);
+        expect(after.counts.zombie_powerup_max_ammo / before.counts.zombie_powerup_max_ammo).toBe(1.125);
+        for (const type of ZombiePowerUpTypes) {
+            if (type !== "zombie_powerup_max_ammo") expect(after.counts[type], `${players} ${type}`).toBe(80);
+        }
+    }
+});
+
+test("Issue #74 bonus Max Ammo drops on the next kill even at the round cap, and waits out unreachable spots", () => {
+    const game = startZombieRound();
+    const ops = game.specOps!;
+    const zombie = ops.livingEnemies()[0];
+    ops.zombieRoundDrops = ZombiePowerUpDrops.roundCap;
+    ops.zombieBonusMaxAmmo = 1;
+    ops.onZombieKilledForDrops(zombie, 0, 1);
+    const drops = powerUpDrops(game);
+    expect(drops.map((d) => d.type)).toEqual(["zombie_powerup_max_ammo"]);
+    expect(ops.zombieRoundDrops).toBe(ZombiePowerUpDrops.roundCap);
+    expect(ops.zombieBonusMaxAmmo).toBe(0);
+    // No bonus owed: an unlucky kill drops nothing.
+    ops.onZombieKilledForDrops(zombie, 0, 1);
+    expect(powerUpDrops(game)).toHaveLength(1);
 });
 
 test("Bigger teams need more points and luckier kills per drop", () => {
@@ -2143,7 +2256,7 @@ test("waves mix in Runners from round 4 and Brutes from round 8 without changing
         .toBe(Math.floor(zombieWaveCount(20, 1) * runner.shareMax));
 });
 
-test("Runners are faster and frailer; Brutes are bigger, tougher, hit twice as hard and pay more", () => {
+test("Runners are faster and frailer; Brutes are bigger, tougher, hit harder and pay more", () => {
     const game = createGame(TeamMode.Solo, "zombie_dead_air");
     const operator = game.playerBarn.addTestPlayer({ name: "A" });
     game.update(0.1);
@@ -2161,7 +2274,7 @@ test("Runners are faster and frailer; Brutes are bigger, tougher, hit twice as h
 
     expect(brute.name).toBe("Brute");
     expect(brute.outfit).toBe("outfitZombieBrute");
-    expect(brute.specOpsSpeedMult).toBeCloseTo(walker.specOpsSpeedMult * 0.8, 5);
+    expect(brute.specOpsSpeedMult).toBeCloseTo(walker.specOpsSpeedMult * 0.72, 5);
     expect(brute.health).toBe(Math.min(ZombieVariants.brute.healthCap, walker.health * ZombieVariants.brute.healthMult));
     expect(brute.health).toBeGreaterThan(280);
     expect(brute.scale).toBe(ZombieVariants.brute.scale);

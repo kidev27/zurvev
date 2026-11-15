@@ -56,7 +56,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 |---|---|---|---|---|---|---|---|---|
 | ZOM-001 | Zombie speed by difficulty | Zombies | P1 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts`: table, cap, and spawned zombies per difficulty | In-game feel. Base speed 0.51 Recruit, 0.55 Regular, 0.59 Hardened, 0.64 Veteran; capped at 0.75; rush +15% |
 | ZOM-003 | Pack-a-Punch timer by difficulty | Zombies | P1 | Needs Playtesting | None | `shared/defs/maps/zombiePackAPunch.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` covers every difficulty; Zombies suites unchanged | In-game feel. Claim window 12 s on every difficulty; upgrade 3 s Recruit, 5 s Regular, 7 s Hardened, 9 s Veteran |
-| ZOM-002 | Ammunition scarcity | Zombies | P2 | Completed | None | `shared/defs/maps/zombieIndoorDefs.ts`, `shared/defs/maps/zombiePowerUps.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` (bags, Max Ammo fill, drop chance by round); 20-round solo sim: drops 33 to 23, Max Ammo 8 to 5 | In-game feel. Caps 300 9mm, 270 5.56/7.62/.45, 40 12ga, 84 .50 AE, 36 .308; drops 2000 x1.14 points, 2% per kill minus 0.05 points per round (1% floor) |
+| ZOM-002 | Ammunition scarcity | Zombies | P2 | Completed | None | `shared/defs/maps/zombieIndoorDefs.ts`, `shared/defs/maps/zombiePowerUps.ts`, `server/src/game/specOpsManager.ts` | `zombieMode.test.ts` (bags, Max Ammo fill, drop chance by round); 20-round solo sim: drops 33 to 23, Max Ammo 8 to 5 | In-game feel. Caps raised 20% by issue #74 (see notes); drops 2000 x1.14 points, 2% per kill minus 0.05 points per round (1% floor); Max Ammo 1.125x |
 
 ## Phase 3: Zombies content
 
@@ -72,20 +72,29 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 - Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
   `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
   (0.75). Kill-heat rush adds up to +15% on top in Zombies (`ZombieRushSpeedBonus`); Fireteam keeps +38%.
-- The Pressure Cannon fires its own `pressure_charge` (cap 24 in Zombies, `ZombieAmmoBagSizes`). A box
-  Cannon brings 4; Max Ammo and Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced.
-  Kills drop a charge rarely while the killer owns a Cannon (`ZombieWonderAmmoDrops`: 2%, 1 charge,
-  20 s). The HUD slot shows only while carrying charges (`hideWhenEmpty`).
-- The Tesla Rifle fires its own `tesla_cell` (cap 36 in Zombies). Same rules as Pressure Charges: a box
+- The Pressure Cannon fires its own `pressure_charge` (cap 64 in Zombies, `ZombiePressureChargeCap`,
+  Cannon and Mk II alike). A box Cannon brings 12 spare charges with its loaded magazine; Max Ammo and
+  Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced. Kills drop charges while the
+  killer owns a Cannon (`ZombieWonderAmmoDrops`: 4%, 2 charges, 20 s). The HUD slot shows only while
+  carrying charges (`hideWhenEmpty`).
+- The Tesla Rifle fires its own `tesla_cell` (cap 43 in Zombies). Same rules as Pressure Charges: a box
   Tesla brings 12, Max Ammo and Pack-a-Punch fill to the cap, cells stay if the Tesla is replaced. Kill
-  drop 1.5%, 1 cell, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
+  drop 4%, 2 cells, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
   The Gravegun still shares `12gauge`.
 - Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
 - Zombie variants (`ZombieVariants` in `server/src/game/zombieMode.ts`). Runner from round 4: 1.3x walker
   speed (capped at 0.75), 70% health, 5% of the wave growing 5% a round to 20%; dies to Insta-Kill and
-  Nuke. Brute from round 8 (two from round 12, never more than 2 a wave): 0.8x speed, 4x health (cap 1200),
-  2x melee damage, 1.3x size, 200 kill cash; Insta-Kill doubles damage, Nuke takes a fraction. Brutes
+  Nuke. Brute from round 8 (two from round 12, never more than 2 a wave): 0.72x speed, 4x health (cap 800),
+  1.75x melee damage, 1.3x size, 200 kill cash; Insta-Kill doubles damage, Nuke takes a fraction. Brutes
   spawn last in a wave. Wave totals are unchanged.
+- Duo playtest balance (issue #74). Brutes: health cap 1200 to 800, melee 2x to 1.75x, speed 0.8x to 0.72x
+  (10% slower on every difficulty). Reserve caps for every gun ammo except Pressure Charges are 1.2x the old
+  cap, rounded to the nearest whole number (`ZombieAmmoBaseCaps` x `ZombieAmmoCapMult`): 9mm 360,
+  7.62/5.56/.45 324, 12 gauge 48, .50 AE 101, .308 43, Tesla Cells 43; Pressure Charges 64. Max Ammo 1.125x
+  as often: every 8th refill of the power-up hat also owes one bonus Max Ammo, dropped by the next zombie
+  killed, outside the round cap and without using an earned drop (`maxAmmoBonusEvery`). Other power-ups
+  keep their rate; total drops +3%. Checked by counting 320 lucky kills solo and duo: Max Ammo 80 to 90,
+  each other type 80.
 
 ## Phase 4: Practice improvements
 

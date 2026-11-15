@@ -3893,7 +3893,8 @@ for (
         pressure_cannon: {
             name: "Pressure Cannon",
             maxClip: 2,
-            ammoSpawnCount: 4,
+            // Spare charges with a Mystery Box Cannon, on top of its loaded magazine.
+            ammoSpawnCount: 12,
             reloadTime: 3.5,
             fireDelay: 1.1,
             barrelLength: 3.8,

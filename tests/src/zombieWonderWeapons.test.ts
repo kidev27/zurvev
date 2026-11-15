@@ -151,8 +151,8 @@ test.each(zombieClasses)("pressure blast and Tesla arcs cannot damage %s through
 });
 
 const wonderAmmoCases = [
-    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 24, clip: 2, boxSpare: 4, mk2Clip: 3 },
-    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 36, clip: 3, boxSpare: 12, mk2Clip: 5 },
+    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 64, clip: 2, boxSpare: 12, mk2Clip: 3 },
+    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 43, clip: 3, boxSpare: 12, mk2Clip: 5 },
 ] as const;
 
 for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
@@ -250,18 +250,33 @@ for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
     });
 }
 
-test("drop rates: 2% for Pressure Charges, 1.5% for Tesla Cells; owning both rolls each", () => {
-    expect(ZombieWonderAmmoDrops.pressure_charge.killChance).toBe(0.02);
-    expect(ZombieWonderAmmoDrops.tesla_cell.killChance).toBe(0.015);
+test("drop rates (issue #74): 4% per kill for each, 2 at a time; owning both rolls each", () => {
+    for (const ammo of ["pressure_charge", "tesla_cell"]) {
+        expect(ZombieWonderAmmoDrops[ammo].killChance, ammo).toBe(0.04);
+        expect(ZombieWonderAmmoDrops[ammo].count, ammo).toBe(2);
+    }
     const { shooter, ops, zombie } = arena();
     shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
     shooter.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "tesla_rifle", 3);
-    const between = () => 0.017;
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), between).map((l) => l.type)).toEqual(["pressure_charge"]);
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), () => 0.001).map((l) => l.type)).toEqual([
+    // One roll per ammo, in ZombieWonderAmmo order: Pressure Charges, then Tesla Cells.
+    const rolls = (...r: number[]) => () => r.shift()!;
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), rolls(0.039, 0.04)).map((l) => [l.type, l.count]))
+        .toEqual([["pressure_charge", 2]]);
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), rolls(0.04, 0.039)).map((l) => [l.type, l.count]))
+        .toEqual([["tesla_cell", 2]]);
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(8), rolls(0.01, 0.01)).map((l) => l.type)).toEqual([
         "pressure_charge",
         "tesla_cell",
     ]);
+});
+
+test("Pressure Cannon Mk II shares the 64-charge cap, and Max Ammo fills it", () => {
+    const { shooter, ops } = arena();
+    shooter.weaponManager.setWeapon(primary, packAPunchType("pressure_cannon"), 3);
+    shooter.invManager.set("pressure_charge", 0);
+    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(64);
+    ops.activateZombiePowerUp("zombie_powerup_max_ammo");
+    expect(shooter.invManager.get("pressure_charge")).toBe(64);
 });
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {

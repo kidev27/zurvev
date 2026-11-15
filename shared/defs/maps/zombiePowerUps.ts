@@ -39,6 +39,10 @@ export function isZombiePowerUpType(type: string): type is ZombiePowerUpType {
  * - Luck: every zombie kill also has a `killChance` roll.
  * - At most `roundCap` drops per round; the type comes from a shuffled "hat"
  *   holding every power-up once, refilled when empty.
+ * - Bonus Max Ammo: every `maxAmmoBonusEvery`-th refill of the hat also owes one Max Ammo,
+ *   dropped by the next zombie killed. It uses no earned drop and does not count toward
+ *   `roundCap`, so the other power-ups keep their rate and Max Ammo comes 9 times for every
+ *   8 of each other type: 1.125x the old rate (issue #74), solo or in a team.
  * Bigger teams fight more zombies, so the target is multiplied and the kill
  * chance divided by `zombieDropTeamScale` to keep drops per round the same.
  */
@@ -51,6 +55,7 @@ export const ZombiePowerUpDrops = {
     killChanceDecayPerRound: 0.0005,
     killChanceMin: 0.01,
     roundCap: 4,
+    maxAmmoBonusEvery: 8,
 };
 
 /** Per-kill drop chance for a round (before the team-size scale). */
