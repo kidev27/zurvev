@@ -131,9 +131,17 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-009 | Practice bots: player move speed | Practice | P1 | Needs Playtesting | PRA-006 | `server/src/game/specOpsManager.ts`, `shared/practice.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 60/60; `practiceBotOverclock.test.ts` 15/15 | In-game feel. Bots are faster than before at every Wiggle setting below 9 |
 | PRA-003 | Quick Switch profiles | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `server/src/game/weaponManager.ts`, `server/src/game/practiceController.ts`, `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/practiceEditor.ts` | `practiceQsProfiles.test.ts` 8/8; `practiceBotOverclock.test.ts` 16/16; `practiceBotRange.test.ts` 8/8; browser check of the dropdown; full fights per profile (see notes) | In-game feel of each profile. Surviv (original) timing not sourced |
 | PRA-010 | Your adrenaline: none, full at spawn, or always full | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `shared/net/practiceMsg.ts`, `server/src/game/specOpsManager.ts`, `server/src/game/practiceController.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 61/61; browser check of the dropdown | Protocol 1045: players must refresh after deploy |
+| PRA-011 | Anonymous Practice recordings for bot training | Practice | P2 | Needs Playtesting | None | `server/src/game/practiceObservation.ts`, `server/src/game/practiceRecorder.ts`, `server/src/utils/practiceRecordStore.ts`, `docs/practice-recordings.md` | `practiceRecorder.test.ts` 7/7 (off by default, sample rate, other modes never record, rows/events/outcomes, death and respawn, observation cost, gzip store and disk guard) | Players must be told before it is turned on; Docker needs a volume for `logs/practice` |
 
 ### Notes
 
+- Practice recordings (PRA-011), step 1 of training bots on people's play. Off by default
+  (`practiceRecording` in the config). When on, each sampled Practice game writes one anonymous gzip'd
+  JSON-lines file: 10 rows a second of what the player could see (`practiceObserve`: own state, up to
+  4 bots on screen, 16 wall/cover rays, incoming bullets) and what they did (move, aim, fire, and
+  swap/reload/item/scope events caught every tick), plus damage and kills. About 2 MB per hour.
+  Format: `docs/practice-recordings.md`. Next: collect, then train a model that copies the best
+  players' heal, reload, swap, peek, push and dodge choices, and run it as a Practice bot option.
 - Practice already saves one settings blob in browser storage (`practiceMenu.ts`). Presets and loadouts
   can extend that format.
 - Presets (`PracticePresets` in `shared/practice.ts`): Default, Moving targets (4 bots, never shoot back,

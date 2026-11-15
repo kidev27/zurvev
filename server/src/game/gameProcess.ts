@@ -12,11 +12,13 @@ import { Config } from "../config.ts";
 import { apiPrivateRouter, checkIp } from "../utils/apiRouter.ts";
 import { resolveFireteamSquadName } from "../utils/badWords.ts";
 import { logErrorToWebhook } from "../utils/logger.ts";
+import { appendPracticeRecord } from "../utils/practiceRecordStore.ts";
 import { HTTPRateLimit, WebSocketRateLimit } from "../utils/rateLimit.ts";
 import { resolveClientIp } from "../utils/requestIp.ts";
 import type { SaveGameBody } from "../utils/types.ts";
 import type { Client } from "./client.ts";
 import { Game } from "./game.ts";
+import type { PracticeRecordChunk } from "./practiceRecorder.ts";
 import { type ProcessMsg, ProcessMsgType } from "./ipcTypes.ts";
 import { ClientSocket } from "./socket.ts";
 
@@ -254,6 +256,10 @@ class ServerGame extends Game {
 
     override sendQuestProgress(userId: string, progress: Array<{ id: string; delta: number }>) {
         sendQuestProgress(userId, progress);
+    }
+
+    override recordPractice(chunk: PracticeRecordChunk) {
+        void appendPracticeRecord(chunk);
     }
 }
 
