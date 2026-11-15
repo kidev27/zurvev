@@ -3985,6 +3985,17 @@ util.mergeDeep(BaseDefs.rocket_launcher, {
 export const GunDefs: Record<string, GunDef> = { ...BaseDefs, ...SkinDefs };
 
 /**
+ * Name of the weapon behind a kill source, when no translation exists: a gun, or a
+ * Rocket Launcher's rocket (rocket kills report the rocket, not the launcher).
+ */
+export function weaponSourceName(type: string): string {
+    const gun = GunDefs[type];
+    if (gun?.type === "gun") return gun.name;
+    const projectile = ThrowableDefs[type];
+    return projectile?.explodeOnImpact && projectile.noGravity ? projectile.name : "";
+}
+
+/**
  * Mark II bullet: the original bullet with a purple tracer, 1.2x thicker. Single
  * bullets also get a cyan-white plasma core and a spark trail; shotgun pellets
  * skip those to keep many-pellet shots light. Damage, speed and range are unchanged.

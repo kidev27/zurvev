@@ -55,6 +55,8 @@ import {
     ZombieAmmoBaseCaps,
     ZombieAmmoCapMult,
     ZombiePressureChargeCap,
+    ZombieViewZoomMult,
+    zombieViewZoomMult,
 } from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { zombiePerkMachine, ZombiePerkMachines, ZombiePerkMachineTypes } from "../../shared/defs/maps/zombiePerks.ts";
 import {
@@ -485,6 +487,29 @@ test("Issue #74 bonus Max Ammo drops on the next kill even at the round cap, and
     // No bonus owed: an unlucky kill drops nothing.
     ops.onZombieKilledForDrops(zombie, 0, 1);
     expect(powerUpDrops(game)).toHaveLength(1);
+});
+
+test("Zombies players see 9% further; other modes keep the normal view", () => {
+    expect(ZombieViewZoomMult).toBe(1.09);
+    // The client camera multiplies the player's zoom by this (client/src/game.ts).
+    for (const map of ZombieMapPool) expect(zombieViewZoomMult(MapDefs[map].gameMode), map).toBe(1.09);
+    for (const map of [...FireteamMapPool, "practice_arena"] as const) {
+        expect(zombieViewZoomMult(MapDefs[map].gameMode), map).toBe(1);
+    }
+
+    // The server sends objects across that wider view; the zoom itself stays a normal step.
+    const culling = (map: "zombie_dead_air" | "practice_arena") => {
+        const game = createGame(TeamMode.Solo, map);
+        const player = game.playerBarn.addTestPlayer({ name: "Operator" });
+        for (let i = 0; i < 40; i++) game.update(0.1);
+        const client = game.clientBarn.clients.find((c) => c.player === player)!;
+        return { zoom: player.zoom, culling: (client as unknown as { _cullingZoom: number })._cullingZoom };
+    };
+    const zombies = culling("zombie_dead_air");
+    expect(Object.values(GameConfig.scopeZoomRadius.desktop)).toContain(zombies.zoom);
+    expect(zombies.culling).toBeCloseTo(zombies.zoom * 1.09, 5);
+    const practice = culling("practice_arena");
+    expect(practice.culling).toBeCloseTo(practice.zoom, 5);
 });
 
 test("Bigger teams need more points and luckier kills per drop", () => {

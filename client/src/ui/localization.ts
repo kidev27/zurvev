@@ -1,5 +1,5 @@
 import $ from "jquery";
-import { GunDefs } from "../../../shared/defs/gameObjects/gunDefs.ts";
+import { weaponSourceName } from "../../../shared/defs/gameObjects/gunDefs.ts";
 import { device } from "../device.ts";
 import english from "../en.json";
 
@@ -39,10 +39,10 @@ const Locales = {
 export type Locale = keyof typeof Locales;
 
 /** New guns and Mk II variants use their defined names when no translation exists. */
+/** Fallback name for a gun (or a Rocket Launcher's rocket) when no translation exists. */
 function gunNameTranslation(key: string): string {
     if (!key.startsWith("game-")) return "";
-    const gun = GunDefs[key.slice("game-".length)];
-    return gun?.type === "gun" ? gun.name : "";
+    return weaponSourceName(key.slice("game-".length));
 }
 
 export class Localization {

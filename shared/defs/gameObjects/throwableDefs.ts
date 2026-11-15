@@ -1,4 +1,5 @@
 import type { Vec2 } from "../../utils/v2.ts";
+import { ZombiePackAPunchNames } from "../maps/zombiePackAPunch.ts";
 
 export interface ThrowableDef {
     readonly type: "throwable";
@@ -991,9 +992,10 @@ export const ThrowableDefs: Record<string, ThrowableDef> = {
  */
 export const ZombieRocket = { speed: 55, range: 60 } as const;
 
-function zombieRocket(explosionType: string): ThrowableDef {
+/** `name` is what kill messages show for a rocket kill. */
+function zombieRocket(name: string, explosionType: string): ThrowableDef {
     return {
-        name: "Rocket",
+        name,
         type: "throwable",
         quality: 0,
         explosionType,
@@ -1046,5 +1048,5 @@ function zombieRocket(explosionType: string): ThrowableDef {
     };
 }
 
-ThrowableDefs.rocket_proj = zombieRocket("explosion_rocket");
-ThrowableDefs.rocket_proj_pap = zombieRocket("explosion_rocket_pap");
+ThrowableDefs.rocket_proj = zombieRocket("Rocket Launcher", "explosion_rocket");
+ThrowableDefs.rocket_proj_pap = zombieRocket(ZombiePackAPunchNames.rocket_launcher, "explosion_rocket_pap");

@@ -97,6 +97,12 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   (`zombieAmmoCapRound`): 9mm 430, 7.62/5.56/.45 390, 12 gauge 60, .50 AE 120, .308 50, Tesla Cells 50,
   Pressure Charges 75, Rockets 15. Special-ammo kill drops +2 points: Pressure Charges and Tesla Cells 6%,
   Rockets 5%.
+- Zombies view 9% wider (`ZombieViewZoomMult` 1.09, `zombieViewZoomMult(gameMode)` in
+  `zombieIndoorDefs.ts`), scopes and indoor zoom included. The server still sends the normal zoom step
+  (a whole number the client maps to mobile steps); the client camera (`client/src/game.ts`) and the
+  server's visible area (`server/src/game/client.ts`) both multiply it.
+- Rocket kills report the rocket; its def names are "Rocket Launcher" and "Rocket Launcher Mk II", and
+  `weaponSourceName` (gunDefs) gives the kill feed and kill messages that name when no translation exists.
 - Zombie variants (`ZombieVariants` in `server/src/game/zombieMode.ts`). Runner from round 4: 1.3x walker
   speed (capped at 0.75), 70% health, 5% of the wave growing 5% a round to 20%; dies to Insta-Kill and
   Nuke. Brute from round 8 (two from round 12, never more than 2 a wave): 0.72x speed, 4x health (cap 800),

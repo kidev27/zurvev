@@ -4,7 +4,7 @@ import type { Game } from "../../server/src/game/game.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
 import { stairAtPos } from "../../server/src/game/specOpsNav.ts";
 import type { ZombieClass } from "../../server/src/game/zombieMode.ts";
-import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
+import { type GunDef, weaponSourceName } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
 import { packAPunchType, packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
@@ -17,6 +17,7 @@ import {
 import { ZombieRocket } from "../../shared/defs/gameObjects/throwableDefs.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
+import * as net from "../../shared/net/net.ts";
 import { isPracticeGun } from "../../shared/practice.ts";
 import { collider } from "../../shared/utils/collider.ts";
 import { v2, type Vec2 } from "../../shared/utils/v2.ts";
@@ -569,4 +570,33 @@ test("a Mk II rocket hits harder and wider than a base rocket", () => {
     expect(base.center).toBeGreaterThan(0);
     expect(mk2.center).toBeGreaterThan(base.center);
     expect(mk2.edge).toBeGreaterThan(base.edge);
+});
+
+test("rocket kills count, pay cash and name the launcher (or its Mk II) in kill messages", async () => {
+    for (const [type, name] of [
+        ["rocket_launcher", "Rocket Launcher"],
+        [packAPunchType("rocket_launcher"), "Rocket Launcher Mk II"],
+    ] as const) {
+        const { game, shooter, zombie } = arena();
+        const target = zombie(12);
+        target.health = 42;
+        const sources: string[] = [];
+        const broadcast = game.clientBarn.broadcastMsg.bind(game.clientBarn);
+        game.clientBarn.broadcastMsg = (msgType, msg) => {
+            if (msgType === net.MsgType.Kill) sources.push((msg as net.KillMsg).itemSourceType);
+            broadcast(msgType, msg);
+        };
+        const kills = shooter.kills;
+        const cash = shooter.specOpsCash;
+        fireRocket(game, shooter, type);
+        expect(target.dead, type).toBe(true);
+        expect(shooter.kills, type).toBe(kills + 1);
+        expect(shooter.specOpsCash, type).toBeGreaterThan(cash);
+        expect(sources.length, type).toBeGreaterThan(0);
+        // The kill feed and "You killed ... with" text fall back to this name (localization.ts).
+        for (const source of sources) expect(weaponSourceName(source), type).toBe(name);
+    }
+    // Guns keep their names; other projectiles keep their own translations.
+    expect(weaponSourceName("rocket_launcher")).toBe("Rocket Launcher");
+    expect(weaponSourceName("potato_cannonball")).toBe("");
 });

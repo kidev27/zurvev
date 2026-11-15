@@ -6,6 +6,17 @@ import type { PartialMapDef } from "./baseDefs.ts";
 import { LastCallDisplayName } from "./lastCallLayout.ts";
 import { SpecOps } from "./specOpsDefs.ts";
 
+/**
+ * Zombies: players see this much further than the normal view (scopes and indoor zoom
+ * included). The server still sends the normal zoom (a whole number the client maps to
+ * mobile steps); the client camera and the server's visible area both apply this.
+ */
+export const ZombieViewZoomMult = 1.09;
+
+export function zombieViewZoomMult(gameMode: { zombieMode?: boolean }): number {
+    return gameMode.zombieMode ? ZombieViewZoomMult : 1;
+}
+
 /** Zombies reserve caps before `ZombieAmmoCapMult`, one per shared ammo type. */
 export const ZombieAmmoBaseCaps: Record<string, number> = {
     "9mm": 300,

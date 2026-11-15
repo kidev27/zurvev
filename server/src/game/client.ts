@@ -1,4 +1,5 @@
 import type { EmoteDef } from "../../../shared/defs/gameObjects/emoteDefs.ts";
+import { zombieViewZoomMult } from "../../../shared/defs/maps/zombieIndoorDefs.ts";
 import { GameObjectDefs } from "../../../shared/defs/register.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import * as net from "../../../shared/net/net.ts";
@@ -558,7 +559,9 @@ export class Client {
             }
         }
 
-        const targetZoom = this.spectating?.zoom ?? this.player?.zoom ?? 1;
+        // Zombies players see a little further; send what their camera shows.
+        const targetZoom = (this.spectating?.zoom ?? this.player?.zoom ?? 1)
+            * zombieViewZoomMult(this.game.map.mapDef.gameMode);
 
         // lerp towards the target zoom
         if (math.eqAbs(this._cullingZoom, targetZoom, 0.1)) {
