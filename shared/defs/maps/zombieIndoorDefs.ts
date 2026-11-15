@@ -6,20 +6,38 @@ import type { PartialMapDef } from "./baseDefs.ts";
 import { LastCallDisplayName } from "./lastCallLayout.ts";
 import { SpecOps } from "./specOpsDefs.ts";
 
+/** Zombies reserve caps before `ZombieAmmoCapMult`, one per shared ammo type. */
+export const ZombieAmmoBaseCaps: Record<string, number> = {
+    "9mm": 300,
+    "762mm": 270,
+    "556mm": 270,
+    "45acp": 270,
+    "12gauge": 40,
+    "50AE": 84,
+    "308sub": 36,
+    tesla_cell: 36,
+};
+
+/** All gun ammo except Pressure Charges carries this much more in Zombies (issue #74). */
+export const ZombieAmmoCapMult = 1.2;
+
+/** Pressure Charges have their own cap, for the Cannon and its Mk II alike. */
+export const ZombiePressureChargeCap = 64;
+
 /**
  * Zombies ammo caps (players always carry a level-1 bag here). Max Ammo fills to these and
  * box/Pack-a-Punch reserve is capped by them. Fireteam keeps `SpecOpsBagSizes`.
+ * Each cap is base x ZombieAmmoCapMult rounded to the nearest whole number (Math.round):
+ * 9mm 360, 7.62/5.56/.45 324, 12 gauge 48, .50 AE 101 (100.8), .308 43 and Tesla 43 (43.2).
  */
 export const ZombieAmmoBagSizes: Record<string, number[]> = {
-    "9mm": [300, 300, 300, 300, 300],
-    "762mm": [270, 270, 270, 270, 270],
-    "556mm": [270, 270, 270, 270, 270],
-    "45acp": [270, 270, 270, 270, 270],
-    "12gauge": [40, 40, 40, 40, 40],
-    "50AE": [84, 84, 84, 84, 84],
-    "308sub": [36, 36, 36, 36, 36],
-    pressure_charge: [24, 24, 24, 24, 24],
-    tesla_cell: [36, 36, 36, 36, 36],
+    ...Object.fromEntries(
+        Object.entries(ZombieAmmoBaseCaps).map(([ammo, base]) => {
+            const cap = Math.round(base * ZombieAmmoCapMult);
+            return [ammo, [cap, cap, cap, cap, cap]];
+        }),
+    ),
+    pressure_charge: Array(5).fill(ZombiePressureChargeCap),
 };
 
 /**

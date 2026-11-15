@@ -5967,6 +5967,10 @@ export class SpecOpsManager implements PracticeHost {
     zombiePointTarget = ZombiePowerUpDrops.pointStart;
     /** Shuffled power-ups still to draw; refilled with all of them when empty. */
     zombiePowerUpHat: ZombiePowerUpType[] = [];
+    /** Hat refills so far; every ZombiePowerUpDrops.maxAmmoBonusEvery-th owes a bonus Max Ammo. */
+    zombieHatRefills = 0;
+    /** Bonus Max Ammo owed; the next zombie killed in reach drops it. */
+    zombieBonusMaxAmmo = 0;
     /** Drops earned on a zombie that died where players can't reach. */
     private zombiePendingDrops = 0;
     private packAPunchState: ZombiePackAPunchState | undefined;
@@ -6158,6 +6162,8 @@ export class SpecOpsManager implements PracticeHost {
         if (!this.zombiePowerUpHat.length) {
             this.zombiePowerUpHat = [...ZombiePowerUpTypes];
             util.shuffleArray(this.zombiePowerUpHat);
+            this.zombieHatRefills++;
+            if (this.zombieHatRefills % ZombiePowerUpDrops.maxAmmoBonusEvery === 0) this.zombieBonusMaxAmmo++;
         }
         return this.zombiePowerUpHat.shift()!;
     }
@@ -6186,12 +6192,19 @@ export class SpecOpsManager implements PracticeHost {
         if (rand < zombiePowerUpKillChance(this.wave) / scale) earned++;
 
         const owed = earned + this.zombiePendingDrops;
-        if (!owed) return;
+        const bonus = this.zombieBonusMaxAmmo > 0;
+        if (!owed && !bonus) return;
 
         if (!lastCallPosReachable(this.game, victim.pos, undefined, util.toGroundLayer(victim.layer))) {
             // Somewhere players can't reach: hand it to the next zombie that dies in play.
             this.zombiePendingDrops = owed;
             return;
+        }
+
+        // A bonus Max Ammo owed from an earlier hat refill, outside the round cap.
+        if (bonus) {
+            this.zombieBonusMaxAmmo--;
+            this.spawnZombiePowerUp("zombie_powerup_max_ammo", v2.copy(victim.pos), victim.layer);
         }
 
         this.zombiePendingDrops = 0;
