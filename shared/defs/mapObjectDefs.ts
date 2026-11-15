@@ -7,6 +7,7 @@ import {
     lastCallCarDef,
     LastCallMapObjectDefs,
     lastCallPowerGateDef,
+    LastCallRestyledProps,
     lastCallShutterDef,
 } from "./lastCallObjectDefs.ts";
 import type { BuildingDef, LootSpawnDef, MapObjectDef, ObstacleDef, StructureDef } from "./mapObjectsTyping.ts";
@@ -36302,3 +36303,9 @@ export const RawMapObjectDefs: Record<string, MapObjectDef> = {
     ...LastCallMapObjectDefs,
     ...SurvivalMapObjectDefs,
 };
+
+// Last Call: survev furniture with After Hours art. Gameplay (collision, health, loot, explosion) is the base def's.
+for (const [type, art] of Object.entries(LastCallRestyledProps)) {
+    const base = RawMapObjectDefs[art.base] as ObstacleDef;
+    RawMapObjectDefs[type] = { ...base, img: { ...base.img, sprite: art.sprite, scale: art.scale ?? base.img.scale } };
+}

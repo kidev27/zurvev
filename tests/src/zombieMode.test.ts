@@ -578,7 +578,7 @@ test("After Hours generates its furnished motel, maintenance, motor court and ga
     expect(game.map.height).toBe(208);
 
     const props = new Set(game.map.obstacles.map((obstacle) => obstacle.type));
-    expect(props.has("bed_sm_01")).toBe(true);
+    expect(props.has("lastcall_bed")).toBe(true);
     expect(props.has("lastcall_parts_rack")).toBe(true);
     expect(props.has("lastcall_sign_island")).toBe(true);
     expect(props.has("zombie_power_switch")).toBe(true);

@@ -141,18 +141,19 @@ export const ZombieBranchingComplex = util.mergeDeep(
             atlases: ["gradient", "loadout", "shared", "main", "lastcall"],
         },
         biome: {
+            // Dusk: deep violet around the block (floor art: scripts/lastcall/buildArt.ts).
             colors: {
-                background: 0x0a0910,
-                water: 0x0a0910,
-                waterRipple: 0x1b1826,
-                beach: 0x15131c,
-                riverbank: 0x15131c,
-                grass: 0x15131c,
-                underground: 0x0a0910,
-                playerSubmerge: 0x1b1826,
-                playerGhillie: 0x15131c,
+                background: 0x241a3d,
+                water: 0x241a3d,
+                waterRipple: 0x3a2f5c,
+                beach: 0x2c2249,
+                riverbank: 0x2c2249,
+                grass: 0x2c2249,
+                underground: 0x241a3d,
+                playerSubmerge: 0x3a2f5c,
+                playerGhillie: 0x2c2249,
             },
-            // The floor art is already painted at night; don't darken props further.
+            // The floor art is already painted at dusk; don't darken props further.
             valueAdjust: 1,
         },
         mapGen: {

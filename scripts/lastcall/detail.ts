@@ -17,19 +17,20 @@ import {
 const n = (v: number) => Math.round(v * 1000) / 1000;
 const P = (x: number, y: number) => [x * S, y * S] as const;
 
+// Dusk + neon: grime is light and cartoony, glows are strong.
 const C = {
-    grime: "#1a201e",
-    oil: "#0f1312",
-    water: "#1c2a2d",
-    blood: "#4a1512",
-    bloodDrop: "#521713",
-    tape: "#e2c23a",
-    tapeInk: "#1b1a10",
-    paper: "#c9ccc2",
-    sodium: "#ffb84d",
-    neon: "#ff4f6a",
-    flare: "#ff3b2f",
-    hazard: "#c8ad66",
+    grime: "#2a1d38",
+    oil: "#2a1d38",
+    water: "#5a4fa0",
+    blood: "#c22a45",
+    bloodDrop: "#d8344f",
+    tape: "#ffd23f",
+    tapeInk: "#2a1d38",
+    paper: "#fff1d6",
+    sodium: "#ffb547",
+    neon: "#ff4fd8",
+    flare: "#ff5a3c",
+    hazard: "#ffd23f",
 };
 
 /** Small seeded RNG, one stream per zone. */
@@ -65,12 +66,12 @@ function cracks(r: LastCallRect, count: number, rand: () => number): string {
             y += (rand() - 0.5) * 3.2;
             d += ` L${n(x)} ${n(y)}`;
         }
-        s += path(d, C.grime, 0.16, `opacity=".7"`);
+        s += path(d, C.grime, 0.18, `opacity=".22"`);
     }
     return s;
 }
 
-function stains(r: LastCallRect, count: number, rand: () => number, color = C.oil, opacity = 0.45): string {
+function stains(r: LastCallRect, count: number, rand: () => number, color = C.oil, opacity = 0.16): string {
     let s = "";
     for (let i = 0; i < count; i++) {
         const x = r.x0 + 3 + rand() * (r.x1 - r.x0 - 6);
@@ -84,32 +85,33 @@ function stains(r: LastCallRect, count: number, rand: () => number, color = C.oi
 
 function litter(r: LastCallRect, count: number, rand: () => number, colors: string[]): string {
     let s = "";
-    for (let i = 0; i < count; i++) {
+    // Sparse: bright litter reads as confetti in quantity.
+    for (let i = 0; i < Math.round(count * 0.4); i++) {
         const x = r.x0 + 1 + rand() * (r.x1 - r.x0 - 2);
         const y = r.y0 + 1 + rand() * (r.y1 - r.y0 - 2);
         const c = colors[Math.floor(rand() * colors.length)];
-        s += rot(x, y, rand() * 180, box(x, y, 0.3 + rand() * 0.45, 0.2 + rand() * 0.3, c, `opacity=".7"`));
+        s += rot(x, y, rand() * 180, box(x, y, 0.35 + rand() * 0.45, 0.25 + rand() * 0.3, c, `opacity=".85"`));
     }
     return s;
 }
 
 /** Puddle with a faint warm reflection of the nearest lamp. */
 function puddle(x: number, y: number, rx: number, ry: number): string {
-    return ellipse(x, y, rx, ry, C.water, `opacity=".85"`)
-        + ellipse(x - rx * 0.3, y - ry * 0.25, rx * 0.45, ry * 0.3, "#e0a64c", `opacity=".16"`);
+    return ellipse(x, y, rx, ry, C.water, `opacity=".75" stroke="${C.grime}" stroke-width=".15"`)
+        + ellipse(x - rx * 0.3, y - ry * 0.25, rx * 0.45, ry * 0.3, C.neon, `opacity=".35"`);
 }
 
 /** Two parallel tire marks along a cubic curve. */
 function skid(d: string): string {
-    return path(d, "#141917", 0.4, `opacity=".3"`)
-        + `<g transform="translate(.8 1.4)">${path(d, "#141917", 0.4, `opacity=".3"`)}</g>`;
+    return path(d, C.grime, 0.4, `opacity=".18"`)
+        + `<g transform="translate(.8 1.4)">${path(d, C.grime, 0.4, `opacity=".18"`)}</g>`;
 }
 
 /** Dark, broken drag trail with a few drops along it. */
 function bloodTrail(d: string, drops: Array<[number, number, number]>): string {
-    let s = path(d, C.blood, 0.6, `opacity=".65" stroke-dasharray="1.6 1.1 .5 1.6 2.2 1.3"`);
+    let s = path(d, C.blood, 0.6, `opacity=".75" stroke-dasharray="1.6 1.1 .5 1.6 2.2 1.3"`);
     for (const [x, y, r] of drops) {
-        s += `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="${C.bloodDrop}" opacity=".7"/>`;
+        s += `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r)}" fill="${C.bloodDrop}" opacity=".85"/>`;
     }
     return s;
 }
@@ -150,7 +152,7 @@ function spray(x: number, y: number, value: string, size: number, deg = 0): stri
         x,
         y,
         deg,
-        `<text x="${n(x)}" y="${n(y)}" fill="${C.paper}" opacity=".38" font-family="Arial,Helvetica,sans-serif" font-weight="bold" font-size="${
+        `<text x="${n(x)}" y="${n(y)}" fill="${C.neon}" opacity=".85" font-family="Arial,Helvetica,sans-serif" font-weight="bold" font-size="${
             n(size)
         }" text-anchor="middle" letter-spacing=".25">${value}</text>`,
     );
@@ -161,7 +163,7 @@ function papers(x: number, y: number, count: number, rand: () => number): string
     for (let i = 0; i < count; i++) {
         const px = x + (rand() - 0.5) * 5;
         const py = y + (rand() - 0.5) * 3.5;
-        s += rot(px, py, rand() * 90 - 45, box(px, py, 0.9, 1.2, "#d6d0b8", `opacity=".55"`));
+        s += rot(px, py, rand() * 90 - 45, box(px, py, 0.9, 1.2, "#fff6e4", `opacity=".9" stroke="${C.grime}" stroke-width=".06"`));
     }
     return s;
 }
@@ -183,25 +185,25 @@ function footprints(x0: number, y0: number, x1: number, y1: number, steps: numbe
 }
 
 function hazardStripe(x: number, y: number, w: number, h: number): string {
-    return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#detailHazard)" opacity=".38"/>`;
+    return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="url(#detailHazard)" opacity=".9"/>`;
 }
 
 /** Warm sodium lamp: a soft pool plus the lamp head. Baked, no flicker. */
 function lamp(x: number, y: number, radius = 13): string {
     return `<circle cx="${n(x)}" cy="${n(y)}" r="${n(radius)}" fill="url(#detailSodium)"/>`
-        + `<circle cx="${n(x)}" cy="${n(y)}" r=".9" fill="#3a3b35" stroke="#151715" stroke-width=".18"/>`
-        + `<circle cx="${n(x)}" cy="${n(y)}" r=".4" fill="#ffd27a"/>`;
+        + `<circle cx="${n(x)}" cy="${n(y)}" r="1" fill="#3b335e" stroke="${C.grime}" stroke-width=".25"/>`
+        + `<circle cx="${n(x)}" cy="${n(y)}" r=".5" fill="#ffe08a"/>`;
 }
 
 // ── Shared defs ─────────────────────────────────────────────────────────────
 
 export const LastCallDetailDefs = [
-    `<radialGradient id="detailSodium"><stop offset="0" stop-color="${C.sodium}" stop-opacity=".34"/><stop offset=".55" stop-color="#e09a3a" stop-opacity=".1"/><stop offset="1" stop-color="#e09a3a" stop-opacity="0"/></radialGradient>`,
-    `<radialGradient id="detailNeon"><stop offset="0" stop-color="${C.neon}" stop-opacity=".4"/><stop offset="1" stop-color="${C.neon}" stop-opacity="0"/></radialGradient>`,
+    `<radialGradient id="detailSodium"><stop offset="0" stop-color="${C.sodium}" stop-opacity=".42"/><stop offset=".55" stop-color="#ff9a3a" stop-opacity=".14"/><stop offset="1" stop-color="#ff9a3a" stop-opacity="0"/></radialGradient>`,
+    `<radialGradient id="detailNeon"><stop offset="0" stop-color="${C.neon}" stop-opacity=".5"/><stop offset="1" stop-color="${C.neon}" stop-opacity="0"/></radialGradient>`,
     `<radialGradient id="detailFlare"><stop offset="0" stop-color="${C.flare}" stop-opacity=".6"/><stop offset=".4" stop-color="${C.flare}" stop-opacity=".18"/><stop offset="1" stop-color="${C.flare}" stop-opacity="0"/></radialGradient>`,
     `<linearGradient id="detailBeam"><stop offset="0" stop-color="#fff3c4" stop-opacity=".38"/><stop offset="1" stop-color="#fff3c4" stop-opacity="0"/></linearGradient>`,
     `<linearGradient id="detailSpill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d48a" stop-opacity=".16"/><stop offset="1" stop-color="#f2d48a" stop-opacity="0"/></linearGradient>`,
-    `<pattern id="detailHazard" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width=".8" height="1.6" fill="${C.hazard}"/><rect x=".8" width=".8" height="1.6" fill="#202825"/></pattern>`,
+    `<pattern id="detailHazard" width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width=".8" height="1.6" fill="${C.hazard}"/><rect x=".8" width=".8" height="1.6" fill="${C.grime}"/></pattern>`,
 ];
 
 // ── Per-zone detail (drawn under props, doors and walls) ────────────────────
@@ -217,7 +219,7 @@ export function lastCallFloorDetail(): string {
         let b = cracks(r, 10, rand) + stains(r, 4, rand);
         b += skid(`M${P(44, 79)} C ${P(53, 75)}, ${P(61, 69)}, ${P(69, 68.5)} C ${P(77, 68)}, ${P(84, 70.5)}, ${P(93, 65)}`);
         b += puddle(...P(67, 82.5), 4.2, 2.1) + puddle(...P(84, 60), 3.2, 1.6) + puddle(...P(49, 56), 2.4, 1.2);
-        b += litter(r, 28, rand, ["#6d5a3a", "#5a4a30", "#8a8670", "#7a3f30"]);
+        b += litter(r, 28, rand, ["#ff8a5c", "#ffd23f", "#7fd3ff", "#ff4fd8"]);
         // Drag trail from the first car to the Reception shutter.
         b += bloodTrail(
             `M${P(52.6, 64.8)} C ${P(56, 69)}, ${P(61.3, 73.3)}, ${P(65.3, 78.7)} C ${P(67.3, 81.3)}, ${P(69, 84.7)}, ${
@@ -242,8 +244,8 @@ export function lastCallFloorDetail(): string {
     {
         const r = zoneRect("lobby");
         const rand = rng("lobby");
-        let b = papers(...P(62, 97), 9, rand) + stains(r, 2, rand, "#3b2c22", 0.35);
-        b += footprints(...P(68, 92), ...P(76, 100), 9, "#3a2a20");
+        let b = papers(...P(62, 97), 9, rand) + stains(r, 2, rand, "#2a1d38", 0.35);
+        b += footprints(...P(68, 92), ...P(76, 100), 9, "#2a1d38");
         b += box(...P(73, 112), 1.1, 0.5, "#b8a46a", `opacity=".7"`); // dropped room key
         s.push(clip("lobby", b));
     }
@@ -252,17 +254,17 @@ export function lastCallFloorDetail(): string {
     {
         const r = zoneRect("storage");
         const rand = rng("storage");
-        s.push(clip("storage", cracks(r, 3, rand) + litter(r, 10, rand, ["#8a7a58", "#6d5a3a"]) + stains(r, 2, rand)));
+        s.push(clip("storage", cracks(r, 3, rand) + litter(r, 10, rand, ["#ffd23f", "#e8b273"]) + stains(r, 2, rand)));
     }
 
     // Night Owl Diner: dinner rush that never finished.
     {
         const r = zoneRect("diner");
         const rand = rng("diner");
-        let b = litter(r, 18, rand, ["#d6d0b8", "#c9c3ab", "#a7442f"]); // napkins, plate shards, sauce
-        b += ellipse(...P(27, 104), 1.4, 0.8, "#3b2c22", `opacity=".5"`); // spilled coffee
+        let b = litter(r, 18, rand, ["#fff6e4", "#ffd23f", "#ff5a5f"]); // napkins, plate shards, sauce
+        b += ellipse(...P(27, 104), 1.4, 0.8, "#2a1d38", `opacity=".5"`); // spilled coffee
         b += puddle(...P(16, 96.5), 1.8, 1); // mop water by the kitchen
-        b += footprints(...P(30, 112), ...P(48, 104), 10, "#3a2a20");
+        b += footprints(...P(30, 112), ...P(48, 104), 10, "#2a1d38");
         s.push(clip("diner", b));
     }
 
@@ -271,20 +273,20 @@ export function lastCallFloorDetail(): string {
         const r = zoneRect("alley");
         const rand = rng("alley");
         let b = cracks(r, 6, rand) + stains(r, 3, rand);
-        b += puddle(...P(104, 84), 2.6, 1.4) + puddle(...P(108, 58), 2, 1.1);
-        b += litter(r, 26, rand, ["#2b2f2c", "#3b3f3a", "#7a6a48", "#6d5a3a"]);
+        b += puddle(...P(104, 88), 2.6, 1.4) + puddle(...P(108, 56), 2, 1.1);
+        b += litter(r, 26, rand, ["#ff8a5c", "#7fd3ff", "#ffd23f", "#b4ff7a"]);
         // The garage shutter is in the alley's east wall.
-        b += spray(...P(107, 82.5), "GARAGE →", 1.5);
+        b += spray(...P(113, 92), "GARAGE →", 1.5);
         s.push(clip("alley", b));
-        s.push(lamp(...P(107.5, 60), 10) + lamp(...P(107.5, 105), 10));
+        s.push(lamp(...P(110, 60), 11) + lamp(...P(110, 105), 11));
     }
 
     // Guest Rooms: someone barricaded in, someone didn't make it.
     {
         const r = zoneRect("wing");
         const rand = rng("wing");
-        let b = litter(r, 14, rand, ["#d6d0b8", "#8a6548", "#6b6a40"]);
-        b += footprints(...P(32, 86), ...P(32, 40), 16, "#3a2a20");
+        let b = litter(r, 14, rand, ["#fff6e4", "#ffd23f", "#ff8a5c"]);
+        b += footprints(...P(32, 86), ...P(32, 40), 16, "#2a1d38");
         b += bloodTrail(`M${P(20.5, 82)} C ${P(23, 81)}, ${P(26, 80)}, ${P(29, 78)}`, [[...P(29.5, 77.5), 0.5]]);
         b += box(...P(30, 60), 1.6, 1, "#d6d0b8", `opacity=".5"`); // room-service tray
         s.push(clip("wing", b));
@@ -298,7 +300,7 @@ export function lastCallFloorDetail(): string {
         b += skid(`M${P(66, 46)} C ${P(70, 40)}, ${P(72, 36)}, ${P(73, 33)}`);
         b += hazardStripe(...P(66, 10.5), 9 * S, 0.8);
         b += puddle(...P(96, 18), 2.4, 1.2); // laundry leak
-        b += litter(r, 22, rand, ["#8a8670", "#5a4a30", "#9b9b8a"]);
+        b += litter(r, 22, rand, ["#ffd23f", "#ff8a5c", "#fff6e4"]);
         // Dropped wrench.
         b += rot(...P(80, 26), 30, box(...P(80, 26), 1.6, 0.35, "#8c8f86", `opacity=".8"`));
         s.push(clip("club", b));
@@ -308,7 +310,7 @@ export function lastCallFloorDetail(): string {
     {
         const rand = rng("office");
         let b = papers(...P(124, 10), 12, rand) + papers(...P(136, 16), 6, rand);
-        b += stains(zoneRect("office"), 1, rand, "#3b2c22", 0.35);
+        b += stains(zoneRect("office"), 1, rand, "#2a1d38", 0.35);
         s.push(clip("office", b));
     }
 
@@ -317,12 +319,12 @@ export function lastCallFloorDetail(): string {
         const r = zoneRect("garage");
         const rand = rng("garage");
         let b = cracks(r, 10, rand) + stains(r, 7, rand);
-        b += skid(`M${P(118, 108)} C ${P(119, 90)}, ${P(118, 70)}, ${P(121, 52)}`);
-        for (let y = 33; y <= 105; y += 20) b += hazardStripe(...P(127.4, y), 0.6 * S, 4 * S);
+        b += skid(`M${P(123, 108)} C ${P(124, 90)}, ${P(123, 70)}, ${P(126, 52)}`);
+        for (let y = 33; y <= 105; y += 20) b += hazardStripe(...P(131.9, y), 0.6 * S, 4 * S);
         b += puddle(...P(134, 56), 2.8, 1.4) + puddle(...P(123, 100), 2.2, 1.2);
-        b += litter(r, 20, rand, ["#8a8670", "#5a4a30", "#2b2f2c"]);
-        b += bloodTrail(`M${P(122, 40)} C ${P(124, 35)}, ${P(127, 30)}, ${P(130, 27)}`, [[...P(130, 26.8), 0.55]]);
-        b += spray(...P(124.6, 55), "POWER → OFFICE", 1.5, -90);
+        b += litter(r, 20, rand, ["#ffd23f", "#ff8a5c", "#7fd3ff"]);
+        b += bloodTrail(`M${P(125, 40)} C ${P(126, 35)}, ${P(128, 30)}, ${P(130, 27)}`, [[...P(130, 26.8), 0.55]]);
+        b += spray(...P(127, 55), "POWER → OFFICE", 1.5, -90);
         b += flare(...P(126, 30), 15);
         s.push(clip("garage", b));
     }
