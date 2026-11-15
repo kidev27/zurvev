@@ -570,6 +570,3 @@ test("a Mk II rocket hits harder and wider than a base rocket", () => {
     expect(mk2.center).toBeGreaterThan(base.center);
     expect(mk2.edge).toBeGreaterThan(base.edge);
 });
-
-
-
