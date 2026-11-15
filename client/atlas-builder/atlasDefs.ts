@@ -61,13 +61,6 @@ export const AtlasResolutions: Record<AtlasRes, number> = {
 export const scaledSprites: Record<string, number> = {
     "map/map-zombie-mystery-box-closed.png": 0.09,
     "map/map-zombie-mystery-box-open.png": 0.115,
-    // Perk machines: 0.22 keeps them sharp at PerkMachineScale 1.25 (lastCallObjectDefs.ts).
-    "map/map-zombie-perk-juggernog.png": 0.15,
-    "map/map-zombie-perk-speed-cola.png": 0.15,
-    "map/map-zombie-perk-quick-revive.png": 0.15,
-    "map/map-zombie-perk-quick-revive-off.png": 0.15,
-    "map/map-zombie-perk-stamin-up.png": 0.15,
-    "map/map-zombie-perk-double-tap.png": 0.15,
     // Pack-a-Punch art is 640x620; keep in step with ZombiePackAPunchSprite.atlasScale.
     "map/map-zombie-pap.svg": 0.36,
     "map/map-zombie-pap-on.svg": 0.36,

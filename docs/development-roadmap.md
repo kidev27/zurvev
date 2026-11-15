@@ -83,6 +83,11 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   drop 6%, 2 cells, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
   The Gravegun still shares `12gauge`.
 - Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
+- Perk machine art (art pass 1). Juggernog, Double Tap, Speed Cola, Stamin-Up and Quick Revive (+ powered
+  off) are top-down SVGs in survev's flat style with a chunkier, brighter Zombs Royale feel, replacing the
+  front-view PNGs that looked pasted onto a top-down map. 160x112 with shadow; the 144x90 body at sprite
+  scale 0.5 covers the 4.5 x 2.8 collision box; the bottle tray faces the use side (south). Next: Mystery Box,
+  Pack-a-Punch, then the Zombies map.
 - Rocket Launcher (ZOM-008), RPG-7 look. Mystery Box 3% (wonder weapons now 17% of rolls). 1 rocket per
   load, 2.6 s reload, held on the shoulder like the Potato Cannon. Rockets fly straight at 55 units/s
   (`noGravity`, sprite faces its flight with `faceDir`) and explode on a zombie, a solid obstacle or wall,

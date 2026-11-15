@@ -359,7 +359,9 @@ function lastCallDefs(): Record<string, MapObjectDef> {
             extents: v2.create(2.15 * PerkMachineScale, 1.35 * PerkMachineScale),
             height: 1,
             sprite,
-            spriteScale: PerkMachineScale,
+            // Top-down SVG art (map-zombie-perk-*.svg, 160x112 with shadow): its 144x90 body at 0.5
+            // covers the 4.5 x 2.8 collision box. The front tray faces useDir (south).
+            spriteScale: 0.5,
             metal: true,
             zIdx: 10,
         }),
