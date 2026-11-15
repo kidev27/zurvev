@@ -720,6 +720,12 @@ export function getConfig(isProduction: boolean, dir: string) {
             clientLogs: true,
             clientLogDir: "logs/client",
         },
+        practiceRecording: {
+            enabled: false,
+            dir: "logs/practice",
+            sampleRate: 1,
+            minFreeDiskMb: 2048,
+        },
         database: {
             enabled: false,
             engine: "sqlite",

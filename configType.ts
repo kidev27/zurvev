@@ -333,6 +333,19 @@ export interface ConfigType {
         clientLogs?: boolean;
     };
     /**
+     * Anonymous Practice recordings used to train bots (see docs/practice-recordings.md).
+     * Off by default. Turn it on only with a notice to players that Practice games may be recorded.
+     */
+    practiceRecording?: {
+        enabled: boolean;
+        /** Folder for the recordings; relative paths are from the process cwd. Default: logs/practice */
+        dir?: string;
+        /** Share of Practice games recorded, 0 to 1. Default: 1 */
+        sampleRate?: number;
+        /** Stop writing when the disk has less free space than this (MB). Default: 2048 */
+        minFreeDiskMb?: number;
+    };
+    /**
      * Webhook URL to log server errors.
      */
     errorLoggingWebhook?: string;

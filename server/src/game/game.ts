@@ -25,6 +25,7 @@ import { PlayerBarn } from "./objects/player.ts";
 import { ProjectileBarn } from "./objects/projectile.ts";
 import { SmokeBarn } from "./objects/smoke.ts";
 import { Profiler } from "./profiler.ts";
+import type { PracticeRecordChunk } from "./practiceRecorder.ts";
 import { SpecOpsManager } from "./specOpsManager.ts";
 
 export interface JoinTokenData {
@@ -567,6 +568,7 @@ export class Game {
     stop() {
         if (this.stopped) return;
         this.stopped = true;
+        this.specOps?.practice?.finish();
         for (const client of this.clientBarn.clients) {
             client.disconnect();
         }
@@ -582,6 +584,8 @@ export class Game {
     updateData() {}
     protected _saveGameToDatabase() {}
     sendQuestProgress(_userId: string, _progress: Array<{ id: string; delta: number }>) {}
+    /** Practice recording for bot training (written by gameProcess.ts; dropped elsewhere). */
+    recordPractice(_chunk: PracticeRecordChunk) {}
 
     /**
      * Steps the game X seconds in the future

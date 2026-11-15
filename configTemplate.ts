@@ -326,5 +326,14 @@ logging: {
   clientLogs: ${bool(values.logging?.clientLogs, true)}
   clientLogDir: ${q(values.logging?.clientLogDir || "logs/client")}
 }
+
+// Anonymous Practice recordings for bot training (docs/practice-recordings.md).
+// Tell players before turning this on.
+practiceRecording: {
+  enabled: ${bool(values.practiceRecording?.enabled, false)}
+  dir: ${q(values.practiceRecording?.dir || "logs/practice")}
+  sampleRate: ${num(values.practiceRecording?.sampleRate, 1)}
+  minFreeDiskMb: ${num(values.practiceRecording?.minFreeDiskMb, 2048)}
+}
 `;
 }

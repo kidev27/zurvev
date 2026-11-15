@@ -15,6 +15,7 @@ import {
 import type { Game } from "./game.ts";
 import type { DamageParams } from "./objects/gameObject.ts";
 import type { Player } from "./objects/player.ts";
+import { type PracticeRecordHost, PracticeRecorder } from "./practiceRecorder.ts";
 
 /** What the practice controller needs from the Spec Ops manager. */
 export interface PracticeHost {
@@ -49,7 +50,7 @@ const StatsSendInterval = 0.5;
  * their chosen guns, and tracks stats. Bots don't spawn until the player sends
  * their first setup from the panel.
  */
-export class PracticeController {
+export class PracticeController implements PracticeRecordHost {
     settings: PracticeSettings = defaultPracticeSettings();
     /** True once the player has sent a setup (bots only spawn after that). */
     started = false;
@@ -68,7 +69,12 @@ export class PracticeController {
     private waveRespawnIn = -1;
     private lastBotsAlive = -1;
 
-    constructor(readonly host: PracticeHost) {}
+    /** Anonymous recording of this game for bot training; unset unless enabled in the config. */
+    readonly recorder?: PracticeRecorder;
+
+    constructor(readonly host: PracticeHost) {
+        this.recorder = PracticeRecorder.create(this);
+    }
 
     get game(): Game {
         return this.host.game;
@@ -119,6 +125,7 @@ export class PracticeController {
         if (!player.dead && kitChanged) {
             this.host.equipPracticeHuman(player, settings);
         }
+        this.recorder?.onSettings(player);
         return true;
     }
 
@@ -139,6 +146,7 @@ export class PracticeController {
                 const st = this.statsFor(target);
                 st.damageTaken += amount;
                 st.dirty = true;
+                this.recorder?.onDamage(target, amount, false);
             }
             return;
         }
@@ -146,6 +154,7 @@ export class PracticeController {
         if (!source || source.specOpsAi) return;
         const st = this.statsFor(source);
         st.damageDealt += amount;
+        this.recorder?.onDamage(source, amount, true);
         const isBulletHit = params.damageType === GameConfig.DamageType.Player
             && !params.isExplosion
             && !!GunDefs[params.gameSourceType ?? ""];
@@ -161,6 +170,7 @@ export class PracticeController {
         const st = this.statsFor(player);
         st.shotsFired++;
         st.dirty = true;
+        this.recorder?.onShot(player);
     }
 
     /**
@@ -191,12 +201,33 @@ export class PracticeController {
         this.clock += dt;
         this.updateHumans(dt);
         if (this.started && !this.botsPaused) this.updateBots(dt);
+        if (this.recorder) {
+            this.recorder.update(dt, this.game.playerBarn.players.filter((p) => !p.specOpsAi && !p.disconnected));
+        }
 
         this.statsTicker -= dt;
         if (this.statsTicker <= 0) {
             this.statsTicker = StatsSendInterval;
             this.sendStats();
         }
+    }
+
+    /** Living bots the human fights (for the recorder). */
+    enemiesOf(_player: Player): Player[] {
+        const out: Player[] = [];
+        for (const slot of this.slots) if (slot.bot && !slot.bot.dead) out.push(slot.bot);
+        return out;
+    }
+
+    /** Practice stats for the recorder's summary row. */
+    statsSummary(player: Player): object {
+        const { ttkTotalMs: _ttk, dirty: _dirty, ...stats } = this.statsFor(player);
+        return stats;
+    }
+
+    /** Game over. */
+    finish(): void {
+        this.recorder?.finish();
     }
 
     private updateHumans(dt: number): void {
@@ -322,6 +353,7 @@ export class PracticeController {
         if (!killer || killer.specOpsAi) return;
         const st = this.statsFor(killer);
         st.kills++;
+        this.recorder?.onKill(killer);
         if (slot.firstHitAt > 0) {
             const ttk = Math.max(this.clock - slot.firstHitAt, 0) * 1000;
             st.ttkTotalMs += ttk;
