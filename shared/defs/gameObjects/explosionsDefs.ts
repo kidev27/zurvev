@@ -216,6 +216,27 @@ export const ExplosionDefs: Record<string, ExplosionDef> = {
         frozenSprites: ["player-mash-01.img", "player-mash-02.img", "player-mash-03.img"],
         dropRandomLoot: 2,
     },
+    // Zombies Rocket Launcher (Mk II: about 1.35x damage, a bigger blast). No shrapnel.
+    explosion_rocket: {
+        type: "explosion",
+        damage: 250,
+        obstacleDamage: 2,
+        rad: { min: 4, max: 10 },
+        shrapnelCount: 0,
+        shrapnelType: "",
+        explosionEffectType: "frag",
+        decalType: "decal_frag_explosion",
+    },
+    explosion_rocket_pap: {
+        type: "explosion",
+        damage: 340,
+        obstacleDamage: 2,
+        rad: { min: 4.5, max: 11 },
+        shrapnelCount: 0,
+        shrapnelType: "",
+        explosionEffectType: "frag",
+        decalType: "decal_frag_explosion",
+    },
     explosion_potato_cannonball: {
         type: "explosion",
         damage: 95,

@@ -22,6 +22,7 @@ import {
 import { Editor } from "./debug/editor.ts";
 /* STRIP_FROM_PROD_CLIENT:END */
 
+import { zombieViewZoomMult } from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { packAPunchSpecialFor } from "../../shared/defs/maps/zombiePackAPunch.ts";
 import { isZombiePowerUpType } from "../../shared/defs/maps/zombiePowerUps.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
@@ -561,7 +562,8 @@ export class Game {
 
         this.m_camera.m_pos = v2.copy(this.m_activePlayer.m_visualPos);
         this.m_camera.m_applyShake();
-        const zoom = this.m_activePlayer.m_getZoom();
+        const zoom = this.m_activePlayer.m_getZoom()
+            * zombieViewZoomMult(this.m_map.getMapDef().gameMode);
 
         const minDim = math.min(
             this.m_camera.m_screenWidth,

@@ -335,7 +335,8 @@ export class ProjectileBarn {
                         p.strobeDir *= -1;
                     }
                 }
-                p.sprite.rotation = p.rot;
+                // Rockets point where they fly; everything else spins.
+                p.sprite.rotation = itemDef.faceDir ? -Math.atan2(p.dir.y, p.dir.x) : p.rot;
                 p.sprite.alpha = p.inWater ? 0.3 : 1;
 
                 // Trail
@@ -348,13 +349,16 @@ export class ProjectileBarn {
                         0,
                         1,
                     )
-                        * math.remap(
-                            p.posZ,
-                            0.1,
-                            GameConfig.projectile.maxHeight * 0.5,
-                            0,
-                            1,
-                        );
+                        // A flat-flying rocket stays low on purpose: full trail.
+                        * (itemDef.noGravity
+                            ? 1
+                            : math.remap(
+                                p.posZ,
+                                0.1,
+                                GameConfig.projectile.maxHeight * 0.5,
+                                0,
+                                1,
+                            ));
                     p.trail.scale.set(
                         itemDef.trail.maxLength * trailT,
                         itemDef.trail.width,

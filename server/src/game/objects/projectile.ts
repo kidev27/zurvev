@@ -228,7 +228,7 @@ export class Projectile extends BaseGameObject {
         // Velocity
         //
 
-        if (this.posZ <= this.obstacleBellowHeight) {
+        if (this.posZ <= this.obstacleBellowHeight && !def.noGravity) {
             const isOnWater = this.game.map.isOnWater(this.pos, this.layer);
             // drag values based on plotted data from surviv
             const drag = isOnWater ? 5 : 2.3;
@@ -241,7 +241,7 @@ export class Projectile extends BaseGameObject {
         //
         // Height / posZ
         //
-        this.velZ -= gravity * dt;
+        if (!def.noGravity) this.velZ -= gravity * dt;
         this.posZ += this.velZ * dt;
         this.posZ = math.clamp(
             this.posZ,
@@ -347,6 +347,8 @@ export class Projectile extends BaseGameObject {
                 && !obj.dead
                 && util.sameLayer(this.layer, obj.layer)
                 && obj.__id !== this.playerId
+                // Rockets fly past the shooter's teammates.
+                && !(def.noGravity && obj.teamId === this.ownerTeamId())
             ) {
                 if (coldet.testCircleCircle(this.pos, rad, obj.pos, obj.rad)) {
                     this.explode();
@@ -387,6 +389,11 @@ export class Projectile extends BaseGameObject {
                 this.explode();
             }
         }
+    }
+
+    private ownerTeamId(): number | undefined {
+        const owner = this.game.objectRegister.getById(this.playerId);
+        return owner?.__type === ObjectType.Player ? owner.teamId : undefined;
     }
 
     /**

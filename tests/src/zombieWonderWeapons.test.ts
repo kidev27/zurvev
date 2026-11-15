@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { lastCallNavPoints, lastCallWalkable } from "../../server/src/game/lastCallNav.ts";
+import type { Game } from "../../server/src/game/game.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
 import { stairAtPos } from "../../server/src/game/specOpsNav.ts";
 import type { ZombieClass } from "../../server/src/game/zombieMode.ts";
-import type { GunDef } from "../../shared/defs/gameObjects/gunDefs.ts";
+import { type GunDef, weaponSourceName } from "../../shared/defs/gameObjects/gunDefs.ts";
 import { ZombieMapPool } from "../../shared/defs/maps/specOpsDefs.ts";
 import { SpecOpsShopCatalog } from "../../shared/defs/maps/specOpsShop.ts";
 import { packAPunchType, packAPunchUpgradeTime, ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts";
@@ -13,8 +14,11 @@ import {
     ZombieWonderAmmoDrops,
     ZombieWonderWeapons,
 } from "../../shared/defs/maps/zombieWonderWeapons.ts";
+import { ZombieRocket } from "../../shared/defs/gameObjects/throwableDefs.ts";
 import { GameObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, type InventoryItem, TeamMode } from "../../shared/gameConfig.ts";
+import * as net from "../../shared/net/net.ts";
+import { isPracticeGun } from "../../shared/practice.ts";
 import { collider } from "../../shared/utils/collider.ts";
 import { v2, type Vec2 } from "../../shared/utils/v2.ts";
 import { createGame } from "./gameTestHelpers.ts";
@@ -74,7 +78,8 @@ test("each wonder weapon occupies a fixed mystery-box interval; an owned result 
         shooter.weaponManager.setWeapon(primary, "", 0);
         start += weapon.chance;
     }
-    expect(start).toBeCloseTo(0.1);
+    // Ray Gun 3%, Pressure Cannon 4%, Tesla Rifle 4%, Gravegun 3%, Rocket Launcher 3%.
+    expect(start).toBeCloseTo(0.17);
 });
 
 for (const { type } of added) {
@@ -151,8 +156,9 @@ test.each(zombieClasses)("pressure blast and Tesla arcs cannot damage %s through
 });
 
 const wonderAmmoCases = [
-    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 64, clip: 2, boxSpare: 12, mk2Clip: 3 },
-    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 43, clip: 3, boxSpare: 12, mk2Clip: 5 },
+    { gun: "pressure_cannon", ammo: "pressure_charge", cap: 75, clip: 2, boxSpare: 12, mk2Clip: 3 },
+    { gun: "tesla_rifle", ammo: "tesla_cell", cap: 50, clip: 3, boxSpare: 12, mk2Clip: 5 },
+    { gun: "rocket_launcher", ammo: "rocket", cap: 15, clip: 1, boxSpare: 6, mk2Clip: 2 },
 ] as const;
 
 for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
@@ -250,19 +256,20 @@ for (const { gun, ammo, cap, clip, boxSpare, mk2Clip } of wonderAmmoCases) {
     });
 }
 
-test("drop rates (issue #74): 4% per kill for each, 2 at a time; owning both rolls each", () => {
+test("drop rates: Pressure Charges and Tesla Cells 6% per kill, 2 at a time; Rockets 5%, 1; owning several rolls each", () => {
     for (const ammo of ["pressure_charge", "tesla_cell"]) {
-        expect(ZombieWonderAmmoDrops[ammo].killChance, ammo).toBe(0.04);
+        expect(ZombieWonderAmmoDrops[ammo].killChance, ammo).toBe(0.06);
         expect(ZombieWonderAmmoDrops[ammo].count, ammo).toBe(2);
     }
+    expect(ZombieWonderAmmoDrops.rocket).toEqual({ killChance: 0.05, count: 1, lifetime: 20 });
     const { shooter, ops, zombie } = arena();
     shooter.weaponManager.setWeapon(primary, "pressure_cannon", 2);
     shooter.weaponManager.setWeapon(GameConfig.WeaponSlot.Secondary, "tesla_rifle", 3);
     // One roll per ammo, in ZombieWonderAmmo order: Pressure Charges, then Tesla Cells.
     const rolls = (...r: number[]) => () => r.shift()!;
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), rolls(0.039, 0.04)).map((l) => [l.type, l.count]))
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(4), rolls(0.059, 0.06)).map((l) => [l.type, l.count]))
         .toEqual([["pressure_charge", 2]]);
-    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), rolls(0.04, 0.039)).map((l) => [l.type, l.count]))
+    expect(ops.maybeDropWonderAmmo(shooter, zombie(6), rolls(0.06, 0.059)).map((l) => [l.type, l.count]))
         .toEqual([["tesla_cell", 2]]);
     expect(ops.maybeDropWonderAmmo(shooter, zombie(8), rolls(0.01, 0.01)).map((l) => l.type)).toEqual([
         "pressure_charge",
@@ -270,13 +277,31 @@ test("drop rates (issue #74): 4% per kill for each, 2 at a time; owning both rol
     ]);
 });
 
-test("Pressure Cannon Mk II shares the 64-charge cap, and Max Ammo fills it", () => {
+test("Pressure Cannon Mk II shares the 75-charge cap, and Max Ammo fills it", () => {
     const { shooter, ops } = arena();
     shooter.weaponManager.setWeapon(primary, packAPunchType("pressure_cannon"), 3);
     shooter.invManager.set("pressure_charge", 0);
-    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(64);
+    expect(shooter.invManager.getMaxCapacity("pressure_charge")).toBe(75);
     ops.activateZombiePowerUp("zombie_powerup_max_ammo");
-    expect(shooter.invManager.get("pressure_charge")).toBe(64);
+    expect(shooter.invManager.get("pressure_charge")).toBe(75);
+});
+
+test("Rocket Launcher uses its own recorded shot and reload, at normal speed inside the reload", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { default: soundDefs } = await import("../../client/src/soundDefs.ts");
+    for (const type of ["rocket_launcher", packAPunchType("rocket_launcher")]) {
+        const def = GameObjectDefs.typeToDef(type, "gun");
+        expect(def.sound.shoot, type).toBe("rocket_launcher_01");
+        expect(def.sound.reload, type).toBe("rocket_launcher_reload_01");
+        expect(def.sound.reloadDuration, type).toBeUndefined();
+    }
+    for (const name of ["rocket_launcher_01", "rocket_launcher_reload_01"]) {
+        const sound = soundDefs.Sounds.players[name];
+        expect(sound.path).toBe(`audio/guns/${name}.mp3`);
+        const file = readFileSync(new URL(`../../client/public/${sound.path}`, import.meta.url));
+        // MP3: an ID3 tag or a frame sync.
+        expect(file.toString("ascii", 0, 3) === "ID3" || (file[0] === 0xff && (file[1] & 0xe0) === 0xe0), name).toBe(true);
+    }
 });
 
 for (const { label, upgraded, doubleTap, multiplier } of damageCases) {
@@ -415,7 +440,8 @@ test("a buy gate blocks the pressure blast until the squad opens it", () => {
     expect(game.bulletBarn.damages.some((damage) => damage.obj === target)).toBe(true);
 });
 
-for (const { type } of added) {
+// The Rocket Launcher's recordings are MP3 with no reloadDuration; they have their own test.
+for (const { type } of added.filter((w) => w.type !== "rocket_launcher")) {
     test(`${type}: the custom reload recording matches its declared timing and Mk II variant`, async () => {
         const { readFileSync } = await import("node:fs");
         const { default: soundDefs } = await import("../../client/src/soundDefs.ts");
@@ -432,3 +458,145 @@ for (const { type } of added) {
         expect(upgrade.sound.reloadDuration).toBeCloseTo(duration, 4);
     });
 }
+
+/** Fires the shooter's Rocket Launcher (or Mk II) and steps until its rocket is gone. */
+function fireRocket(game: Game, shooter: Player, type = "rocket_launcher") {
+    // A fresh gun each time: no cooldown left from the last shot.
+    shooter.weaponManager.setWeapon(primary, "", 0);
+    shoot(shooter, type);
+    const rocket = game.projectileBarn.projectiles.find((p) => p.playerId === shooter.__id && !p.destroyed)!;
+    expect(rocket).toBeDefined();
+    const start = v2.copy(rocket.pos);
+    let last = v2.copy(rocket.pos);
+    const heights = new Set<number>();
+    for (let t = 0; t < 3 && !rocket.destroyed; t += 0.01) {
+        last = v2.copy(rocket.pos);
+        heights.add(rocket.posZ);
+        game.update(0.01);
+    }
+    expect(rocket.destroyed).toBe(true);
+    return { rocket, start, end: last, heights };
+}
+
+test("Rocket Launcher: 1 rocket per load, 2.6 s reload, shoulder-held; Mk II holds 2 and fires a stronger rocket", () => {
+    const def = GameObjectDefs.typeToDef("rocket_launcher", "gun");
+    expect(def).toMatchObject({ maxClip: 1, reloadTime: 2.6, isLauncher: true, projType: "rocket_proj", ammo: "rocket" });
+    const mk2 = GameObjectDefs.typeToDef(packAPunchType("rocket_launcher"), "gun");
+    expect(mk2.projType).toBe("rocket_proj_pap");
+    const { shooter } = arena();
+    expect(shooter.weaponManager.getAmmoStats(mk2).maxClip).toBe(2);
+
+    const rocket = GameObjectDefs.typeToDef("rocket_proj", "throwable");
+    expect(rocket).toMatchObject({ noGravity: true, faceDir: true, explodeOnImpact: true, playerCollision: true });
+    expect(rocket.throwPhysics.speed).toBe(55);
+    expect(rocket.fuseTime * rocket.throwPhysics.speed).toBeCloseTo(60);
+    expect(GameObjectDefs.typeToDef("explosion_rocket", "explosion")).toMatchObject({
+        damage: 250,
+        rad: { min: 4, max: 10 },
+        obstacleDamage: 2,
+        shrapnelCount: 0,
+    });
+    expect(GameObjectDefs.typeToDef("explosion_rocket_pap", "explosion")).toMatchObject({
+        damage: 340,
+        rad: { min: 4.5, max: 11 },
+    });
+    // Practice never offers it.
+    expect(isPracticeGun("rocket_launcher")).toBe(false);
+});
+
+test("a rocket flies straight and level and bursts in the air at 60 units", () => {
+    const game = createGame(TeamMode.Solo, "practice_arena");
+    const shooter = game.playerBarn.addTestPlayer({ name: "Operator" });
+    game.update(0.1);
+    place(shooter, v2.create(30, 30));
+    v2.set(shooter.dir, v2.create(1, 0));
+    const { start, end, heights } = fireRocket(game, shooter);
+    expect(heights.size).toBe(1);
+    expect(Math.abs(end.y - start.y)).toBeLessThan(0.01);
+    expect(v2.distance(start, end)).toBeGreaterThan(ZombieRocket.range - 1.5);
+    expect(v2.distance(start, end)).toBeLessThanOrEqual(ZombieRocket.range + 0.5);
+});
+
+test("a rocket explodes on the first zombie it meets and kills a round-1 crowd around it", () => {
+    const { game, shooter, zombie } = arena();
+    // Round-1 zombies: 42 HP.
+    const target = zombie(14);
+    const behind = zombie(16.5);
+    target.health = behind.health = 42;
+    const { end } = fireRocket(game, shooter);
+    expect(v2.distance(end, target.pos)).toBeLessThan(2.5);
+    expect(target.dead).toBe(true);
+    expect(behind.dead).toBe(true);
+    expect(shooter.health).toBe(shooter.maxHealth);
+});
+
+test("rockets fly past teammates, never hurt them, but hurt the shooter point-blank", () => {
+    const { game, shooter, zombie } = arena();
+    const mate = game.playerBarn.addTestPlayer({ name: "Teammate" });
+    game.update(0.1);
+    mate.teamId = shooter.teamId;
+    place(mate, v2.add(shooter.pos, v2.create(4, 0)), shooter.layer);
+    const target = zombie(12);
+    const { end } = fireRocket(game, shooter);
+    expect(v2.distance(end, target.pos)).toBeLessThan(2.5);
+    expect(mate.health).toBe(mate.maxHealth);
+    expect(shooter.health).toBe(shooter.maxHealth);
+
+    // A zombie in your face: the blast reaches you too (armor first, as for any hit),
+    // never your teammate.
+    const toughness = (p: Player) => p.health + p.specOpsArmor;
+    const before = toughness(shooter);
+    const mateBefore = toughness(mate);
+    zombie(5.5);
+    fireRocket(game, shooter);
+    expect(toughness(shooter)).toBeLessThan(before - 50);
+    expect(toughness(mate)).toBe(mateBefore);
+});
+
+test("a Mk II rocket hits harder and wider than a base rocket", () => {
+    const hit = (type: string) => {
+        const { game, shooter, zombie } = arena("zombie_high_water", "zombie_brute");
+        game.specOps!.wave = 30;
+        const target = zombie(12);
+        // In the blast's falloff ring, along the clear lane.
+        const near = zombie(19);
+        const hp = target.health;
+        const nearHp = near.health;
+        fireRocket(game, shooter, type);
+        return { center: hp - target.health, edge: nearHp - near.health };
+    };
+    const base = hit("rocket_launcher");
+    const mk2 = hit(packAPunchType("rocket_launcher"));
+    expect(base.center).toBeGreaterThan(0);
+    expect(mk2.center).toBeGreaterThan(base.center);
+    expect(mk2.edge).toBeGreaterThan(base.edge);
+});
+
+test("rocket kills count, pay cash and name the launcher (or its Mk II) in kill messages", async () => {
+    for (const [type, name] of [
+        ["rocket_launcher", "Rocket Launcher"],
+        [packAPunchType("rocket_launcher"), "Rocket Launcher Mk II"],
+    ] as const) {
+        const { game, shooter, zombie } = arena();
+        const target = zombie(12);
+        target.health = 42;
+        const sources: string[] = [];
+        const broadcast = game.clientBarn.broadcastMsg.bind(game.clientBarn);
+        game.clientBarn.broadcastMsg = (msgType, msg) => {
+            if (msgType === net.MsgType.Kill) sources.push((msg as net.KillMsg).itemSourceType);
+            broadcast(msgType, msg);
+        };
+        const kills = shooter.kills;
+        const cash = shooter.specOpsCash;
+        fireRocket(game, shooter, type);
+        expect(target.dead, type).toBe(true);
+        expect(shooter.kills, type).toBe(kills + 1);
+        expect(shooter.specOpsCash, type).toBeGreaterThan(cash);
+        expect(sources.length, type).toBeGreaterThan(0);
+        // The kill feed and "You killed ... with" text fall back to this name (localization.ts).
+        for (const source of sources) expect(weaponSourceName(source), type).toBe(name);
+    }
+    // Guns keep their names; other projectiles keep their own translations.
+    expect(weaponSourceName("rocket_launcher")).toBe("Rocket Launcher");
+    expect(weaponSourceName("potato_cannonball")).toBe("");
+});

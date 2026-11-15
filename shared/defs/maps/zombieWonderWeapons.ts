@@ -4,21 +4,23 @@ export const ZombieWonderWeapons = [
     { type: "pressure_cannon", chance: 0.04 },
     { type: "tesla_rifle", chance: 0.04 },
     { type: "gravegun", chance: 0.03 },
+    { type: "rocket_launcher", chance: 0.03 },
 ] as const;
 
 /**
  * Ammo only wonder weapons use (caps in ZombieAmmoBagSizes). Max Ammo refills it only for
  * players who own a gun that fires it; a Pack-a-Punched one comes back with a full stock.
  */
-export const ZombieWonderAmmo: readonly string[] = ["pressure_charge", "tesla_cell"];
+export const ZombieWonderAmmo: readonly string[] = ["pressure_charge", "tesla_cell", "rocket"];
 
 /**
  * Rare wonder-ammo drop from zombie kills, per ammo type. Rolls only while the killer owns
  * a gun that fires that ammo; anyone can pick it up. lifetime is in seconds.
  */
 export const ZombieWonderAmmoDrops: Record<string, { killChance: number; count: number; lifetime: number }> = {
-    pressure_charge: { killChance: 0.04, count: 2, lifetime: 20 },
-    tesla_cell: { killChance: 0.04, count: 2, lifetime: 20 },
+    pressure_charge: { killChance: 0.06, count: 2, lifetime: 20 },
+    tesla_cell: { killChance: 0.06, count: 2, lifetime: 20 },
+    rocket: { killChance: 0.05, count: 1, lifetime: 20 },
 };
 
 export const ZombiePressureBlast = {

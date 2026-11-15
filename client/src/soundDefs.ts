@@ -159,7 +159,12 @@ const Sounds: Record<string, Record<string, SoundDef>> = {
 
         gravegun_01: { path: "audio/guns/gravegun_01.wav", volume: 3.4, maxInstances: 4 },
 
+        rocket_launcher_01: { path: "audio/guns/rocket_launcher_01.mp3", volume: 1, maxInstances: 4 },
+
         pressure_cannon_reload_01: { path: "audio/guns/pressure_cannon_reload_01.mp3", volume: 3.1, maxInstances: 4 },
+
+        // Last sound at 2.3 s, inside the 2.6 s reload: played at normal speed (no reloadDuration).
+        rocket_launcher_reload_01: { path: "audio/guns/rocket_launcher_reload_01.mp3", volume: 1, maxInstances: 4 },
 
         tesla_rifle_reload_01: { path: "audio/guns/tesla_rifle_reload_01.mp3", volume: 1, maxInstances: 4 },
 

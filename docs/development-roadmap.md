@@ -66,22 +66,43 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | ZOM-004 | Pressure Cannon special ammunition | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gearDefs.ts`, `shared/defs/maps/zombieWonderWeapons.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/ui2.ts` | `zombieWonderWeapons.test.ts` (charges, box, Max Ammo, drop, Mk II); PR #53 | Live check of HUD slot and drop art |
 | ZOM-005 | Tesla Rifle special ammunition | Zombies | P2 | Needs Playtesting | None | Same as ZOM-004, plus `shared/practice.ts` | `zombieWonderWeapons.test.ts` 39/42 (Tesla cases + per-ammo drop rates; 3 failures pre-existing on `main`); `practice.test.ts` 49/49 | Live check of HUD slot and drop art |
 | ZOM-007 | Zombie variants: Runner and Brute | Zombies | P2 | Needs Playtesting | None | `server/src/game/zombieMode.ts`, `server/src/game/specOpsManager.ts`, `server/src/game/objects/player.ts`, `shared/defs/gameObjects/outfitDefs.ts` | `zombieMode.test.ts` 81/81 (wave mix, stats, size, melee damage, power-ups); reach sim on High Water and Dead Air: Brute at 1.3x reaches as many spots as at 1.0x | In-game feel and readability; Charger (#19) not started |
+| ZOM-008 | Rocket Launcher wonder weapon | Zombies | P2 | Needs Playtesting | None | `shared/defs/gameObjects/gunDefs.ts`, `shared/defs/gameObjects/throwableDefs.ts`, `shared/defs/gameObjects/explosionsDefs.ts`, `server/src/game/objects/projectile.ts`, `client/src/objects/projectile.ts`, `client/public/img` | `zombieWonderWeapons.test.ts` (stats, flight, range, crowd kill, teammates, self-damage, Mk II, box spares, cap, Max Ammo, kill drops, sounds) | In-game check of the shoulder pose, rocket facing and trail; protocol 1046 |
 
 ### Notes
 
 - Zombie speed lives in `ZombieSpeedByDifficulty` (`zombieMode.ts`), separate from Fireteam's
   `SpecOpsDifficultyMods`. Future types scale it with `speedScale`, capped by `ZombieMaxSpeedMult`
   (0.75). Kill-heat rush adds up to +15% on top in Zombies (`ZombieRushSpeedBonus`); Fireteam keeps +38%.
-- The Pressure Cannon fires its own `pressure_charge` (cap 64 in Zombies, `ZombiePressureChargeCap`,
+- The Pressure Cannon fires its own `pressure_charge` (cap 75 in Zombies, `ZombiePressureChargeCap`,
   Cannon and Mk II alike). A box Cannon brings 12 spare charges with its loaded magazine; Max Ammo and
   Pack-a-Punch fill to the cap; charges stay if the Cannon is replaced. Kills drop charges while the
-  killer owns a Cannon (`ZombieWonderAmmoDrops`: 4%, 2 charges, 20 s). The HUD slot shows only while
+  killer owns a Cannon (`ZombieWonderAmmoDrops`: 6%, 2 charges, 20 s). The HUD slot shows only while
   carrying charges (`hideWhenEmpty`).
-- The Tesla Rifle fires its own `tesla_cell` (cap 43 in Zombies). Same rules as Pressure Charges: a box
+- The Tesla Rifle fires its own `tesla_cell` (cap 50 in Zombies). Same rules as Pressure Charges: a box
   Tesla brings 12, Max Ammo and Pack-a-Punch fill to the cap, cells stay if the Tesla is replaced. Kill
-  drop 4%, 2 cells, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
+  drop 6%, 2 cells, 20 s. The Tesla is no longer offered in Practice (no wonder-ammo space there).
   The Gravegun still shares `12gauge`.
 - Box guns: with two guns, the box gun replaces the held one instead of dropping it (PR #52).
+- Rocket Launcher (ZOM-008), RPG-7 look. Mystery Box 3% (wonder weapons now 17% of rolls). 1 rocket per
+  load, 2.6 s reload, held on the shoulder like the Potato Cannon. Rockets fly straight at 55 units/s
+  (`noGravity`, sprite faces its flight with `faceDir`) and explode on a zombie, a solid obstacle or wall,
+  or in the air at 60 units; they fly past teammates. Blast 250 damage, full within 4 units, falling to 0
+  at 10, 2x to obstacles, no shrapnel. Mk II: 2 per load and its own rocket, 340 damage, 4.5 to 11 units
+  (explosions don't scale with gun damage). Own `rocket` ammo: cap 15 in Zombies, 0 elsewhere; a box
+  launcher brings 6 spare; Max Ammo and Pack-a-Punch fill to the cap for owners; kill drop 5%, 1 rocket,
+  20 s. Self-damage as for frags (operator armor absorbs first); teammates take none. Own recorded shot
+  and reload (`rocket_launcher_01`, `rocket_launcher_reload_01`); the reload's last sound is at 2.3 s, so it
+  plays at normal speed inside the 2.6 s reload.
+- Zombies ammo caps raised 20% again (after issue #74), now rounded to the nearest multiple of 5
+  (`zombieAmmoCapRound`): 9mm 430, 7.62/5.56/.45 390, 12 gauge 60, .50 AE 120, .308 50, Tesla Cells 50,
+  Pressure Charges 75, Rockets 15. Special-ammo kill drops +2 points: Pressure Charges and Tesla Cells 6%,
+  Rockets 5%.
+- Zombies view 9% wider (`ZombieViewZoomMult` 1.09, `zombieViewZoomMult(gameMode)` in
+  `zombieIndoorDefs.ts`), scopes and indoor zoom included. The server still sends the normal zoom step
+  (a whole number the client maps to mobile steps); the client camera (`client/src/game.ts`) and the
+  server's visible area (`server/src/game/client.ts`) both multiply it.
+- Rocket kills report the rocket; its def names are "Rocket Launcher" and "Rocket Launcher Mk II", and
+  `weaponSourceName` (gunDefs) gives the kill feed and kill messages that name when no translation exists.
 - Zombie variants (`ZombieVariants` in `server/src/game/zombieMode.ts`). Runner from round 4: 1.3x walker
   speed (capped at 0.75), 70% health, 5% of the wave growing 5% a round to 20%; dies to Insta-Kill and
   Nuke. Brute from round 8 (two from round 12, never more than 2 a wave): 0.72x speed, 4x health (cap 800),

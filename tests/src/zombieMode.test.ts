@@ -55,6 +55,8 @@ import {
     ZombieAmmoBaseCaps,
     ZombieAmmoCapMult,
     ZombiePressureChargeCap,
+    ZombieViewZoomMult,
+    zombieViewZoomMult,
 } from "../../shared/defs/maps/zombieIndoorDefs.ts";
 import { zombiePerkMachine, ZombiePerkMachines, ZombiePerkMachineTypes } from "../../shared/defs/maps/zombiePerks.ts";
 import {
@@ -388,25 +390,28 @@ test("Issue #74 Brute tuning: 800 HP cap, 1.75x melee, 10% slower on every diffi
     }
 });
 
-test("Issue #74 Zombies reserve caps: +20% rounded to the nearest whole number, Pressure Charges 64", () => {
-    expect(ZombieAmmoCapMult).toBe(1.2);
-    expect(ZombiePressureChargeCap).toBe(64);
+test("Zombies reserve caps: +20% twice, rounded to the nearest multiple of 5; Pressure Charges 75, Rockets 15", () => {
+    expect(ZombieAmmoCapMult).toBeCloseTo(1.44, 10);
+    expect(ZombiePressureChargeCap).toBe(75);
     const caps = Object.fromEntries(Object.entries(ZombieAmmoBagSizes).map(([ammo, sizes]) => [ammo, sizes[1]]));
     expect(caps).toEqual({
-        "9mm": 360,
-        "762mm": 324,
-        "556mm": 324,
-        "45acp": 324,
-        "12gauge": 48,
-        "50AE": 101,
-        "308sub": 43,
-        tesla_cell: 43,
-        pressure_charge: 64,
+        "9mm": 430,
+        "762mm": 390,
+        "556mm": 390,
+        "45acp": 390,
+        "12gauge": 60,
+        "50AE": 120,
+        "308sub": 50,
+        tesla_cell: 50,
+        pressure_charge: 75,
+        rocket: 15,
     });
     for (const [ammo, base] of Object.entries(ZombieAmmoBaseCaps)) {
-        expect(ZombieAmmoBagSizes[ammo].every((cap) => cap === Math.round(base * 1.2)), ammo).toBe(true);
+        const cap = Math.round((base * 1.44) / 5) * 5;
+        expect(ZombieAmmoBagSizes[ammo].every((c) => c === cap && c % 5 === 0), ammo).toBe(true);
     }
-    expect(ZombieAmmoBagSizes.pressure_charge.every((cap) => cap === 64)).toBe(true);
+    expect(ZombieAmmoBagSizes.pressure_charge.every((cap) => cap === 75)).toBe(true);
+    expect(ZombieAmmoBagSizes.rocket.every((cap) => cap === 15)).toBe(true);
     // Every gun Zombies hands out fires an ammo with a Zombies cap.
     for (const type of [...ZombieMysteryBoxWeapons, ...ZombieWonderWeapons.map((w) => w.type), "m9", "m1911"]) {
         const ammo = (GameObjectDefs.typeToDef(type, "gun") as GunDef).ammo;
@@ -482,6 +487,29 @@ test("Issue #74 bonus Max Ammo drops on the next kill even at the round cap, and
     // No bonus owed: an unlucky kill drops nothing.
     ops.onZombieKilledForDrops(zombie, 0, 1);
     expect(powerUpDrops(game)).toHaveLength(1);
+});
+
+test("Zombies players see 9% further; other modes keep the normal view", () => {
+    expect(ZombieViewZoomMult).toBe(1.09);
+    // The client camera multiplies the player's zoom by this (client/src/game.ts).
+    for (const map of ZombieMapPool) expect(zombieViewZoomMult(MapDefs[map].gameMode), map).toBe(1.09);
+    for (const map of [...FireteamMapPool, "practice_arena"] as const) {
+        expect(zombieViewZoomMult(MapDefs[map].gameMode), map).toBe(1);
+    }
+
+    // The server sends objects across that wider view; the zoom itself stays a normal step.
+    const culling = (map: "zombie_dead_air" | "practice_arena") => {
+        const game = createGame(TeamMode.Solo, map);
+        const player = game.playerBarn.addTestPlayer({ name: "Operator" });
+        for (let i = 0; i < 40; i++) game.update(0.1);
+        const client = game.clientBarn.clients.find((c) => c.player === player)!;
+        return { zoom: player.zoom, culling: (client as unknown as { _cullingZoom: number })._cullingZoom };
+    };
+    const zombies = culling("zombie_dead_air");
+    expect(Object.values(GameConfig.scopeZoomRadius.desktop)).toContain(zombies.zoom);
+    expect(zombies.culling).toBeCloseTo(zombies.zoom * 1.09, 5);
+    const practice = culling("practice_arena");
+    expect(practice.culling).toBeCloseTo(practice.zoom, 5);
 });
 
 test("Bigger teams need more points and luckier kills per drop", () => {
