@@ -88,6 +88,18 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   front-view PNGs that looked pasted onto a top-down map. 160x112 with shadow; the 144x90 body at sprite
   scale 0.5 covers the 4.5 x 2.8 collision box; the bottle tray faces the use side (south). Next: Mystery Box,
   Pack-a-Punch, then the Zombies map.
+- After Hours redesign (art pass 2, map). Dusk + neon look in the Zombs Royale style: violet street, a bright
+  floor per room (checkered diner, peach reception, teal hall carpet, blue/purple guest rooms, mint
+  maintenance, orange office, periwinkle garage), cream walls with chunky dark outlines, a neon motor-court
+  sign, less grime and cartoon-red blood. Floor and prop art come from `bun scripts/lastcall/buildArt.ts`.
+  Flow: Service Alley 15 -> 20 wide with a dumpster island (Garage 30 -> 25); each guest room has two
+  doorways; clear loops in the Motor Court, Maintenance and Garage (cover moved to the edges, couches
+  removed); Stockroom -> Alley gap 6 -> 10. Beds sit against each room's north wall so the loop stays clear.
+  The survev chair, table, stove, refrigerator, barrel and bed are redrawn as `lastcall_*` props
+  (`LastCallRestyledProps`): each copies its survev def (collision, health, loot, explosion) and only swaps
+  the art. Prebaked zombie routing: `lastCall.test.ts` 12/12. Still survev art: broken-prop debris, the
+  Mystery Box and Pack-a-Punch, and the empty strip between Maintenance and the Garage. New prop types,
+  so protocol 1047.
 - Rocket Launcher (ZOM-008), RPG-7 look. Mystery Box 3% (wonder weapons now 17% of rolls). 1 rocket per
   load, 2.6 s reload, held on the shoulder like the Potato Cannon. Rockets fly straight at 55 units/s
   (`noGravity`, sprite faces its flight with `faceDir`) and explode on a zombie, a solid obstacle or wall,

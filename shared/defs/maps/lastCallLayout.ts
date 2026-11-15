@@ -77,19 +77,19 @@ export const LastCallBaseZones: LastCallZone[] = [
     { id: "storage", name: "Stockroom", rect: { x0: 85, y0: 90, x1: 100, y1: 115 } },
     { id: "courtyard", name: "Motor Court", rect: { x0: 40, y0: 50, x1: 100, y1: 90 } },
     { id: "diner", name: "Night Owl Diner", rect: { x0: 10, y0: 90, x1: 55, y1: 115 } },
-    { id: "alley", name: "Service Alley", rect: { x0: 100, y0: 50, x1: 115, y1: 115 } },
+    { id: "alley", name: "Service Alley", rect: { x0: 100, y0: 50, x1: 120, y1: 115 } },
     { id: "wing", name: "Guest Rooms", rect: { x0: 0, y0: 30, x1: 40, y1: 90 } },
     { id: "club", name: "Maintenance Hall", rect: { x0: 40, y0: 0, x1: 110, y1: 50 } },
     { id: "office", name: "Manager's Office", rect: { x0: 110, y0: 0, x1: 145, y1: 25 } },
-    { id: "garage", name: "Roadside Garage", rect: { x0: 115, y0: 25, x1: 145, y1: 115 } },
+    { id: "garage", name: "Roadside Garage", rect: { x0: 120, y0: 25, x1: 145, y1: 115 } },
 ];
 
 /** Motel rooms 101–104 inside the wing (walls only, same zone). */
 const BaseMotelRooms: LastCallRect[] = [
-    { x0: 0, y0: 30, x1: 25, y1: 45 },
-    { x0: 0, y0: 45, x1: 20, y1: 60 },
-    { x0: 0, y0: 60, x1: 25, y1: 75 },
-    { x0: 0, y0: 75, x1: 20, y1: 90 },
+    { x0: 0, y0: 30, x1: 22, y1: 45 },
+    { x0: 0, y0: 45, x1: 22, y1: 60 },
+    { x0: 0, y0: 60, x1: 22, y1: 75 },
+    { x0: 0, y0: 75, x1: 22, y1: 90 },
 ];
 
 /** Parts store and laundry create smaller spaces around an L-shaped service hall.
@@ -137,7 +137,7 @@ const BaseDoors: LastCallDoor[] = [
     { id: "lobby_diner", kind: "shutter", cost: 1000, zones: ["lobby", "diner"], opening: vOpen(55, 102, SW) },
     { id: "lobby_storage", kind: "shutter", cost: 750, zones: ["lobby", "storage"], opening: vOpen(85, 102, SW) },
     // Storage → Alley is always open: the cheap shortcut that adds a second front.
-    { id: "storage_alley", kind: "open", cost: 0, zones: ["storage", "alley"], opening: vOpen(100, 102, SW) },
+    { id: "storage_alley", kind: "open", cost: 0, zones: ["storage", "alley"], opening: vOpen(100, 102, 10) },
     // Courtyard hub
     { id: "courtyard_wing", kind: "shutter", cost: 1250, zones: ["courtyard", "wing"], opening: vOpen(40, 69, SW) },
     { id: "courtyard_club", kind: "shutter", cost: 1500, zones: ["courtyard", "club"], opening: hOpen(50, 70, SW) },
@@ -145,17 +145,18 @@ const BaseDoors: LastCallDoor[] = [
     { id: "wing_diner", kind: "shutter", cost: 1250, zones: ["wing", "diner"], opening: hOpen(90, 31, SW) },
     // Back half
     { id: "club_office", kind: "shutter", cost: 1000, zones: ["club", "office"], opening: vOpen(110, 12, SW) },
-    { id: "alley_garage", kind: "shutter", cost: 1250, zones: ["alley", "garage"], opening: vOpen(115, 88, SW) },
+    { id: "alley_garage", kind: "shutter", cost: 1250, zones: ["alley", "garage"], opening: vOpen(120, 88, SW) },
     // Freight gate: opens when the power is switched on.
     { id: "office_garage", kind: "power", cost: 0, zones: ["office", "garage"], opening: hOpen(25, 130, SW) },
     // Parts store and laundry are permanently open within the maintenance zone.
     { id: "parts_room", kind: "room", cost: 0, zones: ["club", "club"], opening: hOpen(19, 53, SW) },
     { id: "laundry_room", kind: "room", cost: 0, zones: ["club", "club"], opening: hOpen(22, 98, SW) },
-    // Motel room doorways (open, same zone: no doors to snag zombies on)
-    { id: "room_101", kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(25, 37.5, RW) },
-    { id: "room_102", kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(20, 52.5, RW) },
-    { id: "room_103", kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(25, 67.5, RW) },
-    { id: "room_104", kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(20, 82.5, RW) },
+    // Motel rooms: two open doorways each (same zone, no doors to snag zombies on), so every
+    // room is a loop off the hallway instead of a dead end.
+    ...[30, 45, 60, 75].flatMap((y0, i) => [
+        { id: `room_${101 + i}a`, kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(22, y0 + 4, RW) },
+        { id: `room_${101 + i}b`, kind: "room", cost: 0, zones: ["wing", "wing"], opening: vOpen(22, y0 + 11, RW) },
+    ] satisfies LastCallDoor[]),
 ];
 
 /**
@@ -189,10 +190,10 @@ const BaseEntries: LastCallEntry[] = [
     { zone: "garage", pos: v2.create(142, 44.5), window: vOpen(145, 44.5, WIN) },
     { zone: "garage", pos: v2.create(142, 77.5), window: vOpen(145, 77.5, WIN) },
     { zone: "garage", pos: v2.create(142, 102.5), window: vOpen(145, 102.5, WIN) },
-    { zone: "alley", pos: v2.create(107.5, 112), window: hOpen(115, 107.5, 9) },
+    { zone: "alley", pos: v2.create(110, 112), window: hOpen(115, 110, 9) },
     { zone: "courtyard", pos: v2.create(46, 56), manhole: true },
     { zone: "courtyard", pos: v2.create(95, 85), manhole: true },
-    { zone: "garage", pos: v2.create(121, 69), manhole: true },
+    { zone: "garage", pos: v2.create(124.5, 69), manhole: true },
 ];
 
 /** Where the squad spawns. */
@@ -223,7 +224,7 @@ const BaseBoxSpots: Array<{ pos: Vec2; zone: LastCallZoneId }> = [
     { pos: v2.create(82, 55), zone: "courtyard" },
     { pos: v2.create(100, 44.5), zone: "club" },
     { pos: v2.create(43, 103.5), zone: "diner" },
-    { pos: v2.create(121, 47), zone: "garage" },
+    { pos: v2.create(126, 47), zone: "garage" },
 ];
 
 const BasePowerSwitchPos = v2.create(139, 20.5);
@@ -246,13 +247,13 @@ export interface LastCallProp {
 export const LastCallBaseProps: LastCallProp[] = [
     // Lobby: reception desk + waiting chairs
     { type: "lastcall_reception", pos: v2.create(63, 96) },
-    { type: "chair_01", pos: v2.create(58, 108), ori: 1 },
-    { type: "chair_01", pos: v2.create(58, 111.5), ori: 1 },
+    { type: "lastcall_chair", pos: v2.create(58, 108), ori: 1 },
+    { type: "lastcall_chair", pos: v2.create(58, 111.5), ori: 1 },
     { type: "lastcall_planter", pos: v2.create(83, 93) },
     // Storage: pallets of stock
     { type: "lastcall_pallet", pos: v2.create(88.5, 94) },
     { type: "lastcall_pallet", pos: v2.create(96.5, 94) },
-    { type: "barrel_01", pos: v2.create(97.5, 111.5) },
+    { type: "lastcall_barrel", pos: v2.create(97.5, 111.5) },
     // Motor court: a low sign island anchors two drive-around routes.
     { type: "lastcall_sign_island", pos: v2.create(70, 69) },
     { type: "zombie_garage_car", pos: v2.create(51, 63), ori: 1 },
@@ -260,19 +261,18 @@ export const LastCallBaseProps: LastCallProp[] = [
     { type: "lastcall_planter", pos: v2.create(46, 84) },
     { type: "lastcall_planter", pos: v2.create(94, 55) },
     { type: "lastcall_planter", pos: v2.create(46, 62) },
-    { type: "couch_01", pos: v2.create(57, 82), ori: 0 },
-    { type: "couch_01", pos: v2.create(83, 82), ori: 0 },
     // Diner: counter, booths, kitchen
     { type: "lastcall_counter_diner", pos: v2.create(19, 99) },
-    { type: "table_01", pos: v2.create(19, 108.5) },
-    { type: "table_01", pos: v2.create(31, 108.5) },
-    { type: "stove_01", pos: v2.create(15, 93.5) },
-    { type: "refrigerator_01", pos: v2.create(24, 93) },
+    { type: "lastcall_table", pos: v2.create(19, 108.5) },
+    { type: "lastcall_table", pos: v2.create(31, 108.5) },
+    { type: "lastcall_stove", pos: v2.create(15, 93.5) },
+    { type: "lastcall_refrigerator", pos: v2.create(24, 93) },
     // Motel wing: beds, ice machines
-    { type: "bed_sm_01", pos: v2.create(12, 39), ori: 0 },
-    { type: "bed_sm_01", pos: v2.create(11, 51.5), ori: 0 },
-    { type: "bed_sm_01", pos: v2.create(12, 69), ori: 0 },
-    { type: "bed_sm_01", pos: v2.create(12, 84), ori: 0 },
+    // Beds against each room's north wall keep the middle clear for the two-doorway loop.
+    { type: "lastcall_bed", pos: v2.create(11, 32.1), ori: 1 },
+    { type: "lastcall_bed", pos: v2.create(11, 47.1), ori: 1 },
+    { type: "lastcall_bed", pos: v2.create(11, 62.1), ori: 1 },
+    { type: "lastcall_bed", pos: v2.create(11, 77.1), ori: 1 },
     { type: "lastcall_ice_machine", pos: v2.create(37, 33.5) },
     { type: "lastcall_ice_machine", pos: v2.create(37, 86.5) },
     // Maintenance: parts store, workbench and laundry, leaving the center clear.
@@ -284,32 +284,30 @@ export const LastCallBaseProps: LastCallProp[] = [
     { type: "lastcall_pallet", pos: v2.create(58, 6) },
     { type: "lastcall_laundry", pos: v2.create(90, 7) },
     { type: "lastcall_laundry", pos: v2.create(90, 13) },
-    { type: "lastcall_luggage", pos: v2.create(18, 33) },
-    { type: "lastcall_luggage", pos: v2.create(16, 78) },
+    { type: "lastcall_luggage", pos: v2.create(4, 33) },
+    { type: "lastcall_luggage", pos: v2.create(4, 87) },
     { type: "lastcall_luggage", pos: v2.create(59, 99) },
     // Office: the manager's table
     { type: "lastcall_office_table", pos: v2.create(128, 8.5) },
-    { type: "chair_01", pos: v2.create(128, 12.5), ori: 2 },
-    // Alley: dumpsters, barrel
-    { type: "lastcall_dumpster", pos: v2.create(112, 64), ori: 1 },
-    { type: "lastcall_dumpster", pos: v2.create(111, 96), ori: 1 },
-    { type: "barrel_01", pos: v2.create(103, 74) },
-    // Garage: pillars + parked cars (second loop)
-    { type: "lastcall_pillar", pos: v2.create(128, 40) },
-    { type: "lastcall_pillar", pos: v2.create(128, 60) },
-    { type: "lastcall_pillar", pos: v2.create(128, 80) },
-    { type: "lastcall_pillar", pos: v2.create(128, 100) },
-    { type: "zombie_garage_car", pos: v2.create(139.5, 36) },
-    { type: "zombie_garage_car", pos: v2.create(139.5, 90) },
-    { type: "zombie_garage_car", pos: v2.create(120.5, 32), ori: 2 },
+    { type: "lastcall_chair", pos: v2.create(128, 12.5), ori: 2 },
+    // Alley: a dumpster island to circle in the middle, more bins against the walls.
+    { type: "lastcall_dumpster", pos: v2.create(110, 80), ori: 1 },
+    { type: "lastcall_dumpster", pos: v2.create(117.5, 62), ori: 1 },
+    { type: "lastcall_dumpster", pos: v2.create(117.5, 101), ori: 1 },
+    { type: "lastcall_barrel", pos: v2.create(103, 74) },
+    // Garage: a pillar row down the middle makes the loop; cars park on the east side.
+    { type: "lastcall_pillar", pos: v2.create(132.5, 40) },
+    { type: "lastcall_pillar", pos: v2.create(132.5, 60) },
+    { type: "lastcall_pillar", pos: v2.create(132.5, 80) },
+    { type: "lastcall_pillar", pos: v2.create(132.5, 100) },
+    { type: "zombie_garage_car", pos: v2.create(140.5, 36) },
+    { type: "zombie_garage_car", pos: v2.create(140.5, 90) },
     // Low cover: a few pieces per big room, clear of doors, windows, stations, box spots and spawns.
-    { type: "lastcall_sandbags", pos: v2.create(52, 76) },
-    { type: "lastcall_jersey_barrier", pos: v2.create(88, 62) },
-    { type: "lastcall_bell_cart", pos: v2.create(62, 86) },
+    // (Kept to the edges so each big room has a clear circle to run zombies around.)
+    { type: "lastcall_sandbags", pos: v2.create(47, 76) },
+    { type: "lastcall_jersey_barrier", pos: v2.create(95, 62), ori: 1 },
+    { type: "lastcall_bell_cart", pos: v2.create(47, 87) },
     { type: "lastcall_sandbags", pos: v2.create(58, 38) },
-    { type: "lastcall_jersey_barrier", pos: v2.create(86, 31), ori: 1 },
-    { type: "lastcall_jersey_barrier", pos: v2.create(121, 80), ori: 1 },
-    { type: "lastcall_sandbags", pos: v2.create(135, 75) },
     { type: "lastcall_vending", pos: v2.create(48, 91.5) },
     { type: "lastcall_vending", pos: v2.create(38.5, 47), ori: 1 },
 ];

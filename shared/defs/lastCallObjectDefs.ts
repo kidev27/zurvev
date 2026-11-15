@@ -450,3 +450,16 @@ function lastCallDefs(): Record<string, MapObjectDef> {
 }
 
 export const LastCallMapObjectDefs = lastCallDefs();
+
+/**
+ * Survev furniture redrawn for After Hours. Each type copies its base survev def (collision, health,
+ * loot, explosion) and only swaps the art; mapObjectDefs.ts builds them after the survev defs exist.
+ */
+export const LastCallRestyledProps: Record<string, { base: string; sprite: string; scale?: number }> = {
+    lastcall_chair: { base: "chair_01", sprite: "map-lastcall-chair.img" },
+    lastcall_table: { base: "table_01", sprite: "map-lastcall-table.img" },
+    lastcall_stove: { base: "stove_01", sprite: "map-lastcall-stove.img" },
+    lastcall_refrigerator: { base: "refrigerator_01", sprite: "map-lastcall-refrigerator.img" },
+    lastcall_barrel: { base: "barrel_01", sprite: "map-lastcall-barrel.img", scale: 0.5 },
+    lastcall_bed: { base: "bed_sm_01", sprite: "map-lastcall-bed.img" },
+};
