@@ -10,6 +10,7 @@ import {
     sanitizePracticeSettings,
 } from "../../../shared/practice.ts";
 import {
+    adrenNote,
     button,
     type EditorHost,
     type EditorState,
@@ -143,13 +144,13 @@ type Section = "" | "guns" | "gear" | "bot";
 
 /** The parts of a setup the Apply bar counts as separate changes. */
 function changeGroups(s: PracticeSettings): string[] {
-    const { melee, helmet, vest, backpack, scope, fillAmmo, counts } = s.kit;
+    const { melee, helmet, vest, backpack, scope, fillAmmo, adren, counts } = s.kit;
     return [
         s.primary,
         s.secondary,
         melee,
         JSON.stringify([helmet, vest, backpack, scope]),
-        JSON.stringify([fillAmmo, counts]),
+        JSON.stringify([fillAmmo, adren, counts]),
         ...s.bots.map((b) => JSON.stringify(b)),
         `bots:${s.bots.length}`,
         JSON.stringify([s.respawnMode, s.respawnDelay]),
@@ -542,8 +543,8 @@ export class PracticeMenu implements EditorHost {
         row(
             "KIT",
             [],
-            `${kit.length ? kit.join(", ") : "Nothing extra"}${k.fillAmmo ? " · full ammo" : ""}`,
-            JSON.stringify([k.fillAmmo, k.counts]) !== JSON.stringify([a.kit.fillAmmo, a.kit.counts]),
+            `${kit.length ? kit.join(", ") : "Nothing extra"}${k.fillAmmo ? " · full ammo" : ""}${adrenNote(k.adren)}`,
+            JSON.stringify([k.fillAmmo, k.adren, k.counts]) !== JSON.stringify([a.kit.fillAmmo, a.kit.adren, a.kit.counts]),
             gear,
         );
         body.append(el("p", { class: "pe-muted" }, "Your new loadout is given when you press Apply, and saved to the loadout picked above."));

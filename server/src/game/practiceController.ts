@@ -227,6 +227,7 @@ export class PracticeController {
             } else {
                 this.humanRespawn.delete(player);
                 this.respawnHold.delete(player);
+                if (this.settings.kit.adren === "always" && player.boost < 100) player.boost = 100;
             }
         }
     }
