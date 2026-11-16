@@ -136,6 +136,7 @@ export class PracticeController implements PracticeRecordHost {
 
     /** Called on every damage event, with the damage that actually landed. */
     onDamage(target: Player, params: DamageParams, amount: number): void {
+        this.recorder?.onDamage(target, params, amount);
         const source = params.source?.__type === ObjectType.Player
             ? (params.source as Player)
             : undefined;
@@ -146,7 +147,6 @@ export class PracticeController implements PracticeRecordHost {
                 const st = this.statsFor(target);
                 st.damageTaken += amount;
                 st.dirty = true;
-                this.recorder?.onDamage(target, amount, false);
             }
             return;
         }
@@ -154,7 +154,6 @@ export class PracticeController implements PracticeRecordHost {
         if (!source || source.specOpsAi) return;
         const st = this.statsFor(source);
         st.damageDealt += amount;
-        this.recorder?.onDamage(source, amount, true);
         const isBulletHit = params.damageType === GameConfig.DamageType.Player
             && !params.isExplosion
             && !!GunDefs[params.gameSourceType ?? ""];
@@ -349,6 +348,7 @@ export class PracticeController implements PracticeRecordHost {
 
     private onBotDied(slot: BotSlot): void {
         const bot = slot.bot!;
+        this.recorder?.onBotDied(bot);
         const killer = bot.killedBy;
         if (!killer || killer.specOpsAi) return;
         const st = this.statsFor(killer);
