@@ -149,6 +149,7 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
 | PRA-003 | Quick Switch profiles | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `server/src/game/weaponManager.ts`, `server/src/game/practiceController.ts`, `server/src/game/practiceCombat.ts`, `server/src/game/specOpsManager.ts`, `client/src/ui/practiceEditor.ts` | `practiceQsProfiles.test.ts` 8/8; `practiceBotOverclock.test.ts` 16/16; `practiceBotRange.test.ts` 8/8; browser check of the dropdown; full fights per profile (see notes) | In-game feel of each profile. Surviv (original) timing not sourced |
 | PRA-010 | Your adrenaline: none, full at spawn, or always full | Practice | P3 | Needs Playtesting | None | `shared/practice.ts`, `shared/net/practiceMsg.ts`, `server/src/game/specOpsManager.ts`, `server/src/game/practiceController.ts`, `client/src/ui/practiceEditor.ts` | `practice.test.ts` 61/61; browser check of the dropdown | Protocol 1045: players must refresh after deploy |
 | PRA-011 | Anonymous Practice recordings for bot training | Practice | P2 | Needs Playtesting | None | `server/src/game/practiceObservation.ts`, `server/src/game/practiceRecorder.ts`, `server/src/utils/practiceRecordStore.ts`, `docs/practice-recordings.md` | `practiceRecorder.test.ts` 7/7 (off by default, sample rate, other modes never record, rows/events/outcomes, death and respawn, observation cost, gzip store and disk guard) | Players must be told before it is turned on; Docker needs a volume for `logs/practice` |
+| PRA-012 | Practice recordings v2: the full world (grenades, barrels, doors, map, exact guns, causes of death) | Practice | P2 | Needs Playtesting | PRA-011 | `server/src/game/practiceObservation.ts`, `server/src/game/practiceRecorder.ts`, `docs/practice-recordings.md` | `practiceRecorder.test.ts` 10/10 (adds a barrel shot near a bot, a grenade at your feet, exact guns every row) | None |
 
 ### Notes
 
@@ -159,6 +160,14 @@ Reference: `37f180d` (last merge before PR #38). No Fireteam AI or gameplay code
   swap/reload/item/scope events caught every tick), plus damage and kills. About 2 MB per hour.
   Format: `docs/practice-recordings.md`. Next: collect, then train a model that copies the best
   players' heal, reload, swap, peek, push and dodge choices, and run it as a Practice bot option.
+- Practice recordings v2 (PRA-012). The header holds the whole map (every obstacle with its shape,
+  height, blast radius and door/window/wall/tree/bush flags, plus buildings and rivers). Every row also
+  holds the raw world: you (exact guns and ammo, inventory, action, cooking, gear), every bot (exact
+  gun, ammo, action, on screen, clear shot), every grenade, nearby bullets, and obstacles that broke
+  or doors that moved. New events: throw, cook, melee, every hit you take or cause with its kind,
+  weapon and map object (so a barrel you shot counts), and every bot death with its cause; death rows
+  carry the fatal hit. The feature vector adds grenades in your kit, cooking, the 2 nearest
+  barrels/stoves and the 2 nearest grenades. About 6-8 MB per player-hour with 3 bots.
 - Practice already saves one settings blob in browser storage (`practiceMenu.ts`). Presets and loadouts
   can extend that format.
 - Presets (`PracticePresets` in `shared/practice.ts`): Default, Moving targets (4 bots, never shoot back,

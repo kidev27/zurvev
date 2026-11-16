@@ -1,13 +1,18 @@
 import { BulletDefs } from "../../../shared/defs/gameObjects/bulletDefs.ts";
+import { ExplosionDefs } from "../../../shared/defs/gameObjects/explosionsDefs.ts";
 import { GunDefs } from "../../../shared/defs/gameObjects/gunDefs.ts";
+import { ThrowableDefs } from "../../../shared/defs/gameObjects/throwableDefs.ts";
+import { MapObjectDefs } from "../../../shared/defs/register.ts";
 import { GameConfig } from "../../../shared/gameConfig.ts";
 import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
 import { practiceGunGroup, PracticeGunGroups } from "../../../shared/practice.ts";
+import { collider } from "../../../shared/utils/collider.ts";
 import { collisionHelpers } from "../../../shared/utils/collisionHelpers.ts";
 import { util } from "../../../shared/utils/util.ts";
 import { v2, type Vec2 } from "../../../shared/utils/v2.ts";
 import type { Obstacle } from "./objects/obstacle.ts";
 import type { Player } from "./objects/player.ts";
+import type { Projectile } from "./objects/projectile.ts";
 import { practiceOnScreen, practicePeekDistance } from "./practiceCombat.ts";
 
 /**
@@ -17,7 +22,7 @@ import { practiceOnScreen, practicePeekDistance } from "./practiceCombat.ts";
  *
  * Bump PracticeObservationVersion whenever a field is added, removed or changes meaning.
  */
-export const PracticeObservationVersion = 1;
+export const PracticeObservationVersion = 2;
 
 export const PracticeObservationTuning = {
     /** Enemies described, nearest first; missing ones are all zeros. */
@@ -32,6 +37,14 @@ export const PracticeObservationTuning = {
     bulletMissRange: 3,
     /** ...within this many seconds. */
     bulletHorizon: 1,
+    /** Things that explode when shot (barrels, stoves), nearest first. */
+    maxExplosives: 2,
+    /** Look this far for them (units). */
+    explosiveSearch: 20,
+    /** Grenades and other thrown things in the air or on the ground, nearest first. */
+    maxProjectiles: 2,
+    /** Look this far for them (units). */
+    projectileSearch: 25,
 };
 
 const T = PracticeObservationTuning;
@@ -64,6 +77,10 @@ export const PracticeObservationFields: string[] = (() => {
         "self_healthkit",
         "self_soda",
         "self_painkiller",
+        "self_frag",
+        "self_smoke",
+        "self_mirv",
+        "self_cooking",
         ...gun("gun0"),
         ...gun("gun1"),
     );
@@ -92,6 +109,24 @@ export const PracticeObservationFields: string[] = (() => {
     for (let i = 0; i < T.maxBullets; i++) {
         const p = `bullet${i}`;
         f.push(`${p}_present`, `${p}_dx`, `${p}_dy`, `${p}_vel_x`, `${p}_vel_y`, `${p}_miss`, `${p}_time`);
+    }
+    for (let i = 0; i < T.maxExplosives; i++) {
+        const p = `explosive${i}`;
+        f.push(`${p}_present`, `${p}_dx`, `${p}_dy`, `${p}_blast`, `${p}_health`, `${p}_enemy_in_blast`);
+    }
+    for (let i = 0; i < T.maxProjectiles; i++) {
+        const p = `proj${i}`;
+        f.push(
+            `${p}_present`,
+            `${p}_dx`,
+            `${p}_dy`,
+            `${p}_vel_x`,
+            `${p}_vel_y`,
+            `${p}_height`,
+            `${p}_fuse_left`,
+            `${p}_blast`,
+            `${p}_mine`,
+        );
     }
     return f;
 })();
@@ -196,6 +231,73 @@ function enemyFeatures(out: number[], self: Player, enemy: Player | undefined): 
     );
 }
 
+/** Blast radius of an obstacle that explodes when destroyed (barrels, stoves), else 0. */
+export function obstacleBlastRadius(o: Obstacle): number {
+    const def = MapObjectDefs.typeToDef(o.type, "obstacle");
+    return def?.explosion ? ExplosionDefs[def.explosion]?.rad.max ?? 0 : 0;
+}
+
+/** Blast radius of a thrown thing (0 for smoke and other non-damaging ones). */
+export function projectileBlastRadius(p: Projectile): number {
+    const def = ThrowableDefs[p.type];
+    const exp = def?.explosionType ? ExplosionDefs[def.explosionType] : undefined;
+    return exp && exp.rad.max > 0 && (exp.damage ?? 0) > 0 ? exp.rad.max : 0;
+}
+
+export function obstacleCenter(o: Obstacle): Vec2 {
+    const col = o.collider;
+    return col.type === collider.Type.Circle ? col.pos : v2.mul(v2.add(col.min, col.max), 0.5);
+}
+
+/** Barrels and stoves near you, nearest first, and whether a seen enemy stands in the blast. */
+function explosiveFeatures(out: number[], self: Player, seen: readonly Player[]): void {
+    const found: Array<[number, Obstacle, number]> = [];
+    const near = self.game.grid.intersectCollider(collider.createCircle(self.pos, T.explosiveSearch));
+    for (const obj of near) {
+        if (obj.__type !== ObjectType.Obstacle) continue;
+        const o = obj as Obstacle;
+        if (o.dead || !util.sameLayer(o.layer, self.layer)) continue;
+        const blast = obstacleBlastRadius(o);
+        if (blast <= 0) continue;
+        found.push([v2.distance(obstacleCenter(o), self.pos), o, blast]);
+    }
+    found.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < T.maxExplosives; i++) {
+        const f = found[i];
+        if (!f) {
+            out.push(0, 0, 0, 0, 0, 0);
+            continue;
+        }
+        const [, o, blast] = f;
+        const c = obstacleCenter(o);
+        const d = v2.sub(c, self.pos);
+        const enemyIn = seen.some((e) => v2.distance(e.pos, c) < blast + e.rad);
+        out.push(1, d.x, d.y, blast, o.healthT, enemyIn ? 1 : 0);
+    }
+}
+
+/** Grenades and other thrown things near you, nearest first. */
+function projectileFeatures(out: number[], self: Player, onScreen: (pos: Vec2) => boolean): void {
+    const found: Array<[number, Projectile]> = [];
+    for (const p of self.game.projectileBarn.projectiles) {
+        if (p.destroyed || !util.sameLayer(p.layer, self.layer)) continue;
+        const dist = v2.distance(p.pos, self.pos);
+        if (dist > T.projectileSearch || (p.playerId !== self.__id && !onScreen(p.pos))) continue;
+        found.push([dist, p]);
+    }
+    found.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < T.maxProjectiles; i++) {
+        const p = found[i]?.[1];
+        if (!p) {
+            out.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+            continue;
+        }
+        const d = v2.sub(p.pos, self.pos);
+        const mine = p.playerId === self.__id ? 1 : 0;
+        out.push(1, d.x, d.y, p.vel.x, p.vel.y, p.posZ, p.fuseTime, projectileBlastRadius(p), mine);
+    }
+}
+
 /** Feature vector for `self`, given the players it fights. Length = PracticeObservationFields.length. */
 export function practiceObserve(self: Player, enemies: readonly Player[]): number[] {
     const out: number[] = [];
@@ -218,6 +320,10 @@ export function practiceObserve(self: Player, enemies: readonly Player[]): numbe
         inv.get("healthkit"),
         inv.get("soda"),
         inv.get("painkiller"),
+        inv.get("frag"),
+        inv.get("smoke"),
+        inv.get("mirv"),
+        self.weaponManager.cookingThrowable ? self.weaponManager.cookTicker : 0,
     );
     gunFeatures(out, self, GameConfig.WeaponSlot.Primary);
     gunFeatures(out, self, GameConfig.WeaponSlot.Secondary);
@@ -229,5 +335,7 @@ export function practiceObserve(self: Player, enemies: readonly Player[]): numbe
 
     rayFeatures(out, self);
     bulletFeatures(out, self, new Set(enemies.map((e) => e.__id)));
+    explosiveFeatures(out, self, seen);
+    projectileFeatures(out, self, (pos) => practiceOnScreen(self.pos, pos, self));
     return out;
 }

@@ -5,13 +5,16 @@ import { gunzipSync } from "node:zlib";
 import { afterEach, expect, test } from "vitest";
 import { Config } from "../../server/src/config.ts";
 import type { Game } from "../../server/src/game/game.ts";
+import type { Obstacle } from "../../server/src/game/objects/obstacle.ts";
 import { PracticeObservationFields, practiceObserve } from "../../server/src/game/practiceObservation.ts";
 import { type PracticeRecordChunk, PracticeRecordTuning } from "../../server/src/game/practiceRecorder.ts";
 import { appendPracticeRecord } from "../../server/src/utils/practiceRecordStore.ts";
 import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
 import { InputMsg } from "../../shared/net/inputMsg.ts";
+import { ObjectType } from "../../shared/net/objectSerializeFns.ts";
 import { defaultPracticeBot, defaultPracticeSettings, sanitizePracticeSettings } from "../../shared/practice.ts";
-import { v2 } from "../../shared/utils/v2.ts";
+import { collider } from "../../shared/utils/collider.ts";
+import { v2, type Vec2 } from "../../shared/utils/v2.ts";
 import { createGame } from "./gameTestHelpers.ts";
 
 const saved = { ...Config.practiceRecording! };
@@ -189,4 +192,149 @@ test("the store writes gzip chunks that read back as one stream, in order", asyn
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+/** All events of one kind across sample rows. */
+const eventsOf = (all: any[], kind: string) =>
+    all.flatMap((r) => (r.t === "s" ? r.a.ev : r.t === "ep" ? r.ev ?? [] : [])).filter((e: unknown[]) => e[1] === kind);
+
+test("a barrel the player shoots: seen in the features, marked broken, and the bot it kills is put down to it", () => {
+    const { game, player, practice, chunks } = startPractice(true);
+    const bot = practice.enemiesOf(player)[0];
+    // A barrel with open ground on one side: the bot stands next to it, the player 10 units away.
+    const clear = (pos: Vec2, self?: Obstacle) =>
+        !game.grid.intersectCollider(collider.createCircle(pos, 1.6)).some((o) =>
+            o.__type === ObjectType.Obstacle && o !== self && (o as Obstacle).collidable
+        );
+    let barrel: Obstacle | undefined;
+    let side = v2.create(1, 0);
+    for (const o of game.map.obstacles) {
+        if (o.type !== "barrel_01" || o.dead) continue;
+        for (const d of [v2.create(1, 0), v2.create(-1, 0), v2.create(0, 1), v2.create(0, -1)]) {
+            if ([3, 6.5, 10].every((k) => clear(v2.add(o.pos, v2.mul(d, k)), o))) {
+                barrel = o;
+                side = d;
+                break;
+            }
+        }
+        if (barrel) break;
+    }
+    expect(barrel).toBeDefined();
+    const index = game.map.obstacles.indexOf(barrel!);
+    const place = () => {
+        bot.pos = v2.add(barrel!.pos, v2.mul(side, 3));
+        player.pos = v2.add(barrel!.pos, v2.mul(side, 10));
+        game.grid.updateObject(bot);
+        game.grid.updateObject(player);
+    };
+    for (let i = 0; i < 30; i++) {
+        place();
+        game.update(0.01);
+    }
+    // The blast finishes it.
+    bot.health = 1;
+    barrel!.damage({
+        amount: 9999,
+        damageType: GameConfig.DamageType.Player,
+        source: player,
+        gameSourceType: "hk416",
+        dir: v2.create(1, 0),
+    });
+    place();
+    game.update(0.01);
+    // The blast reaching the bot, as the barrel's explosion deals it (shrapnel and falloff vary).
+    bot.damage({
+        amount: 50,
+        damageType: GameConfig.DamageType.Player,
+        source: player,
+        gameSourceType: "",
+        mapSourceType: "barrel_01",
+        isExplosion: true,
+        dir: v2.create(1, 0),
+    });
+    for (let i = 0; i < 40; i++) game.update(0.01);
+    game.stop();
+
+    const all = rows(chunks);
+    const hdr = all[0];
+    expect(hdr.world.obstacles[index][0]).toBe("barrel_01");
+    expect(hdr.world.obstacles[index].at(-2)).toBeGreaterThan(0);
+
+    const field = (name: string) => hdr.fields.indexOf(name);
+    const samples = all.filter((r) => r.t === "s");
+    const broke = samples.findIndex((r) => r.w.changes.some((c: number[]) => c[0] === index && c[1] === 1));
+    expect(broke).toBeGreaterThan(0);
+    // The row before it broke: the barrel is the nearest explosive, with the bot in its blast.
+    const before = samples[broke - 1];
+    expect(before.o[field("explosive0_present")]).toBe(1);
+    expect(before.o[field("explosive0_enemy_in_blast")]).toBe(1);
+
+    const hit = eventsOf(all, "hit_out").find((e: unknown[]) => e[3] === "explosion");
+    expect(hit?.[5]).toBe("barrel_01");
+    expect(hit?.[6]).toBe("bot1");
+    const died = eventsOf(all, "bot_died")[0];
+    expect(died?.slice(3)).toEqual(["explosion", "", "barrel_01", "player"]);
+});
+
+test("a grenade at your feet: the throw, the grenade near you and your own grenade as the cause of death", () => {
+    Config.practiceRecording = { ...saved, enabled: true, sampleRate: 1 };
+    const game = createGame(TeamMode.Solo, "practice_arena", { endless: false });
+    const chunks = capture(game);
+    const player = game.playerBarn.addTestPlayer({ name: "Trainee" });
+    game.update(0.1);
+    const settings = defaultPracticeSettings();
+    game.specOps!.practice!.applySettings(
+        player,
+        sanitizePracticeSettings({
+            ...settings,
+            kit: { ...settings.kit, counts: { ...settings.kit.counts, frag: 1 } },
+            bots: [{ ...defaultPracticeBot(), shootsBack: false }],
+        }),
+    );
+    for (let i = 0; i < 10; i++) game.update(0.1);
+    player.weaponManager.setCurWeapIndex(GameConfig.WeaponSlot.Throwable);
+    for (let i = 0; i < 30; i++) game.update(0.01);
+    // Cook for a second, drop it at your feet and stand on it.
+    for (let t = 0; t < 1.2; t += 0.01) {
+        const msg = new InputMsg();
+        msg.toMouseDir = v2.create(1, 0);
+        msg.toMouseLen = 1;
+        msg.shootStart = t < 0.02;
+        msg.shootHold = t < 1;
+        player.handleInput(msg);
+        game.update(0.01);
+    }
+    player.health = 40;
+    for (let i = 0; i < 400; i++) game.update(0.01);
+    game.stop();
+
+    const all = rows(chunks);
+    expect(eventsOf(all, "cook").length).toBeGreaterThan(0);
+    const thrown = eventsOf(all, "throw")[0];
+    expect(thrown?.[2]).toBe("frag");
+    const field = (name: string) => all[0].fields.indexOf(name);
+    const withNade = all.filter((r) => r.t === "s" && r.o[field("proj0_present")] === 1);
+    expect(withNade.length).toBeGreaterThan(0);
+    expect(withNade[0].o[field("proj0_mine")]).toBe(1);
+    expect(withNade[0].w.projectiles[0][1]).toBe("self");
+    const hitIn = eventsOf(all, "hit_in").find((e: unknown[]) => e[3] === "explosion");
+    expect(hitIn?.[6]).toBe("self");
+    const death = all.find((r) => r.t === "ep" && r.kind === "death");
+    expect(death?.cause[0]).toBe("explosion");
+    expect(death?.cause[3]).toBe("self");
+});
+
+test("every row carries your exact guns and every bot's exact gun", () => {
+    const { game, player, chunks } = startPractice(true);
+    for (let i = 0; i < 10; i++) game.update(0.1);
+    game.stop();
+    const all = rows(chunks);
+    const weapon = all[0].layouts.bot.indexOf("weapon");
+    const last = all.filter((r) => r.t === "s").at(-1);
+    expect(last.w.self.weapons[0][0]).toBe("hk416");
+    expect(last.w.self.weapons[1][0]).toBe("m870");
+    expect(last.w.bots).toHaveLength(1);
+    expect(last.w.bots[0]).toHaveLength(all[0].layouts.bot.length);
+    expect(last.w.bots[0][weapon]).toBe(all.find((r) => r.t === "set").settings.bots[0].gun);
+    expect(player.weapons[0].type).toBe("hk416");
 });
