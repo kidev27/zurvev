@@ -188,6 +188,13 @@ export function lastCallClearPoint(game: Game, p: Vec2, layer = 0, rad = 1.05): 
     return undefined;
 }
 
+/** lastCallWalkable for bodies that may be standing flush against a wall or prop at either end. */
+export function lastCallReach(game: Game, a: Vec2, b: Vec2, rad = 1.05, layer = 0): boolean {
+    const clearA = lastCallClearPoint(game, a, layer, rad);
+    const clearB = lastCallClearPoint(game, b, layer, rad);
+    return !!clearA && !!clearB && lastCallWalkable(game, clearA, clearB, rad, layer);
+}
+
 /** Body-clear segment on its actual floor; no crossing polygon voids, walls or closed route gates. */
 export function lastCallWalkable(game: Game, a: Vec2, b: Vec2, rad = 1.05, layer = 0): boolean {
     const bounds = collider.createAabb(

@@ -128,7 +128,13 @@ import { v2, type Vec2 } from "../../../shared/utils/v2.ts";
 import { Config } from "../config.ts";
 import type { Game } from "./game.ts";
 import type { Team } from "./group.ts";
-import { lastCallBlock, lastCallOpenZones, lastCallPosReachable, lastCallWalkable } from "./lastCallNav.ts";
+import {
+    lastCallBlock,
+    lastCallOpenZones,
+    lastCallPosReachable,
+    lastCallReach,
+    lastCallWalkable,
+} from "./lastCallNav.ts";
 import type { Building } from "./objects/building.ts";
 import type { Loot } from "./objects/loot.ts";
 import type { Obstacle } from "./objects/obstacle.ts";
@@ -3631,12 +3637,12 @@ function findRouteWaypoint(
     // that is in straight-line reach (string pulling), so bots don't flip-flop.
     if (lastCallBlock(game)) {
         const layer = navGroundLayer(from.layer);
-        if (lastCallWalkable(game, from.pos, goal, 1.05, layer)) return undefined;
+        if (lastCallReach(game, from.pos, goal, 1.05, layer)) return undefined;
         const path = game.specOps?.paths?.path(game, from.pos, goal, layer, layer, from.layer);
         if (!path?.length) return undefined;
         for (let i = path.length - 1; i >= 0; i--) {
             if (v2.distance(from.pos, path[i]) < 1.2) break;
-            if (lastCallWalkable(game, from.pos, path[i], 1.05, layer)) return path[i];
+            if (lastCallReach(game, from.pos, path[i], 1.05, layer)) return path[i];
         }
         return path.find((p) => v2.distance(from.pos, p) >= 1.2);
     }
@@ -4913,7 +4919,7 @@ class AiBrain {
                     // at the target rather than treating that farther wall as a detour.
                     const authoredZombieCharge = zombieMelee && directClear && sameFloor
                         && !!survivalLayout(player.game.config.mapName)
-                        && lastCallWalkable(
+                        && lastCallReach(
                             player.game,
                             player.pos,
                             target.pos,
@@ -6535,7 +6541,8 @@ export class SpecOpsManager implements PracticeHost {
             if (target.layer < 2) {
                 for (let moved = 0; moved < blast.push; moved += 0.5) {
                     const next = v2.add(target.pos, v2.mul(dir, 0.5));
-                    if (!lastCallWalkable(this.game, target.pos, next, target.rad, layer)) break;
+                    // 0.05 skin: a zombie merely touching a wall can still slide along it.
+                    if (!lastCallWalkable(this.game, target.pos, next, target.rad - 0.05, layer)) break;
                     const near = this.game.grid.intersectCollider(collider.createCircle(next, target.rad));
                     if (
                         near.some((obj) =>

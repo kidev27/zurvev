@@ -4,6 +4,7 @@ import {
     lastCallNavPoints,
     lastCallOpenZones,
     lastCallPosReachable,
+    lastCallReach,
     lastCallWalkable,
 } from "../../server/src/game/lastCallNav.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
@@ -377,3 +378,33 @@ for (const layout of SurvivalLayouts) {
         });
     });
 }
+
+describe("High Water foredeck: a player flush against a fixture", () => {
+    function flushAgainstFixture() {
+        const { game, operator } = start(SurvivalLayouts.find((l) => l.key === "highwater")!);
+        const fixture = game.map.obstacles.find((o) => o.type === "survival_highwater_fixture_17")!;
+        const aabb = collider.toAabb(fixture.collider);
+        const flush = v2.create(aabb.max.x + operator.rad, (aabb.min.y + aabb.max.y) / 2);
+        place(operator, flush, 0);
+        return { game, operator, flush };
+    }
+
+    test("routing sees the clear line from a flush player along the fixture face", () => {
+        const { game, flush } = flushAgainstFixture();
+        const along = v2.add(flush, v2.create(1.5, 8));
+        // the old check rejects the flush end; the body-aware one does not
+        expect(lastCallWalkable(game, flush, along, 1.05, 0)).toBe(false);
+        expect(lastCallReach(game, flush, along, 1.05, 0)).toBe(true);
+    });
+
+    test("the pressure cannon slides a zombie touching the fixture along it", () => {
+        const { game, operator, flush } = flushAgainstFixture();
+        const ops = game.specOps!;
+        const zombie = ops.spawnEnemyPublic("zombie_walker");
+        const at = v2.copy(flush);
+        place(zombie, at, 0);
+        place(operator, v2.add(flush, v2.create(0, -4)), 0);
+        ops.pressureBlast(operator, v2.create(0, 1), 1, "pressure_cannon");
+        expect(v2.distance(zombie.pos, at)).toBeGreaterThan(1);
+    });
+});
