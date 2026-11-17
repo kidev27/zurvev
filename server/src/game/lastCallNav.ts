@@ -170,6 +170,24 @@ export function lastCallNavPortals(game: Game, layer = 0): Array<[Vec2, Vec2]> {
     return out;
 }
 
+/**
+ * A body pressed against a prop or wall sits exactly one radius from it, so the
+ * 1.05 clearance test rejects its own position and every route to or from it.
+ * Use the nearest fully clear spot a short step away instead (same room, no
+ * wall crossed). Returns the point itself when it is already clear.
+ */
+export function lastCallClearPoint(game: Game, p: Vec2, layer = 0, rad = 1.05): Vec2 | undefined {
+    if (lastCallWalkable(game, p, p, rad, layer)) return p;
+    for (const step of [0.2, 0.45, 0.75]) {
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const q = v2.add(p, v2.create(Math.cos(angle) * step, Math.sin(angle) * step));
+            if (lastCallWalkable(game, q, q, rad, layer) && lastCallWalkable(game, p, q, 0.5, layer)) return q;
+        }
+    }
+    return undefined;
+}
+
 /** Body-clear segment on its actual floor; no crossing polygon voids, walls or closed route gates. */
 export function lastCallWalkable(game: Game, a: Vec2, b: Vec2, rad = 1.05, layer = 0): boolean {
     const bounds = collider.createAabb(

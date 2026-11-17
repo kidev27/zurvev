@@ -362,5 +362,18 @@ for (const layout of SurvivalLayouts) {
             expect(returnedUpstairs, `zombie remained at ${zombie.pos.x},${zombie.pos.y}, layer ${zombie.layer}`)
                 .toBe(true);
         }, 15000);
+
+        test("zombies still spawn while a player stands flush against the Mystery Box", () => {
+            const { game, operator } = open(layout);
+            const box = game.map.obstacles.find((o) => o.type === "zombie_mystery_box" && o.layer === 0)!;
+            const aabb = collider.toAabb(box.collider);
+            const flush = v2.create(aabb.max.x + operator.rad, (aabb.min.y + aabb.max.y) / 2);
+            expect(lastCallWalkable(game, flush, flush, operator.rad * 0.99, 0)).toBe(true);
+            place(operator, flush, 0);
+            const ops = game.specOps!;
+            ops.startNextWave();
+            ops.drainWaveSpawnQueuePublic();
+            expect(ops.livingEnemies().length).toBeGreaterThan(0);
+        });
     });
 }
