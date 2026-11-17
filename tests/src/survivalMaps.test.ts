@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { Game } from "../../server/src/game/game.ts";
 import {
+    lastCallBlock,
     lastCallNavPoints,
     lastCallOpenZones,
     lastCallPosReachable,
     lastCallWalkable,
 } from "../../server/src/game/lastCallNav.ts";
+import type { Obstacle } from "../../server/src/game/objects/obstacle.ts";
 import type { Player } from "../../server/src/game/objects/player.ts";
 import { MapNavGraph } from "../../server/src/game/specOpsNav.ts";
 import { MapDefs } from "../../shared/defs/mapDefs.ts";
@@ -24,6 +26,7 @@ import { ZombiePackAPunchType } from "../../shared/defs/maps/zombiePackAPunch.ts
 import { MapObjectDefs } from "../../shared/defs/register.ts";
 import { GameConfig, TeamMode } from "../../shared/gameConfig.ts";
 import { ObjectType } from "../../shared/net/objectSerializeFns.ts";
+import { coldet } from "../../shared/utils/coldet.ts";
 import { collider } from "../../shared/utils/collider.ts";
 import { util } from "../../shared/utils/util.ts";
 import { v2, type Vec2 } from "../../shared/utils/v2.ts";
@@ -197,6 +200,44 @@ for (const layout of SurvivalLayouts) {
                         && clearRoute(game, starts[station.layer], p, station.layer)
                     ),
                     `${station.type} layer ${station.layer}`,
+                ).toBe(true);
+            }
+        });
+
+        test("entries can reach legal wall-contact positions around the mystery box", () => {
+            const { game, operator, world } = open(layout);
+            const box = game.map.obstacles.find(o => o.type === "zombie_mystery_box")!;
+            const bounds = collider.toAabb(box.collider);
+            const gap = operator.rad + 0.001;
+            const diagonal = gap * Math.SQRT1_2;
+            const candidates = [
+                v2.create(bounds.max.x + gap, box.pos.y),
+                v2.create(bounds.min.x - gap, box.pos.y),
+                v2.create(box.pos.x, bounds.max.y + gap),
+                v2.create(box.pos.x, bounds.min.y - gap),
+                ...[bounds.min.x, bounds.max.x].flatMap(x =>
+                    [bounds.min.y, bounds.max.y].map(y => v2.create(
+                        x + (x === bounds.min.x ? -diagonal : diagonal),
+                        y + (y === bounds.min.y ? -diagonal : diagonal),
+                    ))
+                ),
+            ];
+            const graph = MapNavGraph.build(game);
+            const legal = candidates.filter(pos => {
+                const body = collider.createCircle(pos, operator.rad);
+                return zoneAt(layout, fromLocal(layout, v2.sub(pos, lastCallBlock(game)!.pos)), 0)
+                    && !game.grid.intersectCollider(body).some(obj => {
+                        if (obj.__type !== ObjectType.Obstacle) return false;
+                        const obstacle = obj as Obstacle;
+                        return !obstacle.dead && obstacle.collidable && util.sameLayer(obstacle.layer, 0)
+                            && coldet.test(body, obstacle.collider);
+                    });
+            });
+            expect(legal.length).toBeGreaterThanOrEqual(4);
+            for (const goal of legal) {
+                expect(
+                    layout.entries.some(entry => graph.path(game, world(entry.pos), goal, 0, 0) !== null),
+                    JSON.stringify(goal),
                 ).toBe(true);
             }
         });

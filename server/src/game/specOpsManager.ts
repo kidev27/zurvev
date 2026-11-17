@@ -7865,13 +7865,11 @@ export class SpecOpsManager implements PracticeHost {
         this.startWave();
     }
 
-    /** Test helper: spawn the full wave roster immediately (no stagger). */
+    /** Test helper: try the current roster once, retaining blocked jobs for later. */
     drainWaveSpawnQueuePublic(): void {
         this.waveSpawnPulseTimer = 0;
-        while (this.waveSpawnQueue.length > 0) {
-            this.spawnWaveBatch(999);
-        }
-        this.waveSpawnComplete = true;
+        this.spawnWaveBatch(this.waveSpawnQueue.length);
+        this.waveSpawnComplete = this.waveSpawnQueue.length === 0;
     }
 
     /**
@@ -7945,17 +7943,17 @@ export class SpecOpsManager implements PracticeHost {
     }
 
     private spawnWaveBatch(batchSize: number): void {
-        let spawned = 0;
-        while (spawned < batchSize && this.waveSpawnQueue.length > 0) {
-            const job = this.waveSpawnQueue.shift()!;
-            this.spawnEnemy(
+        // Try each selected job once; blocked entries wait for the next timed pulse.
+        const jobs = this.waveSpawnQueue.splice(0, batchSize);
+        for (const job of jobs) {
+            const player = this.spawnEnemy(
                 job.kind,
                 job.indexInSquad,
                 job.squadSize,
                 job.approachAngle,
                 job.host,
             );
-            spawned++;
+            if (!player) this.waveSpawnQueue.push(job);
         }
     }
 
@@ -8605,6 +8603,8 @@ export class SpecOpsManager implements PracticeHost {
             return undefined;
         }
         const humans = this.livingHumans();
+        // Retried jobs may outlive the operator they were assigned to.
+        if (host && !humans.includes(host)) host = humans[0];
         const origin = host?.pos
             ?? (humans.length
                 ? this.centroid(humans)

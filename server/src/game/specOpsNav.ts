@@ -1,4 +1,5 @@
 import { survivalLayout } from "../../../shared/defs/maps/survival/index.ts";
+import { GameConfig } from "../../../shared/gameConfig.ts";
 import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
 import { coldet } from "../../../shared/utils/coldet.ts";
 import { collider } from "../../../shared/utils/collider.ts";
@@ -316,7 +317,7 @@ export class MapNavGraph {
             fromLayer === toLayer
             && v2.distance(from, to) < 2.8
             && isWalkClear(game, from, to, fromLayer)
-            && (!survivalLayout(game.config.mapName) || lastCallWalkable(game, from, to, 1.05, fromLayer))
+            && (!survivalLayout(game.config.mapName) || lastCallWalkable(game, from, to, GameConfig.player.radius, fromLayer))
         ) {
             this.remember(cacheKey, []);
             return [];
@@ -331,7 +332,7 @@ export class MapNavGraph {
         if (lastCallBlock(game)) {
             const reachable = ends.filter((node) =>
                 isWalkClear(game, node.pos, to, toLayer)
-                && (!survivalLayout(game.config.mapName) || lastCallWalkable(game, node.pos, to, 1.05, toLayer))
+                && (!survivalLayout(game.config.mapName) || lastCallWalkable(game, node.pos, to, GameConfig.player.radius, toLayer))
             );
             if (reachable.length || survivalLayout(game.config.mapName)) ends = reachable;
         }
@@ -352,7 +353,7 @@ export class MapNavGraph {
         for (let i = 0; i < starts.length; i++) {
             const node = starts[i];
             const walk = survivalLayout(game.config.mapName)
-                ? node.layer === fromLayer && lastCallWalkable(game, from, node.pos, 1.05, fromLayer)
+                ? node.layer === fromLayer && lastCallWalkable(game, from, node.pos, GameConfig.player.radius, fromLayer)
                 : isWalkClear(game, from, node.pos, fromLayer)
                     || v2.distance(from, node.pos) < 3.2
                     || node.kind === "stair"

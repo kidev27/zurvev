@@ -20,6 +20,7 @@ import {
 import { ObjectType } from "../../../shared/net/objectSerializeFns.ts";
 import { coldet } from "../../../shared/utils/coldet.ts";
 import { collider } from "../../../shared/utils/collider.ts";
+import { math } from "../../../shared/utils/math.ts";
 import { util } from "../../../shared/utils/util.ts";
 import { v2, type Vec2 } from "../../../shared/utils/v2.ts";
 import type { Game } from "./game.ts";
@@ -181,15 +182,18 @@ export function lastCallWalkable(game: Game, a: Vec2, b: Vec2, rad = 1.05, layer
         const obs = obj as Obstacle;
         if (obs.dead || obs.destroyed || !obs.collidable || !util.sameLayer(obs.layer, layer) || obs.isDoor) continue;
         const col = obs.collider;
-        const grown = col.type === collider.Type.Circle
-            ? collider.createCircle(col.pos, col.rad + rad)
-            : collider.createAabb(
-                v2.create(col.min.x - rad, col.min.y - rad),
-                v2.create(col.max.x + rad, col.max.y + rad),
-            );
-        if (collider.intersectSegment(grown, a, b)) return false;
         if (coldet.test(collider.createCircle(a, rad), col) || coldet.test(collider.createCircle(b, rad), col)) {
             return false;
+        }
+        if (a.x === b.x && a.y === b.y) continue;
+        if (collider.intersectSegment(col, a, b)) return false;
+        if (col.type === collider.Type.Circle) {
+            if (math.distToSegmentSq(col.pos, a, b) < (col.rad + rad) ** 2) return false;
+        } else {
+            // A swept circle has round corners; an expanded AABB rejects legal corner approaches.
+            for (const corner of collider.getPoints(col)) {
+                if (math.distToSegmentSq(corner, a, b) < rad * rad) return false;
+            }
         }
     }
     const block = survivalLayout(game.config.mapName) ? lastCallBlock(game) : undefined;
