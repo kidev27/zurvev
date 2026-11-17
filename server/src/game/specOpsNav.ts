@@ -8,6 +8,7 @@ import { v2, type Vec2 } from "../../../shared/utils/v2.ts";
 import type { Game } from "./game.ts";
 import {
     lastCallBlock,
+    lastCallClearPoint,
     lastCallNavPoints,
     lastCallNavPortals,
     lastCallRoomKey,
@@ -312,6 +313,21 @@ export class MapNavGraph {
         const cached = this.pathCache.get(cacheKey);
         if (cached !== undefined) return cached;
 
+        // Survival maps check a full body clearance at both ends. Someone standing
+        // flush against a prop or wall would fail it, so search from the nearest
+        // clear spot instead (still in the same room). The path still ends at `goal`.
+        const goal = to;
+        if (survivalLayout(game.config.mapName)) {
+            const clearFrom = lastCallClearPoint(game, from, fromLayer);
+            const clearTo = lastCallClearPoint(game, to, toLayer);
+            if (!clearFrom || !clearTo) {
+                this.remember(cacheKey, null);
+                return null;
+            }
+            from = clearFrom;
+            to = clearTo;
+        }
+
         if (
             fromLayer === toLayer
             && v2.distance(from, to) < 2.8
@@ -421,7 +437,7 @@ export class MapNavGraph {
             if (out.length && v2.distance(out[out.length - 1], pos) < 0.8) continue;
             out.push(pos);
         }
-        if (v2.distance(out[out.length - 1] ?? to, to) > 2.4) out.push(v2.copy(to));
+        if (v2.distance(out[out.length - 1] ?? goal, goal) > 2.4) out.push(v2.copy(goal));
         this.remember(cacheKey, out);
         return out;
     }
@@ -464,6 +480,26 @@ export class MapNavGraph {
                 ) {
                     if (lastCallWalkable(game, corner, corner, 1.1, layer)) {
                         this.addNode(v2.copy(corner), layer, "interior");
+                    }
+                }
+                // Survival maps: a tight ring too, so strips between a prop and a
+                // wall (too narrow for the grid or the 2.2 ring) still get waypoints.
+                if (survivalLayout(game.config.mapName)) {
+                    const tight = expandAabb(toAabb(o), 1.2);
+                    const mid = aabbCenter(tight);
+                    for (
+                        const p of [
+                            tight.min,
+                            tight.max,
+                            v2.create(tight.min.x, tight.max.y),
+                            v2.create(tight.max.x, tight.min.y),
+                            v2.create(tight.min.x, mid.y),
+                            v2.create(tight.max.x, mid.y),
+                            v2.create(mid.x, tight.min.y),
+                            v2.create(mid.x, tight.max.y),
+                        ]
+                    ) {
+                        if (lastCallWalkable(game, p, p, 1.1, layer)) this.addNode(v2.copy(p), layer, "interior");
                     }
                 }
             }
