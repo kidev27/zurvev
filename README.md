@@ -14,7 +14,7 @@
 | Mode | Description |
 |------|-------------|
 | **Fireteam** | Fight escalating waves of enemy soldiers across outdoor maps. Revive teammates, purchase equipment, and compete for the highest round. |
-| **Zombies** | Survive **Last Call**, an indoor map with unlockable rooms, wall weapons, perk machines, a mystery box, power-ups, and increasingly dangerous zombie waves. |
+| **Zombies** | Survive against an endless horde of the undead; complete with indoor maps, unlockable rooms, wall weapons, perk machines, a mystery box, power-ups, and increasingly dangerous zombie waves. |
 | **Practice** | Train against configurable bots with selectable maps, weapons, equipment, and combat settings. |
 
 Fireteam and Zombies support solo and team play. Each mode has separate leaderboard records.
